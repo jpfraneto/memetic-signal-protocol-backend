@@ -1,0 +1,54 @@
+# Dockerfile.prod
+FROM oven/bun:1-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+COPY bun.lockb ./
+
+# Install all dependencies (including dev dependencies for building)
+RUN bun install --frozen-lockfile
+
+# Copy source code and config files
+COPY src/ ./src/
+COPY tsconfig*.json ./
+COPY nest-cli.json ./
+
+# Build the NestJS application
+RUN bun run build
+
+# Production stage
+FROM oven/bun:1-alpine AS production
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Create app user
+RUN addgroup -g 1001 -S bunuser && \
+    adduser -S bunuser -u 1001 -G bunuser
+
+WORKDIR /app
+
+# Copy only production dependencies
+COPY package.json ./
+RUN bun install --production --frozen-lockfile
+
+# Copy built application from builder stage
+COPY --from=builder --chown=bunuser:bunuser /app/dist ./dist
+
+# Create logs directory
+RUN mkdir -p logs && chown bunuser:bunuser logs
+
+# Switch to non-root user
+USER bunuser
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Start the application with Bun (matching your start:prod script)
+CMD ["bun", "run", "dist/main.js"]

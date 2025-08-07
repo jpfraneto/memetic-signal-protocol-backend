@@ -1,0 +1,938 @@
+{
+  "hoidok": {
+    "images": [
+      "001_hoidok.jpg",
+      "035_hoidok.jpg",
+      "041_hoidok.jpg",
+      "048_hoidok.jpg",
+      "053_hoidok.jpg",
+      "054_hoidok.jpg",
+      "080_hoidok.jpg",
+      "082_hoidok.jpg",
+      "120_hoidok.jpg",
+      "138_hoidok.jpg",
+      "144_hoidok.jpg",
+      "150_hoidok.jpg",
+      "173_hoidok.jpg",
+      "175_hoidok.jpg",
+      "196_hoidok.jpg",
+      "197_hoidok.jpg",
+      "211_hoidok.jpg",
+      "213_hoidok.jpg",
+      "229_hoidok.jpg",
+      "240_hoidok.jpg",
+      "250_hoidok.jpg",
+      "255_hoidok.jpg",
+      "283_hoidok.jpg",
+      "316_hoidok.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/hoidok/10.jpg",
+      "https://junglebayisland.com/arts/hoidok/6.jpg",
+      "https://junglebayisland.com/arts/hoidok/16.jpg",
+      "https://junglebayisland.com/arts/hoidok/8.jpg",
+      "https://junglebayisland.com/arts/hoidok/22.jpg",
+      "https://junglebayisland.com/arts/hoidok/2.jpg",
+      "https://junglebayisland.com/arts/hoidok/15.jpg",
+      "https://junglebayisland.com/arts/hoidok/21.jpg",
+      "https://junglebayisland.com/arts/hoidok/13.jpg",
+      "https://junglebayisland.com/arts/hoidok/20.jpg",
+      "https://junglebayisland.com/arts/hoidok/24.jpg",
+      "https://junglebayisland.com/arts/hoidok/3.jpg",
+      "https://junglebayisland.com/arts/hoidok/4.jpg",
+      "https://junglebayisland.com/arts/hoidok/11.jpg",
+      "https://junglebayisland.com/arts/hoidok/17.jpg",
+      "https://junglebayisland.com/arts/hoidok/14.jpg",
+      "https://junglebayisland.com/arts/hoidok/23.jpg",
+      "https://junglebayisland.com/arts/hoidok/12.jpg",
+      "https://junglebayisland.com/arts/hoidok/7.jpg",
+      "https://junglebayisland.com/arts/hoidok/5.jpg",
+      "https://junglebayisland.com/arts/hoidok/18.jpg",
+      "https://junglebayisland.com/arts/hoidok/1.jpg",
+      "https://junglebayisland.com/arts/hoidok/9.jpg",
+      "https://junglebayisland.com/arts/hoidok/19.jpg"
+    ],
+    "image_count": 24,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "linn": {
+    "images": [
+      "002_linn.jpg",
+      "024_linn.jpg",
+      "031_linn.jpg",
+      "044_linn.jpg",
+      "060_linn.jpg",
+      "111_linn.jpg",
+      "121_linn.jpg",
+      "224_linn.jpg",
+      "227_linn.jpg",
+      "231_linn.jpg",
+      "281_linn.jpg",
+      "295_linn.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/linn/12.jpg",
+      "https://junglebayisland.com/arts/linn/9.jpg",
+      "https://junglebayisland.com/arts/linn/7.jpg",
+      "https://junglebayisland.com/arts/linn/6.jpg",
+      "https://junglebayisland.com/arts/linn/3.jpg",
+      "https://junglebayisland.com/arts/linn/1.jpg",
+      "https://junglebayisland.com/arts/linn/4.jpg",
+      "https://junglebayisland.com/arts/linn/2.jpg",
+      "https://junglebayisland.com/arts/linn/11.jpg",
+      "https://junglebayisland.com/arts/linn/5.jpg",
+      "https://junglebayisland.com/arts/linn/8.jpg",
+      "https://junglebayisland.com/arts/linn/10.jpg"
+    ],
+    "image_count": 12,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "rey": {
+    "images": [
+      "003_rey.jpg",
+      "051_rey.jpg",
+      "052_rey.jpg",
+      "076_rey.jpg",
+      "114_rey.jpg",
+      "123_rey.jpg",
+      "204_rey.jpg",
+      "246_rey.jpg",
+      "287_rey.jpg",
+      "308_rey.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/rey/6.jpg",
+      "https://junglebayisland.com/arts/rey/1.jpg",
+      "https://junglebayisland.com/arts/rey/8.jpg",
+      "https://junglebayisland.com/arts/rey/5.jpg",
+      "https://junglebayisland.com/arts/rey/12.jpg",
+      "https://junglebayisland.com/arts/rey/11.jpg",
+      "https://junglebayisland.com/arts/rey/9.jpg",
+      "https://junglebayisland.com/arts/rey/10.jpg",
+      "https://junglebayisland.com/arts/rey/13.jpg",
+      "https://junglebayisland.com/arts/rey/7.jpg"
+    ],
+    "image_count": 10,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": [
+      {
+        "url": "https://junglebayisland.com/arts/rey/2.png",
+        "intended_filename": "102_rey.png",
+        "error": "404 Client Error: Not Found for url: https://junglebayisland.com/arts/rey/2.png"
+      },
+      {
+        "url": "https://junglebayisland.com/arts/rey/3.png",
+        "intended_filename": "122_rey.png",
+        "error": "404 Client Error: Not Found for url: https://junglebayisland.com/arts/rey/3.png"
+      },
+      {
+        "url": "https://junglebayisland.com/arts/rey/4.png",
+        "intended_filename": "184_rey.png",
+        "error": "404 Client Error: Not Found for url: https://junglebayisland.com/arts/rey/4.png"
+      }
+    ]
+  },
+  "dean": {
+    "images": [
+      "004_dean.jpg",
+      "043_dean.jpg",
+      "087_dean.jpg",
+      "101_dean.jpg",
+      "104_dean.jpg",
+      "125_dean.gif",
+      "133_dean.jpg",
+      "140_dean.jpg",
+      "146_dean.gif",
+      "148_dean.jpg",
+      "191_dean.jpg",
+      "199_dean.jpg",
+      "207_dean.jpg",
+      "212_dean.jpg",
+      "218_dean.gif",
+      "235_dean.jpg",
+      "247_dean.jpg",
+      "249_dean.jpg",
+      "261_dean.jpg",
+      "276_dean.jpg",
+      "301_dean.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/dean/13.jpg",
+      "https://junglebayisland.com/arts/dean/16.jpg",
+      "https://junglebayisland.com/arts/dean/7.jpg",
+      "https://junglebayisland.com/arts/dean/3.jpg",
+      "https://junglebayisland.com/arts/dean/4.jpg",
+      "https://junglebayisland.com/arts/dean/17.gif",
+      "https://junglebayisland.com/arts/dean/6.jpg",
+      "https://junglebayisland.com/arts/dean/20.jpg",
+      "https://junglebayisland.com/arts/dean/19.gif",
+      "https://junglebayisland.com/arts/dean/10.jpg",
+      "https://junglebayisland.com/arts/dean/9.jpg",
+      "https://junglebayisland.com/arts/dean/21.jpg",
+      "https://junglebayisland.com/arts/dean/5.jpg",
+      "https://junglebayisland.com/arts/dean/15.jpg",
+      "https://junglebayisland.com/arts/dean/18.gif",
+      "https://junglebayisland.com/arts/dean/11.jpg",
+      "https://junglebayisland.com/arts/dean/1.jpg",
+      "https://junglebayisland.com/arts/dean/2.jpg",
+      "https://junglebayisland.com/arts/dean/12.jpg",
+      "https://junglebayisland.com/arts/dean/8.jpg",
+      "https://junglebayisland.com/arts/dean/14.jpg"
+    ],
+    "image_count": 21,
+    "formats": [
+      "jpg",
+      "gif"
+    ],
+    "missing_images": []
+  },
+  "easy": {
+    "images": [
+      "005_easy.jpg",
+      "013_easy.jpg",
+      "038_easy.jpg",
+      "085_easy.jpg",
+      "155_easy.jpg",
+      "158_easy.jpg",
+      "161_easy.jpg",
+      "166_easy.jpg",
+      "189_easy.jpg",
+      "192_easy.jpg",
+      "230_easy.jpg",
+      "236_easy.jpg",
+      "243_easy.jpg",
+      "244_easy.jpg",
+      "254_easy.jpg",
+      "271_easy.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/easy/1.jpg",
+      "https://junglebayisland.com/arts/easy/2.jpg",
+      "https://junglebayisland.com/arts/easy/15.jpg",
+      "https://junglebayisland.com/arts/easy/16.jpg",
+      "https://junglebayisland.com/arts/easy/14.jpg",
+      "https://junglebayisland.com/arts/easy/12.jpg",
+      "https://junglebayisland.com/arts/easy/13.jpg",
+      "https://junglebayisland.com/arts/easy/4.jpg",
+      "https://junglebayisland.com/arts/easy/10.jpg",
+      "https://junglebayisland.com/arts/easy/11.jpg",
+      "https://junglebayisland.com/arts/easy/7.jpg",
+      "https://junglebayisland.com/arts/easy/5.jpg",
+      "https://junglebayisland.com/arts/easy/3.jpg",
+      "https://junglebayisland.com/arts/easy/6.jpg",
+      "https://junglebayisland.com/arts/easy/9.jpg",
+      "https://junglebayisland.com/arts/easy/8.jpg"
+    ],
+    "image_count": 16,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "morlacos": {
+    "images": [
+      "006_morlacos.jpg",
+      "011_morlacos.jpg",
+      "021_morlacos.jpg",
+      "077_morlacos.jpg",
+      "112_morlacos.jpg",
+      "134_morlacos.jpg",
+      "139_morlacos.jpg",
+      "142_morlacos.jpg",
+      "180_morlacos.jpg",
+      "198_morlacos.jpg",
+      "266_morlacos.jpg",
+      "268_morlacos.jpg",
+      "311_morlacos.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/morlacos/12.jpg",
+      "https://junglebayisland.com/arts/morlacos/6.jpg",
+      "https://junglebayisland.com/arts/morlacos/2.jpg",
+      "https://junglebayisland.com/arts/morlacos/5.jpg",
+      "https://junglebayisland.com/arts/morlacos/1.jpg",
+      "https://junglebayisland.com/arts/morlacos/11.jpg",
+      "https://junglebayisland.com/arts/morlacos/7.jpg",
+      "https://junglebayisland.com/arts/morlacos/4.jpg",
+      "https://junglebayisland.com/arts/morlacos/10.jpg",
+      "https://junglebayisland.com/arts/morlacos/8.jpg",
+      "https://junglebayisland.com/arts/morlacos/3.jpg",
+      "https://junglebayisland.com/arts/morlacos/9.jpg",
+      "https://junglebayisland.com/arts/morlacos/13.jpg"
+    ],
+    "image_count": 13,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "jamex": {
+    "images": [
+      "007_jamex.jpg",
+      "026_jamex.jpg",
+      "061_jamex.jpg",
+      "081_jamex.jpg",
+      "274_jamex.jpg",
+      "322_jamex.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/jamex/5.jpg",
+      "https://junglebayisland.com/arts/jamex/4.jpg",
+      "https://junglebayisland.com/arts/jamex/6.jpg",
+      "https://junglebayisland.com/arts/jamex/2.jpg",
+      "https://junglebayisland.com/arts/jamex/1.jpg",
+      "https://junglebayisland.com/arts/jamex/3.jpg"
+    ],
+    "image_count": 6,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "ink": {
+    "images": [
+      "008_ink.jpg",
+      "015_ink.jpg",
+      "028_ink.jpg",
+      "056_ink.jpg",
+      "068_ink.jpg",
+      "075_ink.jpg",
+      "092_ink.jpg",
+      "107_ink.jpg",
+      "141_ink.jpg",
+      "152_ink.jpg",
+      "160_ink.jpg",
+      "165_ink.jpg",
+      "179_ink.jpg",
+      "200_ink.jpg",
+      "206_ink.jpg",
+      "251_ink.jpg",
+      "264_ink.jpg",
+      "280_ink.jpg",
+      "290_ink.jpg",
+      "299_ink.jpg",
+      "309_ink.jpg",
+      "323_ink.jpg",
+      "324_ink.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/ink/1.jpg",
+      "https://junglebayisland.com/arts/ink/14.jpg",
+      "https://junglebayisland.com/arts/ink/4.jpg",
+      "https://junglebayisland.com/arts/ink/5.jpg",
+      "https://junglebayisland.com/arts/ink/9.jpg",
+      "https://junglebayisland.com/arts/ink/10.jpg",
+      "https://junglebayisland.com/arts/ink/20.jpg",
+      "https://junglebayisland.com/arts/ink/8.jpg",
+      "https://junglebayisland.com/arts/ink/23.jpg",
+      "https://junglebayisland.com/arts/ink/25.jpg",
+      "https://junglebayisland.com/arts/ink/6.jpg",
+      "https://junglebayisland.com/arts/ink/17.jpg",
+      "https://junglebayisland.com/arts/ink/15.jpg",
+      "https://junglebayisland.com/arts/ink/24.jpg",
+      "https://junglebayisland.com/arts/ink/12.jpg",
+      "https://junglebayisland.com/arts/ink/7.jpg",
+      "https://junglebayisland.com/arts/ink/19.jpg",
+      "https://junglebayisland.com/arts/ink/2.jpg",
+      "https://junglebayisland.com/arts/ink/16.jpg",
+      "https://junglebayisland.com/arts/ink/22.jpg",
+      "https://junglebayisland.com/arts/ink/21.jpg",
+      "https://junglebayisland.com/arts/ink/3.jpg",
+      "https://junglebayisland.com/arts/ink/11.jpg"
+    ],
+    "image_count": 23,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "juney": {
+    "images": [
+      "009_juney.jpg",
+      "010_juney.jpg",
+      "017_juney.jpg",
+      "020_juney.jpg",
+      "022_juney.jpg",
+      "023_juney.jpg",
+      "027_juney.jpg",
+      "029_juney.jpg",
+      "030_juney.jpg",
+      "046_juney.jpg",
+      "063_juney.jpg",
+      "071_juney.jpg",
+      "073_juney.jpg",
+      "078_juney.jpg",
+      "086_juney.jpg",
+      "089_juney.jpg",
+      "093_juney.jpg",
+      "095_juney.jpg",
+      "098_juney.jpg",
+      "099_juney.jpg",
+      "106_juney.jpg",
+      "109_juney.jpg",
+      "116_juney.jpg",
+      "117_juney.jpg",
+      "124_juney.jpg",
+      "126_juney.jpg",
+      "129_juney.jpg",
+      "130_juney.jpg",
+      "136_juney.jpg",
+      "149_juney.jpg",
+      "156_juney.jpg",
+      "174_juney.jpg",
+      "186_juney.jpg",
+      "193_juney.jpg",
+      "203_juney.jpg",
+      "225_juney.jpg",
+      "233_juney.jpg",
+      "237_juney.jpg",
+      "253_juney.jpg",
+      "257_juney.jpg",
+      "258_juney.jpg",
+      "259_juney.jpg",
+      "272_juney.jpg",
+      "277_juney.jpg",
+      "286_juney.jpg",
+      "296_juney.jpg",
+      "303_juney.jpg",
+      "304_juney.jpg",
+      "307_juney.jpg",
+      "310_juney.jpg",
+      "317_juney.jpg",
+      "318_juney.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/juney/50.jpg",
+      "https://junglebayisland.com/arts/juney/26.jpg",
+      "https://junglebayisland.com/arts/juney/36.jpg",
+      "https://junglebayisland.com/arts/juney/19.jpg",
+      "https://junglebayisland.com/arts/juney/23.jpg",
+      "https://junglebayisland.com/arts/juney/43.jpg",
+      "https://junglebayisland.com/arts/juney/44.jpg",
+      "https://junglebayisland.com/arts/juney/48.jpg",
+      "https://junglebayisland.com/arts/juney/16.jpg",
+      "https://junglebayisland.com/arts/juney/45.jpg",
+      "https://junglebayisland.com/arts/juney/11.jpg",
+      "https://junglebayisland.com/arts/juney/27.jpg",
+      "https://junglebayisland.com/arts/juney/32.jpg",
+      "https://junglebayisland.com/arts/juney/51.jpg",
+      "https://junglebayisland.com/arts/juney/47.jpg",
+      "https://junglebayisland.com/arts/juney/4.jpg",
+      "https://junglebayisland.com/arts/juney/3.jpg",
+      "https://junglebayisland.com/arts/juney/39.jpg",
+      "https://junglebayisland.com/arts/juney/33.jpg",
+      "https://junglebayisland.com/arts/juney/14.jpg",
+      "https://junglebayisland.com/arts/juney/40.jpg",
+      "https://junglebayisland.com/arts/juney/13.jpg",
+      "https://junglebayisland.com/arts/juney/29.jpg",
+      "https://junglebayisland.com/arts/juney/20.jpg",
+      "https://junglebayisland.com/arts/juney/37.jpg",
+      "https://junglebayisland.com/arts/juney/9.jpg",
+      "https://junglebayisland.com/arts/juney/28.jpg",
+      "https://junglebayisland.com/arts/juney/41.jpg",
+      "https://junglebayisland.com/arts/juney/24.jpg",
+      "https://junglebayisland.com/arts/juney/7.jpg",
+      "https://junglebayisland.com/arts/juney/34.jpg",
+      "https://junglebayisland.com/arts/juney/15.jpg",
+      "https://junglebayisland.com/arts/juney/42.jpg",
+      "https://junglebayisland.com/arts/juney/46.jpg",
+      "https://junglebayisland.com/arts/juney/12.jpg",
+      "https://junglebayisland.com/arts/juney/21.jpg",
+      "https://junglebayisland.com/arts/juney/10.jpg",
+      "https://junglebayisland.com/arts/juney/17.jpg",
+      "https://junglebayisland.com/arts/juney/31.jpg",
+      "https://junglebayisland.com/arts/juney/35.jpg",
+      "https://junglebayisland.com/arts/juney/38.jpg",
+      "https://junglebayisland.com/arts/juney/8.jpg",
+      "https://junglebayisland.com/arts/juney/6.jpg",
+      "https://junglebayisland.com/arts/juney/30.jpg",
+      "https://junglebayisland.com/arts/juney/52.jpg",
+      "https://junglebayisland.com/arts/juney/22.jpg",
+      "https://junglebayisland.com/arts/juney/18.jpg",
+      "https://junglebayisland.com/arts/juney/2.jpg",
+      "https://junglebayisland.com/arts/juney/49.jpg",
+      "https://junglebayisland.com/arts/juney/25.jpg",
+      "https://junglebayisland.com/arts/juney/5.jpg",
+      "https://junglebayisland.com/arts/juney/1.jpg"
+    ],
+    "image_count": 52,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "coppy": {
+    "images": [
+      "012_coppy.jpg",
+      "016_coppy.jpg",
+      "019_coppy.jpg",
+      "025_coppy.jpg",
+      "033_coppy.jpg",
+      "045_coppy.jpg",
+      "062_coppy.jpg",
+      "067_coppy.jpg",
+      "079_coppy.jpg",
+      "110_coppy.jpg",
+      "113_coppy.jpg",
+      "118_coppy.jpg",
+      "119_coppy.jpg",
+      "147_coppy.jpg",
+      "154_coppy.jpg",
+      "159_coppy.jpg",
+      "167_coppy.jpg",
+      "169_coppy.jpg",
+      "177_coppy.jpg",
+      "187_coppy.jpg",
+      "208_coppy.jpg",
+      "214_coppy.jpg",
+      "273_coppy.jpg",
+      "275_coppy.jpg",
+      "278_coppy.jpg",
+      "297_coppy.jpg",
+      "305_coppy.jpg",
+      "312_coppy.jpg",
+      "314_coppy.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/coppy/1.jpg",
+      "https://junglebayisland.com/arts/coppy/25.jpg",
+      "https://junglebayisland.com/arts/coppy/19.jpg",
+      "https://junglebayisland.com/arts/coppy/27.jpg",
+      "https://junglebayisland.com/arts/coppy/4.jpg",
+      "https://junglebayisland.com/arts/coppy/24.jpg",
+      "https://junglebayisland.com/arts/coppy/5.jpg",
+      "https://junglebayisland.com/arts/coppy/15.jpg",
+      "https://junglebayisland.com/arts/coppy/11.jpg",
+      "https://junglebayisland.com/arts/coppy/17.jpg",
+      "https://junglebayisland.com/arts/coppy/22.jpg",
+      "https://junglebayisland.com/arts/coppy/7.jpg",
+      "https://junglebayisland.com/arts/coppy/14.jpg",
+      "https://junglebayisland.com/arts/coppy/8.jpg",
+      "https://junglebayisland.com/arts/coppy/6.jpg",
+      "https://junglebayisland.com/arts/coppy/29.jpg",
+      "https://junglebayisland.com/arts/coppy/9.jpg",
+      "https://junglebayisland.com/arts/coppy/23.jpg",
+      "https://junglebayisland.com/arts/coppy/12.jpg",
+      "https://junglebayisland.com/arts/coppy/26.jpg",
+      "https://junglebayisland.com/arts/coppy/28.jpg",
+      "https://junglebayisland.com/arts/coppy/20.jpg",
+      "https://junglebayisland.com/arts/coppy/13.jpg",
+      "https://junglebayisland.com/arts/coppy/18.jpg",
+      "https://junglebayisland.com/arts/coppy/2.jpg",
+      "https://junglebayisland.com/arts/coppy/3.jpg",
+      "https://junglebayisland.com/arts/coppy/10.jpg",
+      "https://junglebayisland.com/arts/coppy/21.jpg",
+      "https://junglebayisland.com/arts/coppy/16.jpg"
+    ],
+    "image_count": 29,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "filthy": {
+    "images": [
+      "014_filthy.jpg",
+      "066_filthy.jpg",
+      "072_filthy.jpg",
+      "090_filthy.jpg",
+      "097_filthy.jpg",
+      "128_filthy.jpg",
+      "157_filthy.jpg",
+      "201_filthy.jpg",
+      "228_filthy.jpg",
+      "239_filthy.jpg",
+      "262_filthy.jpg",
+      "289_filthy.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/filthy/4.jpg",
+      "https://junglebayisland.com/arts/filthy/8.jpg",
+      "https://junglebayisland.com/arts/filthy/5.jpg",
+      "https://junglebayisland.com/arts/filthy/11.jpg",
+      "https://junglebayisland.com/arts/filthy/7.jpg",
+      "https://junglebayisland.com/arts/filthy/10.jpg",
+      "https://junglebayisland.com/arts/filthy/6.jpg",
+      "https://junglebayisland.com/arts/filthy/1.jpg",
+      "https://junglebayisland.com/arts/filthy/12.jpg",
+      "https://junglebayisland.com/arts/filthy/3.jpg",
+      "https://junglebayisland.com/arts/filthy/9.jpg",
+      "https://junglebayisland.com/arts/filthy/2.jpg"
+    ],
+    "image_count": 12,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "loground": {
+    "images": [
+      "018_loground.jpg",
+      "034_loground.jpg",
+      "039_loground.jpg",
+      "040_loground.jpg",
+      "057_loground.jpg",
+      "083_loground.jpg",
+      "084_loground.jpg",
+      "108_loground.jpg",
+      "137_loground.jpg",
+      "163_loground.jpg",
+      "164_loground.jpg",
+      "181_loground.jpg",
+      "194_loground.jpg",
+      "195_loground.jpg",
+      "205_loground.jpg",
+      "217_loground.jpg",
+      "221_loground.jpg",
+      "238_loground.jpg",
+      "248_loground.jpg",
+      "279_loground.jpg",
+      "291_loground.jpg",
+      "292_loground.jpg",
+      "293_loground.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/loground/18.jpg",
+      "https://junglebayisland.com/arts/loground/16.jpg",
+      "https://junglebayisland.com/arts/loground/10.jpg",
+      "https://junglebayisland.com/arts/loground/2.jpg",
+      "https://junglebayisland.com/arts/loground/23.jpg",
+      "https://junglebayisland.com/arts/loground/4.jpg",
+      "https://junglebayisland.com/arts/loground/13.jpg",
+      "https://junglebayisland.com/arts/loground/9.jpg",
+      "https://junglebayisland.com/arts/loground/6.jpg",
+      "https://junglebayisland.com/arts/loground/8.jpg",
+      "https://junglebayisland.com/arts/loground/11.jpg",
+      "https://junglebayisland.com/arts/loground/20.jpg",
+      "https://junglebayisland.com/arts/loground/3.jpg",
+      "https://junglebayisland.com/arts/loground/12.jpg",
+      "https://junglebayisland.com/arts/loground/1.jpg",
+      "https://junglebayisland.com/arts/loground/17.jpg",
+      "https://junglebayisland.com/arts/loground/22.jpg",
+      "https://junglebayisland.com/arts/loground/21.jpg",
+      "https://junglebayisland.com/arts/loground/7.jpg",
+      "https://junglebayisland.com/arts/loground/5.jpg",
+      "https://junglebayisland.com/arts/loground/19.jpg",
+      "https://junglebayisland.com/arts/loground/14.jpg",
+      "https://junglebayisland.com/arts/loground/15.jpg"
+    ],
+    "image_count": 23,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "blends": {
+    "images": [
+      "032_blends.jpg",
+      "245_blends.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/blends/1.jpg",
+      "https://junglebayisland.com/arts/blends/2.jpg"
+    ],
+    "image_count": 2,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "israel": {
+    "images": [
+      "036_israel.jpg",
+      "059_israel.jpg",
+      "070_israel.jpg",
+      "168_israel.jpg",
+      "219_israel.jpg",
+      "267_israel.jpg",
+      "282_israel.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/israel/3.jpg",
+      "https://junglebayisland.com/arts/israel/2.jpg",
+      "https://junglebayisland.com/arts/israel/6.jpg",
+      "https://junglebayisland.com/arts/israel/5.jpg",
+      "https://junglebayisland.com/arts/israel/7.jpg",
+      "https://junglebayisland.com/arts/israel/4.jpg",
+      "https://junglebayisland.com/arts/israel/1.jpg"
+    ],
+    "image_count": 7,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "puro": {
+    "images": [
+      "037_puro.gif",
+      "058_puro.png",
+      "162_puro.gif",
+      "202_puro.gif"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/puro/2.gif",
+      "https://junglebayisland.com/arts/puro/3.png",
+      "https://junglebayisland.com/arts/puro/4.gif",
+      "https://junglebayisland.com/arts/puro/1.gif"
+    ],
+    "image_count": 4,
+    "formats": [
+      "gif",
+      "png"
+    ],
+    "missing_images": []
+  },
+  "Scream": {
+    "images": [
+      "042_Scream.jpg",
+      "069_Scream.jpg",
+      "088_Scream.jpg",
+      "091_Scream.jpg",
+      "094_Scream.jpg",
+      "096_Scream.jpg",
+      "105_Scream.jpg",
+      "127_Scream.jpg",
+      "131_Scream.jpg",
+      "132_Scream.jpg",
+      "143_Scream.jpg",
+      "151_Scream.jpg",
+      "170_Scream.jpg",
+      "176_Scream.jpg",
+      "210_Scream.jpg",
+      "222_Scream.jpg",
+      "223_Scream.jpg",
+      "265_Scream.jpg",
+      "269_Scream.jpg",
+      "270_Scream.jpg",
+      "285_Scream.jpg",
+      "294_Scream.jpg",
+      "300_Scream.jpg",
+      "306_Scream.jpg",
+      "313_Scream.jpg",
+      "315_Scream.jpg",
+      "319_Scream.jpg",
+      "321_Scream.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/Scream/7.jpg",
+      "https://junglebayisland.com/arts/Scream/28.jpg",
+      "https://junglebayisland.com/arts/Scream/20.jpg",
+      "https://junglebayisland.com/arts/Scream/26.jpg",
+      "https://junglebayisland.com/arts/Scream/21.jpg",
+      "https://junglebayisland.com/arts/Scream/24.jpg",
+      "https://junglebayisland.com/arts/Scream/1.jpg",
+      "https://junglebayisland.com/arts/Scream/11.jpg",
+      "https://junglebayisland.com/arts/Scream/3.jpg",
+      "https://junglebayisland.com/arts/Scream/6.jpg",
+      "https://junglebayisland.com/arts/Scream/15.jpg",
+      "https://junglebayisland.com/arts/Scream/16.jpg",
+      "https://junglebayisland.com/arts/Scream/17.jpg",
+      "https://junglebayisland.com/arts/Scream/10.jpg",
+      "https://junglebayisland.com/arts/Scream/27.jpg",
+      "https://junglebayisland.com/arts/Scream/4.jpg",
+      "https://junglebayisland.com/arts/Scream/25.jpg",
+      "https://junglebayisland.com/arts/Scream/22.jpg",
+      "https://junglebayisland.com/arts/Scream/19.jpg",
+      "https://junglebayisland.com/arts/Scream/23.jpg",
+      "https://junglebayisland.com/arts/Scream/13.jpg",
+      "https://junglebayisland.com/arts/Scream/5.jpg",
+      "https://junglebayisland.com/arts/Scream/2.jpg",
+      "https://junglebayisland.com/arts/Scream/9.jpg",
+      "https://junglebayisland.com/arts/Scream/14.jpg",
+      "https://junglebayisland.com/arts/Scream/12.jpg",
+      "https://junglebayisland.com/arts/Scream/18.jpg",
+      "https://junglebayisland.com/arts/Scream/8.jpg"
+    ],
+    "image_count": 28,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "cordova": {
+    "images": [
+      "047_cordova.jpg",
+      "153_cordova.jpg",
+      "171_cordova.jpg",
+      "190_cordova.jpg",
+      "242_cordova.jpg",
+      "263_cordova.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/cordova/4.jpg",
+      "https://junglebayisland.com/arts/cordova/1.jpg",
+      "https://junglebayisland.com/arts/cordova/3.jpg",
+      "https://junglebayisland.com/arts/cordova/5.jpg",
+      "https://junglebayisland.com/arts/cordova/6.jpg",
+      "https://junglebayisland.com/arts/cordova/2.jpg"
+    ],
+    "image_count": 6,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "rosie": {
+    "images": [
+      "049_rosie.jpg",
+      "103_rosie.jpg",
+      "232_rosie.jpg",
+      "252_rosie.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/rosie/4.jpg",
+      "https://junglebayisland.com/arts/rosie/3.jpg",
+      "https://junglebayisland.com/arts/rosie/2.jpg",
+      "https://junglebayisland.com/arts/rosie/1.jpg"
+    ],
+    "image_count": 4,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "juju": {
+    "images": [
+      "050_juju.jpg",
+      "256_juju.jpg",
+      "298_juju.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/juju/2.jpg",
+      "https://junglebayisland.com/arts/juju/3.jpg",
+      "https://junglebayisland.com/arts/juju/1.jpg"
+    ],
+    "image_count": 3,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "ojo": {
+    "images": [
+      "055_ojo.jpg",
+      "220_ojo.jpg",
+      "234_ojo.jpg",
+      "241_ojo.jpg",
+      "260_ojo.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/ojo/4.jpg",
+      "https://junglebayisland.com/arts/ojo/2.jpg",
+      "https://junglebayisland.com/arts/ojo/5.jpg",
+      "https://junglebayisland.com/arts/ojo/1.jpg",
+      "https://junglebayisland.com/arts/ojo/3.jpg"
+    ],
+    "image_count": 5,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "uno": {
+    "images": [
+      "064_uno.jpg",
+      "065_uno.jpg",
+      "145_uno.jpg",
+      "172_uno.jpg",
+      "183_uno.jpg",
+      "209_uno.jpg",
+      "216_uno.jpg",
+      "284_uno.jpg",
+      "288_uno.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/uno/7.jpg",
+      "https://junglebayisland.com/arts/uno/2.jpg",
+      "https://junglebayisland.com/arts/uno/8.jpg",
+      "https://junglebayisland.com/arts/uno/6.jpg",
+      "https://junglebayisland.com/arts/uno/9.jpg",
+      "https://junglebayisland.com/arts/uno/5.jpg",
+      "https://junglebayisland.com/arts/uno/3.jpg",
+      "https://junglebayisland.com/arts/uno/4.jpg",
+      "https://junglebayisland.com/arts/uno/1.jpg"
+    ],
+    "image_count": 9,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "clare": {
+    "images": [
+      "074_clare.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/clare/1.jpg"
+    ],
+    "image_count": 1,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "izzy": {
+    "images": [
+      "100_izzy.jpg",
+      "115_izzy.jpg",
+      "178_izzy.jpg",
+      "182_izzy.jpg",
+      "188_izzy.jpg",
+      "215_izzy.jpg",
+      "226_izzy.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/izzy/3.jpg",
+      "https://junglebayisland.com/arts/izzy/6.jpg",
+      "https://junglebayisland.com/arts/izzy/5.jpg",
+      "https://junglebayisland.com/arts/izzy/1.jpg",
+      "https://junglebayisland.com/arts/izzy/7.jpg",
+      "https://junglebayisland.com/arts/izzy/2.jpg",
+      "https://junglebayisland.com/arts/izzy/4.jpg"
+    ],
+    "image_count": 7,
+    "formats": [
+      "jpg"
+    ],
+    "missing_images": []
+  },
+  "endrithy": {
+    "images": [
+      "135_endrithy.gif"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/endrithy/1.gif"
+    ],
+    "image_count": 1,
+    "formats": [
+      "gif"
+    ],
+    "missing_images": []
+  },
+  "tarun": {
+    "images": [
+      "185_tarun.jpg",
+      "302_tarun.png",
+      "320_tarun.jpg"
+    ],
+    "imageUrls": [
+      "https://junglebayisland.com/arts/tarun/3.jpg",
+      "https://junglebayisland.com/arts/tarun/1.png",
+      "https://junglebayisland.com/arts/tarun/2.jpg"
+    ],
+    "image_count": 3,
+    "formats": [
+      "jpg",
+      "png"
+    ],
+    "missing_images": []
+  }
+}

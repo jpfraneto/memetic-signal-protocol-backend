@@ -1,0 +1,50 @@
+# mysql/conf.d/production.cnf
+[mysqld]
+# Basic settings
+default-authentication-plugin = mysql_native_password
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+sql_mode = STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO
+
+# Performance settings
+innodb_buffer_pool_size = 256M
+innodb_log_file_size = 64M
+innodb_log_buffer_size = 16M
+innodb_flush_log_at_trx_commit = 2
+innodb_file_per_table = 1
+
+# Connection settings
+max_connections = 200
+max_connect_errors = 1000
+thread_cache_size = 8
+table_open_cache = 2000
+
+# Query cache (for MySQL 5.7 and below, disabled in 8.0+)
+# query_cache_type = 1
+# query_cache_size = 32M
+
+# Binary logging (for replication and backups)
+log_bin = mysql-bin
+expire_logs_days = 7
+max_binlog_size = 100M
+
+# Security
+local_infile = 0
+
+# Slow query log
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 2
+
+# Error log
+log_error = /var/log/mysql/error.log
+
+# General log (disable in production for performance)
+# general_log = 1
+# general_log_file = /var/log/mysql/general.log
+
+[mysql]
+default-character-set = utf8mb4
+
+[client]
+default-character-set = utf8mb4

@@ -1,0 +1,103 @@
+# .github/workflows/deploy.yml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: runner_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: test
+          DB_NAME: runner_test
+          NODE_ENV: test
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: test
+          DB_NAME: runner_test
+          NODE_ENV: test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Build Docker image
+        run: docker build -f Dockerfile.prod -t runner-api:${{ github.sha }} .
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to production
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$(echo -n '${{ github.event.head_commit.id }}' | openssl dgst -sha256 -hmac '${{ secrets.WEBHOOK_SECRET }}' -binary | openssl base64)" \
+            -d '{
+              "ref": "refs/heads/main",
+              "head_commit": {
+                "id": "${{ github.sha }}",
+                "message": "${{ github.event.head_commit.message }}"
+              },
+              "pusher": {
+                "name": "${{ github.actor }}"
+              }
+            }' \
+            https://api.runnercoin.lat:3001/webhook

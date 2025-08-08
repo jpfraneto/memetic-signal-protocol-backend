@@ -62,11 +62,10 @@ export class AuthController {
         'fid',
         'username',
         'pfpUrl',
-        'totalRuns',
-        'totalDistance',
         'createdAt',
         'updatedAt',
       ]);
+      console.log('IN HERE THE USER IS', user);
 
       if (!user) {
         // Create new user if doesn't exist
@@ -77,8 +76,6 @@ export class AuthController {
         const { user: newUser } = await this.userService.upsert(session.sub, {
           username: neynarUser.username,
           pfpUrl: neynarUser.pfp_url,
-          totalRuns: 0,
-          totalDistance: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

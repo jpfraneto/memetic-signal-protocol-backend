@@ -7,10 +7,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  JoinColumn,
   Index,
 } from 'typeorm';
 
-import { User } from '../User';
 import {
   NotificationTypeEnum,
   NotificationStatusEnum,
@@ -23,7 +23,9 @@ export class NotificationQueue {
   @PrimaryGeneratedColumn()
   id: number;
 
-  user: User;
+  @ManyToOne('User', { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId', referencedColumnName: 'fid' })
+  user: any;
 
   @Column()
   userId: number;

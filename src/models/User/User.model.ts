@@ -9,10 +9,12 @@ import {
   PrimaryColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 
 // Types
 import { UserRoleEnum } from './User.types';
+import { Call } from '../Call/Call.model';
 
 /**
  * @class User
@@ -68,38 +70,6 @@ export class User {
   })
   notificationUrl: string;
 
-  @Column({
-    default: null,
-    nullable: true,
-  })
-  lastRunReminderSent: Date;
-
-  // ================================
-  // QUICK STATS (Denormalized for performance)
-  // ================================
-
-  @Column({ default: 0 })
-  totalRuns: number;
-
-  @Column({ type: 'decimal', precision: 8, scale: 2, default: 0 })
-  totalDistance: number;
-
-  @Column({ default: 0 })
-  totalTimeMinutes: number;
-
-  @Column({ default: 0 })
-  currentStreak: number;
-
-  @Column({ default: 0 })
-  longestStreak: number;
-
-  // ================================
-  // WORKOUT VALIDATION & BAN SYSTEM
-  // ================================
-
-  @Column({ default: 0 })
-  invalidWorkoutSubmissions: number; // Count of invalid workout submissions
-
   @Column({ default: false })
   isBanned: boolean; // Whether user is currently banned
 
@@ -122,4 +92,7 @@ export class User {
   // ================================
   // RELATIONSHIPS
   // ================================
+
+  @OneToMany(() => Call, (call) => call.user)
+  calls: Call[];
 }

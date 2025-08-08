@@ -2,6 +2,7 @@
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { AdminModule } from './admin/admin.module';
+import { CallModule } from './call/call.module';
 
 /**
  * Core modules for the RUNNER Farcaster miniapp
@@ -21,6 +22,7 @@ const CoreModules = [
   UserModule, // Foundation - user management
   AuthModule, // Authentication & session management
   AdminModule,
+  CallModule, // Blockchain call data management
 ];
 
 export default CoreModules;

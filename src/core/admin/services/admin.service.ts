@@ -122,11 +122,6 @@ export class AdminService {
     totalUsers: number;
     adminUsers: number;
     regularUsers: number;
-    usersWithTokens: number;
-    averageTokens: number;
-    activeRunners: number;
-    totalRuns: number;
-    totalDistance: number;
   }> {
     const [totalUsers, adminUsers, regularUsers] = await Promise.all([
       this.userRepository.count(),
@@ -134,53 +129,11 @@ export class AdminService {
       this.userRepository.count({ where: { role: UserRoleEnum.USER } }),
     ]);
 
-    const usersWithTokensResult = await this.userRepository
-      .createQueryBuilder('user')
-      .select('COUNT(*)', 'count')
-      .getRawOne();
-
-    const usersWithTokens = parseInt(usersWithTokensResult?.count || '0');
-    const averageTokens = parseFloat(usersWithTokensResult?.average || '0');
-
-    // Get running statistics
-    const activeRunners = await this.userRepository.count({
-      where: { totalRuns: { $gt: 0 } } as any,
-    });
-
-    const totalRunsResult = await this.userRepository
-      .createQueryBuilder('user')
-      .select('SUM(user.totalRuns)', 'total')
-      .getRawOne();
-
-    const totalDistanceResult = await this.userRepository
-      .createQueryBuilder('user')
-      .select('SUM(user.totalDistance)', 'total')
-      .getRawOne();
-
-    const totalRuns = parseInt(totalRunsResult?.total || '0');
-    const totalDistance = parseFloat(totalDistanceResult?.total || '0');
-
     return {
       totalUsers,
       adminUsers,
       regularUsers,
-      usersWithTokens,
-      averageTokens,
-      activeRunners,
-      totalRuns,
-      totalDistance,
     };
-  }
-
-  /**
-   * Get top users by tokens
-   */
-  async getTopUsers(limit: number = 10): Promise<User[]> {
-    return this.userRepository.find({
-      select: ['fid', 'username', 'pfpUrl', 'createdAt'],
-      order: { totalRuns: 'DESC' },
-      take: limit,
-    });
   }
 
   /**

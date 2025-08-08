@@ -3,6 +3,8 @@ import { getConfig } from './security/config';
 
 // Import all entities
 import { User } from './models/User/User.model';
+import { Call } from './models/Call/Call.model';
+import { NotificationQueue } from './models/NotificationQueue/NotificationQueue.model';
 
 // Create data source for TypeORM CLI commands
 export const AppDataSource = new DataSource({
@@ -12,8 +14,8 @@ export const AppDataSource = new DataSource({
   username: getConfig().db.username,
   password: getConfig().db.password,
   database: getConfig().db.name,
-  entities: [User],
-  migrations: ['src/database/migrations/*.ts'],
+  entities: [User, Call, NotificationQueue],
+  migrations: ['src/migrations/*.ts'],
   subscribers: ['src/database/subscribers/*.ts'],
   synchronize: false, // Always false for CLI commands
   logging: getConfig().isProduction ? false : 'all',

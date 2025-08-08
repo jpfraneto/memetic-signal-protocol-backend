@@ -175,6 +175,7 @@ const domains: Domains = {
     'http://localhost:5173',
     'https://sigil.app',
     'https://localhost:3000',
+    'https://miniapp.anky.app',
   ],
   STAGING: ['https://staging-sigil.app', 'https://dev-sigil.app'],
   PRO: [

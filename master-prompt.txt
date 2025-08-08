@@ -1,0 +1,378 @@
+# Memetic Signal Protocol (MSP) - Complete System Architecture
+
+## System Overview
+
+**Product:** Memetic Signal Protocol (MSP)
+**Platform:** Farcaster Miniapp on Base blockchain
+**Purpose:** Trustless credibility scoring system for crypto signal callers
+
+## Core Problem & Solution
+
+**Problem:** Crypto influencers make predictions without accountability, leading to misinformation and poor investment decisions.
+
+**Solution:** Objective, mathematical scoring system that tracks public predictions and calculates verifiable "Memetic Footprint Scores" (MFS) for signal callers, with optional token-staking verification.
+
+## System Architecture
+
+### Technical Stack:
+- **Frontend:** Vite + React 18 + TypeScript
+- **Blockchain:** Base blockchain (ethereum layer 2)
+- **State Management:** TanStack Query + Zustand
+- **Styling:** Tailwind CSS v4 with custom design system
+- **Routing:** React Router DOM v7
+- **Authentication:** Farcaster Frame SDK with QuickAuth
+- **APIs:** Farcaster (Neynar), CoinGecko, custom backend
+
+### Platform Integration:
+- **Farcaster Miniapp:** Native frame integration with TBA support
+- **Mobile-first:** Responsive design optimized for mobile usage
+- **Haptic feedback:** Enhanced mobile experience
+- **Offline capability:** Cached data for core functionality
+
+## Application Structure
+
+### Three-Screen Architecture:
+
+#### Screen 1: Signal Feed (`/`)
+**Purpose:** Display recent verified calls and top performers
+**Features:**
+- Real-time signal stream
+- Performance indicators (profit/loss percentages)
+- User verification status badges
+- Time-stamped predictions with outcomes
+- Filter and sorting capabilities
+- Trending tokens sidebar
+
+#### Screen 2: Make Call (`/call`)
+**Purpose:** Signal creation and staking interface
+**Features:**
+- Token search and selection
+- Prediction type selection (bullish/bearish/price target)
+- Confidence level and time horizon inputs
+- Stake amount calculator with potential rewards
+- MFS impact preview
+- One-click signal broadcast
+
+#### Screen 3: Explore (`/explore`)
+**Purpose:** User discovery and analysis dashboard
+**Features:**
+- Farcaster username search
+- Historical signal analysis
+- MFS score breakdowns
+- Leaderboard rankings
+- User comparison tools
+- Profile verification status
+
+## Design System
+
+### Color Architecture:
+```css
+/* Primary Palette */
+--bg-primary: #000000;        /* Pure black backgrounds */
+--bg-secondary: #1a1a1a;      /* Card surfaces */
+--bg-tertiary: #2a2a2a;       /* Interactive elements */
+
+/* Typography */
+--text-primary: #ffffff;      /* Headlines and primary text */
+--text-secondary: #cccccc;    /* Body text and descriptions */
+--text-muted: #666666;        /* Timestamps and metadata */
+
+/* Brand & Accents */
+--accent-primary: #00ff88;    /* Neon green brand color */
+--accent-secondary: #00cc66;  /* Darker green variants */
+
+/* Status Indicators */
+--success: #00ff88;           /* Profits and positive outcomes */
+--danger: #ff4444;            /* Losses and negative outcomes */
+--warning: #ffcc00;           /* Pending and caution states */
+--info: #0088ff;              /* Informational elements */
+
+/* Structural */
+--border-color: #333333;      /* Subtle element separation */
+--border-hover: #555555;      /* Interactive state borders */
+```
+
+### Visual Principles:
+- **Dark cyberpunk aesthetic:** Professional trading terminal appearance
+- **High contrast typography:** Maximum readability on dark backgrounds
+- **Neon accent strategy:** Bright green highlights for key interactions
+- **Monospace financial data:** All numbers and percentages in monospace fonts
+- **Minimal borders:** Subtle gray separations between content areas
+
+## Data Architecture
+
+### Core Data Models:
+
+#### SignalCall Entity:
+```typescript
+interface SignalCall {
+  id: string;
+  userId: string;
+  fid: number;
+  username: string;
+  token: {
+    symbol: string;
+    address?: string;
+    name: string;
+  };
+  prediction: {
+    type: 'bullish' | 'bearish' | 'price_target';
+    targetPrice?: number;
+    entryPrice: number;
+    currentPrice?: number;
+    confidence: number; // 1-10 scale
+  };
+  staking: {
+    amount: number; // $JBM tokens
+    isVerified: boolean;
+    potentialReward: number;
+  };
+  timing: {
+    createdAt: Date;
+    expiresAt: Date;
+    timeHorizon: '24h' | '1w' | '1m' | '3m';
+  };
+  outcome: {
+    status: 'active' | 'won' | 'lost' | 'expired';
+    pnlPercentage?: number;
+    actualReturn?: number;
+    settledAt?: Date;
+  };
+  metadata: {
+    castHash?: string;
+    farcasterUrl?: string;
+    isPublic: boolean;
+  };
+}
+```
+
+#### UserProfile Entity:
+```typescript
+interface UserProfile {
+  fid: number;
+  username: string;
+  displayName: string;
+  pfpUrl?: string;
+  
+  reputation: {
+    mfsScore: number; // 0-1 Memetic Footprint Score
+    rank: number;
+    tier: 'unverified' | 'bronze' | 'silver' | 'gold' | 'diamond';
+  };
+  
+  performance: {
+    totalCalls: number;
+    activeCalls: number;
+    winRate: number;
+    averageReturn: number;
+    bestCall: SignalCall;
+    worstCall: SignalCall;
+  };
+  
+  staking: {
+    totalStaked: number;
+    totalEarned: number;
+    currentStaked: number;
+    isVerified: boolean;
+    verifiedSince?: Date;
+  };
+  
+  activity: {
+    lastActive: Date;
+    joinedAt: Date;
+    callFrequency: number; // calls per week
+    consistency: number; // regularity score
+  };
+}
+```
+
+#### MemeticFootprintScore Calculation:
+```typescript
+interface MFSComponents {
+  accuracy: number;      // Win/loss ratio (40% weight)
+  recency: number;       // Time-weighted recent performance (25% weight)
+  consistency: number;   // Regular activity pattern (15% weight)
+  commitment: number;    // Average stake ratio (10% weight)
+  riskAdjustment: number; // Volatility penalty (10% weight)
+}
+
+const calculateMFS = (calls: SignalCall[]): number => {
+  const components = analyzeCalls(calls);
+  return (
+    components.accuracy * 0.4 +
+    components.recency * 0.25 +
+    components.consistency * 0.15 +
+    components.commitment * 0.1 +
+    components.riskAdjustment * 0.1
+  );
+};
+```
+
+## API Architecture
+
+### Core Endpoints:
+
+#### Signal Management:
+```
+POST   /api/signals              # Create new signal
+GET    /api/signals              # Fetch signal feed
+GET    /api/signals/:id          # Get specific signal
+PUT    /api/signals/:id/outcome  # Update outcome (automated)
+DELETE /api/signals/:id          # Cancel active signal
+```
+
+#### User Operations:
+```
+GET    /api/users/:fid/profile   # Full user profile with MFS
+GET    /api/users/:fid/signals   # User's signal history
+POST   /api/users/verify         # Opt into verification system
+PUT    /api/users/profile        # Update user preferences
+```
+
+#### Discovery & Analytics:
+```
+GET    /api/search/users         # Search Farcaster users
+GET    /api/leaderboard          # Top performers by MFS
+GET    /api/trending             # Trending tokens and calls
+GET    /api/analytics/:fid       # Detailed user analytics
+```
+
+#### Farcaster Integration:
+```
+GET    /api/farcaster/user/:username    # Lookup by username
+GET    /api/farcaster/casts/:fid        # Historical cast analysis
+POST   /api/farcaster/analyze/:fid      # Generate MFS from casts
+GET    /api/farcaster/following/:fid    # User's following list
+```
+
+#### Token & Market Data:
+```
+GET    /api/tokens/search        # Token search with autocomplete
+GET    /api/tokens/:symbol/price # Real-time price data
+GET    /api/tokens/:symbol/chart # Historical price charts
+GET    /api/market/trending      # Trending tokens across platforms
+```
+
+## Component Architecture
+
+### Page Components:
+```
+src/pages/
+├── SignalFeed/
+│   ├── SignalFeed.tsx
+│   ├── FeedFilters.tsx
+│   ├── SignalStream.tsx
+│   └── TrendingSidebar.tsx
+├── MakeCall/
+│   ├── MakeCall.tsx
+│   ├── TokenSelector.tsx
+│   ├── PredictionForm.tsx
+│   ├── StakeCalculator.tsx
+│   └── SignalPreview.tsx
+├── Explore/
+│   ├── Explore.tsx
+│   ├── UserSearch.tsx
+│   ├── Leaderboard.tsx
+│   ├── UserProfile.tsx
+│   └── AnalyticsDashboard.tsx
+```
+
+### Shared Components:
+```
+src/shared/components/
+├── SignalCard.tsx           # Individual signal display
+├── UserCard.tsx             # User profile summary
+├── MFSBadge.tsx            # Score visualization
+├── PerformanceChart.tsx     # Win/loss charts
+├── StakeInput.tsx          # Token staking interface
+├── VerificationBadge.tsx   # Verified status indicator
+├── ProfitLossIndicator.tsx # P&L visualization
+├── NavigationBar.tsx       # Three-tab navigation
+└── LoadingStates.tsx       # Skeleton screens
+```
+
+### Hooks & State Management:
+```
+src/shared/hooks/
+├── useSignals.ts           # Signal CRUD operations
+├── useUserProfile.ts       # Profile management
+├── useMFSCalculation.ts    # Real-time score updates
+├── useTokenPrices.ts       # Price tracking
+├── useStaking.ts           # $JBM operations
+├── useFarcasterLookup.ts   # User search and analysis
+├── useRealTimeUpdates.ts   # WebSocket connections
+└── useAnalytics.ts         # Performance tracking
+```
+
+## $JBM Token Integration
+
+### Smart Contract Architecture:
+```solidity
+contract MemeticSignalProtocol {
+    mapping(address => uint256) public stakedBalances;
+    mapping(bytes32 => Signal) public signals;
+    mapping(address => UserStats) public userStats;
+    
+    function createSignal(
+        string calldata token,
+        PredictionType prediction,
+        uint256 stakeAmount,
+        uint256 timeHorizon
+    ) external;
+    
+    function settleSignal(bytes32 signalId) external;
+    function claimRewards(bytes32 signalId) external;
+    function updateMFS(address user) external;
+}
+```
+
+### Token Mechanics:
+- **Staking Requirements:** Minimum 100 $JBM for verification
+- **Reward Distribution:** 8-12% APY for high-performing verified users
+- **Penalty System:** Graduated stake slashing for poor performance
+- **Burn Mechanism:** 2% of all stakes burned to create deflationary pressure
+- **Yield Calculation:** Based on MFS score and consistency metrics
+
+## Real-Time Features
+
+### Live Data Streams:
+- **Price Updates:** WebSocket connections to price oracles
+- **Signal Outcomes:** Automated settlement based on price movements
+- **User Rankings:** Real-time leaderboard updates
+- **Feed Updates:** Live signal creation and resolution
+
+### Performance Optimization:
+- **Caching Strategy:** Redis for frequently accessed data
+- **CDN Distribution:** Global edge caching for static assets
+- **Lazy Loading:** Progressive content loading for mobile
+- **Background Sync:** Offline-first data synchronization
+
+## Security & Privacy
+
+### Data Protection:
+- **Opt-in Analytics:** Users control what data is analyzed
+- **Pseudonymous Operation:** FID-based identification only
+- **Encrypted Storage:** Sensitive user data encrypted at rest
+- **Rate Limiting:** API protection against abuse
+
+### Smart Contract Security:
+- **Multi-signature Controls:** Admin functions require multiple signatures
+- **Timelock Mechanisms:** Critical updates have delay periods
+- **Emergency Pause:** Circuit breakers for critical vulnerabilities
+- **Audit Requirements:** Professional smart contract audits
+
+## Scalability Design
+
+### Performance Targets:
+- **Page Load:** Under 2 seconds initial load
+- **API Response:** Under 500ms for all endpoints
+- **Concurrent Users:** Support 10,000+ simultaneous users
+- **Uptime:** 99.9% availability target
+
+### Growth Architecture:
+- **Horizontal Scaling:** Microservices architecture for component scaling
+- **Database Sharding:** User data partitioned by FID ranges
+- **CDN Strategy:** Global content distribution
+- **Mobile Optimization:** Progressive Web App capabilities
+
+This architecture provides a complete foundation for building a professional, scalable credibility scoring system for crypto signal callers within the Farcaster ecosystem.

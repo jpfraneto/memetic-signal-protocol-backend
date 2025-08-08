@@ -9,7 +9,7 @@ import { getConfig } from './security/config';
 // Health
 import { HealthModule } from './health';
 // Models
-import { User } from './models';
+import { User, Call, NotificationQueue } from './models';
 
 @Module({
   imports: [
@@ -22,7 +22,7 @@ import { User } from './models';
       username: getConfig().db.username,
       password: getConfig().db.password,
       database: getConfig().db.name,
-      entities: [User],
+      entities: [User, Call, NotificationQueue],
       // Important: Set synchronize to false in production for safety
       synchronize: true,
       //synchronize: !getConfig().isProduction,

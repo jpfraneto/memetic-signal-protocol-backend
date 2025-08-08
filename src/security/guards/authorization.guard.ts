@@ -9,6 +9,7 @@ import { Request, Response } from 'express';
 
 // Services
 import { AuthService } from '../../core/auth/services';
+import { logger } from 'src/main';
 
 /**
  * Authorization guard for Farcaster QuickAuth JWT tokens.
@@ -51,11 +52,15 @@ export class AuthorizationGuard implements CanActivate {
    * @returns JWT token string or null if not found
    */
   private extractToken(req: Request): string | null {
+    logger.log('Extracting token from request');
     // Primary: Authorization header with Bearer token (miniapp standard)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
+      logger.log('Found token in Authorization header');
       return authHeader.substring(7);
     }
+
+    logger.log('No token found in Authorization header, checking cookies');
 
     // Fallback: Authorization cookie (web compatibility)
     const cookieToken = req.cookies['Authorization'];

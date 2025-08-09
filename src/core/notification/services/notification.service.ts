@@ -359,119 +359,6 @@ export class NotificationService {
   }
 
   /**
-   * Queues daily running reminders for users
-   */
-  async queueDailyRunningReminders(): Promise<void> {
-    try {
-      if (!this.config.notifications.enabled) {
-        this.logger.log(
-          'Notifications disabled globally, skipping daily running reminders',
-        );
-        return;
-      }
-
-      this.logger.log('Processing daily running reminders...');
-
-      const today = new Date().toISOString().split('T')[0];
-
-      // Find users with notifications enabled who haven't received a reminder today
-      const usersNeedingReminder = await this.userRepository
-        .createQueryBuilder('user')
-        .where('user.notificationsEnabled = true')
-        .andWhere('user.notificationToken IS NOT NULL')
-        .andWhere(
-          '(user.lastRunReminderSent IS NULL OR DATE(user.lastRunReminderSent) < :today)',
-          { today },
-        )
-        .getMany();
-
-      if (usersNeedingReminder.length === 0) {
-        this.logger.log('No users require daily running reminders');
-        return;
-      }
-
-      // Queue reminders with unique IDs to prevent duplicates
-      for (const user of usersNeedingReminder) {
-        await this.queueNotification(
-          user.fid,
-          NotificationTypeEnum.DAILY_REMINDER,
-          '🏃‍♂️ Time to run!',
-          'Track your run today and earn points! Keep up your fitness streak!',
-          `${this.config.notifications.baseUrl}`,
-          new Date(),
-          `daily_reminder_${user.fid}_${today}`, // Explicit idempotency key
-        );
-      }
-
-      // Update reminder tracking to prevent duplicate processing
-      await this.userRepository.update(
-        usersNeedingReminder.map((u) => u.fid),
-        { lastRunReminderSent: new Date() },
-      );
-
-      this.logger.log(
-        `Queued daily running reminders for ${usersNeedingReminder.length} users`,
-      );
-    } catch (error) {
-      this.logger.error('Error queuing daily running reminders:', error);
-    }
-  }
-
-  /**
-   * Queues evening running reminders for users who haven't tracked a run
-   */
-  async queueEveningRunningReminders(): Promise<void> {
-    try {
-      if (!this.config.notifications.enabled) {
-        this.logger.log(
-          'Notifications disabled globally, skipping evening reminders',
-        );
-        return;
-      }
-
-      this.logger.log('Processing evening running reminders...');
-
-      const today = new Date().toISOString().split('T')[0];
-
-      // Find users who got morning reminder but still haven't tracked a run
-      const usersNeedingEvening = await this.userRepository
-        .createQueryBuilder('user')
-        .where('user.notificationsEnabled = true')
-        .andWhere('user.notificationToken IS NOT NULL')
-        .andWhere('DATE(user.lastRunReminderSent) = :today', { today }) // Got morning reminder
-        .andWhere(
-          '(user.lastRunDate IS NULL OR DATE(user.lastRunDate) < :today)',
-          { today },
-        ) // Haven't tracked run today
-        .getMany();
-
-      if (usersNeedingEvening.length === 0) {
-        this.logger.log('No users require evening running reminders');
-        return;
-      }
-
-      // Queue evening reminders with different idempotency key
-      for (const user of usersNeedingEvening) {
-        await this.queueNotification(
-          user.fid,
-          NotificationTypeEnum.EVENING_REMINDER,
-          '⏰ Last chance to track your run today!',
-          "Don't break your fitness streak! Track your run now and earn points.",
-          `${this.config.notifications.baseUrl}`,
-          new Date(),
-          `evening_reminder_${user.fid}_${today}`, // Different key from morning
-        );
-      }
-
-      this.logger.log(
-        `Queued evening reminders for ${usersNeedingEvening.length} users`,
-      );
-    } catch (error) {
-      this.logger.error('Error queuing evening reminders:', error);
-    }
-  }
-
-  /**
    * Removes old notification records to maintain database performance
    * Keeps 30-day history for debugging while cleaning completed notifications
    */
@@ -493,61 +380,6 @@ export class NotificationService {
       );
     } catch (error) {
       this.logger.error('Error cleaning up old notifications:', error);
-    }
-  }
-
-  /**
-   * Queues weekly achievement announcements for users
-   */
-  async queueWeeklyAchievementAnnouncements(): Promise<void> {
-    try {
-      if (!this.config.notifications.enabled) {
-        this.logger.log(
-          'Notifications disabled globally, skipping weekly achievement announcements',
-        );
-        return;
-      }
-
-      this.logger.log('Processing weekly achievement announcements...');
-
-      const usersWithNotifications = await this.userRepository.find({
-        where: {
-          notificationsEnabled: true,
-          notificationToken: Not(IsNull()),
-        },
-        select: ['fid', 'username'],
-      });
-
-      if (usersWithNotifications.length === 0) {
-        this.logger.log(
-          'No users with notifications enabled for achievement announcements',
-        );
-        return;
-      }
-
-      const weekKey = new Date().toISOString().substring(0, 10); // YYYY-MM-DD format
-
-      // Queue achievement announcements with week-specific idempotency
-      for (const user of usersWithNotifications) {
-        await this.queueNotification(
-          user.fid,
-          NotificationTypeEnum.WEEKLY_ACHIEVEMENT,
-          '🏆 Weekly Running Achievement!',
-          "Check out this week's top runners and achievements! Keep pushing your limits!",
-          `${this.config.notifications.baseUrl}`,
-          new Date(),
-          `weekly_achievement_${user.fid}_${weekKey}`, // Week-specific idempotency
-        );
-      }
-
-      this.logger.log(
-        `Queued weekly achievement announcements for ${usersWithNotifications.length} users`,
-      );
-    } catch (error) {
-      this.logger.error(
-        'Error queuing weekly achievement announcements:',
-        error,
-      );
     }
   }
 
@@ -585,8 +417,8 @@ export class NotificationService {
     await this.queueNotification(
       user.fid,
       NotificationTypeEnum.WELCOME,
-      '🎉 Welcome to $runner!',
-      'Start tracking your runs and earn points. Join our running community!',
+      '🎉 Welcome to Memetic Signal Protocol',
+      'Start tracking your token calls and earn points.',
       `${this.config.notifications.baseUrl}`,
       new Date(),
       `welcome_${user.fid}`,

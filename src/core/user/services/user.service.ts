@@ -4,40 +4,29 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 // Models
-import { User, UserRoleEnum } from '../../../models';
+import { User, UserRoleEnum, Call } from '../../../models';
 
 // Utils
 import NeynarService from '../../../utils/neynar';
 
+// DTOs
+import { GetUsersQueryDto } from '../dto/get-users-query.dto';
+import { UserCallsQueryDto } from '../dto/user-calls-query.dto';
+import {
+  UserDto,
+  CallDto,
+  UserStatsDto,
+  DetailedUserStatsDto,
+  TopTokenDto,
+} from '../dto/user-response.dto';
+
 @Injectable()
 export class UserService {
-  /**
-   * Cache for leaderboard data
-   */
-  private leaderboardCache: {
-    'all-time': {
-      users: User[];
-      lastUpdated: Date;
-      total: number;
-    } | null;
-    weekly: {
-      users: User[];
-      lastUpdated: Date;
-      total: number;
-    } | null;
-  } = {
-    'all-time': null,
-    weekly: null,
-  };
-
-  /**
-   * Cache TTL in milliseconds (15 minutes)
-   */
-  private readonly CACHE_TTL = 15 * 60 * 1000;
-
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Call)
+    private readonly callRepository: Repository<Call>,
   ) {}
 
   /**
@@ -188,5 +177,198 @@ export class UserService {
     await this.userRepository.remove(user);
 
     return true;
+  }
+
+  async getUsers(query: GetUsersQueryDto): Promise<{
+    users: UserDto[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const { limit, offset, search, sortBy, sortOrder, verified } = query;
+
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.calls', 'call');
+
+    if (search) {
+      queryBuilder.andWhere(
+        '(user.username ILIKE :search OR user.displayName ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    if (verified !== undefined) {
+      queryBuilder.andWhere('user.isVerified = :verified', { verified });
+    }
+
+    queryBuilder
+      .orderBy(`user.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC')
+      .limit(limit)
+      .offset(offset);
+
+    const [users, total] = await queryBuilder.getManyAndCount();
+
+    const userDtos: UserDto[] = users.map((user, index) => ({
+      fid: user.fid,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      bio: user.bio,
+      avatar: user.avatar,
+      pfpUrl: user.pfpUrl,
+      isVerified: user.isVerified,
+      followerCount: user.followerCount,
+      followingCount: user.followingCount,
+      mfsScore: Number(user.mfsScore),
+      winRate: Number(user.winRate),
+      totalCalls: user.totalCalls,
+      totalStaked: Number(user.totalStaked),
+      rank: offset + index + 1,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    }));
+
+    const result = {
+      users: userDtos,
+      total,
+      hasMore: offset + limit < total,
+    };
+
+    return result;
+  }
+
+  async getUserWithDetails(fid: number): Promise<{
+    user: UserDto;
+    recentCalls: CallDto[];
+  }> {
+    const user = await this.userRepository.findOne({
+      where: { fid },
+      relations: ['calls'],
+    });
+
+    if (!user) {
+      throw new Error(`User with FID ${fid} not found`);
+    }
+
+    const recentCalls = await this.callRepository
+      .createQueryBuilder('call')
+      .leftJoin('call.user', 'user')
+      .where('user.fid = :fid', { fid })
+      .orderBy('call.timestamp', 'DESC')
+      .limit(10)
+      .getMany();
+
+    const callDtos: CallDto[] = recentCalls.map((call) =>
+      this.mapCallToDto(call),
+    );
+
+    const userDto: UserDto = {
+      fid: user.fid,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      bio: user.bio,
+      avatar: user.avatar,
+      pfpUrl: user.pfpUrl,
+      isVerified: user.isVerified,
+      followerCount: user.followerCount,
+      followingCount: user.followingCount,
+      totalCalls: user.totalCalls,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
+
+    const result = {
+      user: userDto,
+      recentCalls: callDtos,
+    };
+
+    return result;
+  }
+
+  async getUserCalls(
+    fid: number,
+    query: UserCallsQueryDto,
+  ): Promise<{
+    calls: CallDto[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const { limit, offset, status } = query;
+
+    const queryBuilder = this.callRepository
+      .createQueryBuilder('call')
+      .leftJoin('call.user', 'user')
+      .where('user.fid = :fid', { fid });
+
+    if (status) {
+      queryBuilder.andWhere('call.status = :status', { status });
+    }
+
+    queryBuilder.orderBy('call.timestamp', 'DESC').limit(limit).offset(offset);
+
+    const [calls, total] = await queryBuilder.getManyAndCount();
+
+    const callDtos: CallDto[] = calls.map((call) => this.mapCallToDto(call));
+
+    return {
+      calls: callDtos,
+      total,
+      hasMore: offset + limit < total,
+    };
+  }
+
+  private mapCallToDto(call: Call): CallDto {
+    return {
+      id: call.signalId,
+      signalId: call.signalId,
+      fid: call.user?.fid || 0,
+      tokenAddress: call.tokenAddress,
+      ticker: call.ticker,
+      direction: call.direction,
+      timestamp: call.timestamp,
+      callPrice: call.callPrice,
+      transactionHash: call.transactionHash,
+    };
+  }
+
+  /**
+   * Recalculates and updates the total calls count for all users
+   * This is useful for fixing data inconsistencies
+   */
+  async recalculateTotalCalls(): Promise<void> {
+    const users = await this.userRepository.find();
+
+    for (const user of users) {
+      const callCount = await this.callRepository.count({
+        where: { user: { fid: user.fid } },
+      });
+
+      if (callCount !== user.totalCalls) {
+        await this.userRepository.update(user.fid, { totalCalls: callCount });
+        console.log(
+          `Updated user ${user.username} (FID: ${user.fid}) total calls from ${user.totalCalls} to ${callCount}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Recalculates and updates the total calls count for a specific user
+   */
+  async recalculateUserTotalCalls(fid: number): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { fid } });
+    if (!user) {
+      throw new Error(`User with FID ${fid} not found`);
+    }
+
+    const callCount = await this.callRepository.count({
+      where: { user: { fid: user.fid } },
+    });
+
+    if (callCount !== user.totalCalls) {
+      await this.userRepository.update(user.fid, { totalCalls: callCount });
+      console.log(
+        `Updated user ${user.username} (FID: ${user.fid}) total calls from ${user.totalCalls} to ${callCount}`,
+      );
+    }
   }
 }

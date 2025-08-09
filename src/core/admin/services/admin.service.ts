@@ -156,28 +156,4 @@ export class AdminService {
       notificationUrl: null,
     });
   }
-
-  /**
-   * Reset user's workout validation status (unban and reset invalid submissions)
-   */
-  async resetUserValidationStatus(fid: number): Promise<User> {
-    return this.updateUser(fid, {
-      invalidWorkoutSubmissions: 0,
-      isBanned: false,
-      bannedAt: null,
-    });
-  }
-
-  /**
-   * Get users with validation issues (banned or high invalid submissions)
-   */
-  async getUsersWithValidationIssues(): Promise<User[]> {
-    return this.userRepository.find({
-      where: [
-        { isBanned: true },
-        { invalidWorkoutSubmissions: 2 }, // Users with 2 invalid submissions (1 more and they're banned)
-      ],
-      order: { invalidWorkoutSubmissions: 'DESC', bannedAt: 'DESC' },
-    });
-  }
 }

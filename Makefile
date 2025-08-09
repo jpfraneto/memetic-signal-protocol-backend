@@ -14,7 +14,7 @@ JWT_SECRET := $(shell openssl rand -base64 64)
 # MySQL connection command
 MYSQL_CMD := docker-compose -f docker-compose.yml exec -T mysql mysql -u root -p$(MYSQL_ROOT_PASSWORD)
 
-.PHONY: simple-deploy deploy-production local-setup docker-setup db-reset db-drop db-create db-status help check-mysql check-server-host restart status logs continue-deployment
+.PHONY: simple-deploy deploy-production local-setup docker-setup db-reset db-drop db-create db-status db-recalculate-calls help check-mysql check-server-host restart status logs continue-deployment
 
 # Simple one-command deployment (local execution)
 simple-deploy:
@@ -173,6 +173,10 @@ db-seed:
 	@echo "Seeding database with workout data..."
 	@npx ts-node src/core/training/services/seed-database.ts
 
+db-recalculate-calls:
+	@echo "🔄 Recalculating total calls for all users..."
+	npm run recalculate-calls
+
 # Show available commands
 help:
 	@echo "Available commands:"
@@ -181,6 +185,7 @@ help:
 	@echo "  make db-create  - Create the database"
 	@echo "  make db-seed    - Seed the database with workout data"
 	@echo "  make db-status  - Check if database exists"
+	@echo "  make db-recalculate-calls - Recalculate total calls for all users"
 	@echo "  make help        - Show this help message"
 
 # Default target

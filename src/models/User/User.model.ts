@@ -36,7 +36,80 @@ export class User {
     default: null,
     nullable: true,
   })
+  displayName: string;
+
+  @Column({
+    type: 'text',
+    default: null,
+    nullable: true,
+  })
+  bio: string;
+
+  @Column({
+    default: null,
+    nullable: true,
+  })
+  avatar: string;
+
+  @Column({
+    default: null,
+    nullable: true,
+  })
   pfpUrl: string;
+
+  @Column({
+    default: false,
+  })
+  isVerified: boolean;
+
+  @Column({
+    type: 'int',
+    default: 0,
+  })
+  followerCount: number;
+
+  @Column({
+    type: 'int',
+    default: 0,
+  })
+  followingCount: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 3,
+    default: 0,
+  })
+  mfsScore: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+  })
+  winRate: number;
+
+  @Column({
+    type: 'int',
+    default: 0,
+  })
+  totalCalls: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  totalStaked: number;
+
+  @Column({
+    type: 'int',
+    default: null,
+    nullable: true,
+  })
+  rank: number;
 
   // ================================
   // USER ROLE & PERMISSIONS

@@ -20,9 +20,6 @@ export class Call {
   transactionHash: string;
 
   @Column()
-  fid: number;
-
-  @Column()
   tokenAddress: string;
 
   @Column()

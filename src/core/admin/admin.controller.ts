@@ -373,43 +373,6 @@ export class AdminController {
   }
 
   /**
-   * Get top users by points
-   */
-  @Get('users/top')
-  async getTopUsers(
-    @Session() user: QuickAuthPayload,
-    @Query('limit') limit: number = 10,
-    @Res() res: Response,
-  ) {
-    console.log(`getTopUsers called - user: ${user.sub}, limit: ${limit}`);
-
-    if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
-      return hasError(
-        res,
-        HttpStatus.FORBIDDEN,
-        'getTopUsers',
-        'Admin access required',
-      );
-    }
-
-    try {
-      console.log('Fetching top users...');
-      const topUsers = await this.adminService.getTopUsers(limit);
-      console.log(`Found ${topUsers.length} top users`);
-      return hasResponse(res, { topUsers });
-    } catch (error) {
-      console.error('Error in getTopUsers:', error);
-      return hasError(
-        res,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'getTopUsers',
-        error.message,
-      );
-    }
-  }
-
-  /**
    * Get users with notifications enabled
    */
   @Get('users/notifications/enabled')
@@ -487,93 +450,6 @@ export class AdminController {
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
         'disableUserNotifications',
-        error.message,
-      );
-    }
-  }
-
-  /**
-   * Reset user's workout validation status
-   */
-  @Post('users/:id/reset-validation')
-  async resetUserValidation(
-    @Session() user: QuickAuthPayload,
-    @Param('id') id: number,
-    @Res() res: Response,
-  ) {
-    console.log(`resetUserValidation called - user: ${user.sub}, id: ${id}`);
-
-    if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
-      return hasError(
-        res,
-        HttpStatus.FORBIDDEN,
-        'resetUserValidation',
-        'Admin access required',
-      );
-    }
-
-    try {
-      console.log(`Resetting validation status for user ${id}...`);
-      const updatedUser = await this.adminService.resetUserValidationStatus(id);
-      console.log('User validation status reset successfully:', {
-        fid: updatedUser.fid,
-        username: updatedUser.username,
-        invalidWorkoutSubmissions: updatedUser.invalidWorkoutSubmissions,
-        isBanned: updatedUser.isBanned,
-      });
-
-      return hasResponse(res, {
-        user: updatedUser,
-        message: 'User validation status reset successfully',
-      });
-    } catch (error) {
-      console.error('Error in resetUserValidation:', error);
-      return hasError(
-        res,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'resetUserValidation',
-        error.message,
-      );
-    }
-  }
-
-  /**
-   * Get users with validation issues
-   */
-  @Get('users/validation-issues')
-  async getUsersWithValidationIssues(
-    @Session() user: QuickAuthPayload,
-    @Res() res: Response,
-  ) {
-    console.log(`getUsersWithValidationIssues called - user: ${user.sub}`);
-
-    if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
-      return hasError(
-        res,
-        HttpStatus.FORBIDDEN,
-        'getUsersWithValidationIssues',
-        'Admin access required',
-      );
-    }
-
-    try {
-      console.log('Fetching users with validation issues...');
-      const users = await this.adminService.getUsersWithValidationIssues();
-      console.log(`Found ${users.length} users with validation issues`);
-
-      return hasResponse(res, {
-        users,
-        count: users.length,
-        message: 'Users with validation issues retrieved successfully',
-      });
-    } catch (error) {
-      console.error('Error in getUsersWithValidationIssues:', error);
-      return hasError(
-        res,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'getUsersWithValidationIssues',
         error.message,
       );
     }

@@ -41,7 +41,15 @@ export class CallService {
       ...callData,
       user,
     });
-    return await this.callRepository.save(call);
+
+    const savedCall = await this.callRepository.save(call);
+
+    // Update user's total calls count
+    await this.userService.update(user.fid, {
+      totalCalls: user.totalCalls + 1,
+    });
+
+    return savedCall;
   }
 
   async getCalls(query: GetCallsQueryDto): Promise<CallsFeedResponseDto> {
@@ -106,25 +114,15 @@ export class CallService {
 
       // Enrich calls with additional data
       return calls.map((call) => {
-        const user = call.user || {
-          fid: call.fid,
-          username: call.user.username,
-          pfpUrl: undefined,
-        };
-
         return {
           id: call.signalId, // Using signalId as the id since it's now the primary key
           signalId: call.signalId,
-          fid: call.fid,
-          username: user.username,
-          avatar: user.pfpUrl,
           user: {
-            fid: user.fid,
-            username: user.username,
-            pfpUrl: user.pfpUrl,
-            role: (user as any).role,
-            createdAt: (user as any).createdAt,
-            lastActiveAt: (user as any).lastActiveAt,
+            fid: call.user.fid,
+            username: call.user.username,
+            pfpUrl: call.user.pfpUrl,
+            totalCalls: (call.user as any).totalCalls,
+            createdAt: (call.user as any).createdAt,
           },
           tokenAddress: call.tokenAddress,
           ticker: call.ticker,
@@ -141,16 +139,11 @@ export class CallService {
       return calls.map((call) => ({
         id: call.signalId, // Using signalId as the id since it's now the primary key
         signalId: call.signalId,
-        fid: call.fid,
-        username: call.user?.username || `user${call.fid}`,
-        avatar: call.user?.pfpUrl,
         user: {
-          fid: call.fid,
-          username: call.user?.username || `user${call.fid}`,
+          fid: call.user.fid,
+          username: call.user.username,
           pfpUrl: call.user?.pfpUrl,
-          role: (call.user as any)?.role,
-          createdAt: (call.user as any)?.createdAt,
-          lastActiveAt: (call.user as any)?.lastActiveAt,
+          totalCalls: (call.user as any)?.totalCalls,
         },
         tokenAddress: call.tokenAddress,
         ticker: call.ticker,

@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:reset": "npm run db:drop && npm run db:create && npm run db:migrate && npm run db:seed",
-    "fetch:casts": "ts-node src/data/signalers/getAllCasts.ts"
+    "fetch:casts": "ts-node src/data/signalers/getAllCasts.ts",
+    "recalculate-calls": "ts-node src/scripts/recalculate-total-calls.ts"
   },
   "dependencies": {
     "@farcaster/auth-client": "^0.1.1",

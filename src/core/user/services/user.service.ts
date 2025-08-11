@@ -15,9 +15,6 @@ import { UserCallsQueryDto } from '../dto/user-calls-query.dto';
 import {
   UserDto,
   CallDto,
-  UserStatsDto,
-  DetailedUserStatsDto,
-  TopTokenDto,
 } from '../dto/user-response.dto';
 
 @Injectable()

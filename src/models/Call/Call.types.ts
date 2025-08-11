@@ -5,6 +5,8 @@ export interface CallMetadata {
 }
 
 export type CallDirection = 'up' | 'down';
+export type CallStatus = 'active' | 'won' | 'lost' | 'expired';
+export type CallTimeframe = '24h' | '7d' | '30d';
 
 export interface CreateCallData {
   signalId: string;

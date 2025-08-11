@@ -109,8 +109,7 @@ export class CallService {
       ];
 
       // Fetch current prices
-      const priceMap =
-        await this.tokenPriceService.getTokenPrices(tokenAddresses);
+      await this.tokenPriceService.getTokenPrices(tokenAddresses);
 
       // Enrich calls with additional data
       return calls.map((call) => {

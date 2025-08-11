@@ -21,11 +21,7 @@ import {
   UsersListResponseDto,
   UserDetailResponseDto,
   UserCallsResponseDto,
-  UserStatsResponseDto,
 } from './dto/user-response.dto';
-
-// Models
-import { User } from '../../models';
 
 // Utils
 import { hasError } from '../../utils';

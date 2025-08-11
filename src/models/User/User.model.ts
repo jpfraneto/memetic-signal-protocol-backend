@@ -97,6 +97,18 @@ export class User {
   totalCalls: number;
 
   @Column({
+    type: 'int',
+    default: 0,
+  })
+  activeCalls: number;
+
+  @Column({
+    type: 'int',
+    default: 0,
+  })
+  settledCalls: number;
+
+  @Column({
     type: 'decimal',
     precision: 15,
     scale: 2,

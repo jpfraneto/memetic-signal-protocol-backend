@@ -3,7 +3,6 @@ import * as dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
 import { User } from '../../../models/User/User.model';
 import { Call } from '../../../models/Call/Call.model';
-import { UserRoleEnum } from '../../../models/User/User.types';
 
 // Load environment variables
 dotenv.config();

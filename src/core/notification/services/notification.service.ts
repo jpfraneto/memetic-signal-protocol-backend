@@ -2,7 +2,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, In, IsNull, Not } from 'typeorm';
+import { Repository, LessThan, In } from 'typeorm';
 import { User, NotificationQueue } from '../../../models';
 import { getConfig } from '../../../security/config';
 import { UserService } from '../../user/services';

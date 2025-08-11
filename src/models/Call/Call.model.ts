@@ -8,7 +8,12 @@ import {
   JoinColumn,
 } from 'typeorm';
 
-import { CallDirection, CallMetadata } from './Call.types';
+import {
+  CallDirection,
+  CallMetadata,
+  CallStatus,
+  CallTimeframe,
+} from './Call.types';
 import { User } from '../User/User.model';
 
 @Entity({ name: 'calls' })
@@ -36,6 +41,29 @@ export class Call {
 
   @Column({ type: 'decimal', precision: 18, scale: 8, nullable: true })
   callPrice: number;
+
+  @Column({ type: 'decimal', precision: 18, scale: 8, nullable: true })
+  currentPrice: number;
+
+  @Column({
+    type: 'enum',
+    enum: ['24h', '7d', '30d'],
+    default: '24h',
+  })
+  timeframe: CallTimeframe;
+
+  @Column({
+    type: 'enum',
+    enum: ['active', 'won', 'lost', 'expired'],
+    default: 'active',
+  })
+  status: CallStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expiresAt: Date;
+
+  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true })
+  pnlPercentage: number;
 
   @Column({ type: 'json', nullable: true })
   metadata: CallMetadata;

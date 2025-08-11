@@ -1,0 +1,114 @@
+import { Controller, Get, Query, HttpStatus, Res } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Response } from 'express';
+
+import { LeaderboardService } from './leaderboard.service';
+import { GetLeaderboardDto } from './dto/get-leaderboard.dto';
+import { hasError } from '../../utils';
+
+@ApiTags('leaderboard-service')
+@Controller('leaderboard-service')
+export class LeaderboardController {
+  constructor(private readonly leaderboardService: LeaderboardService) {}
+
+  @Get('')
+  @ApiOperation({ summary: 'Get leaderboard of top performers' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ranked list of top users by MFS score',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          users: [
+            {
+              fid: 12345,
+              username: 'trader1',
+              totalCalls: 25,
+              activeCalls: 3,
+              settledCalls: 22,
+              winRate: 68.2,
+              mfsScore: 0.756,
+              rank: 1,
+            },
+          ],
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: 50,
+            pages: 3,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getLeaderboard(
+    @Query() query: GetLeaderboardDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.leaderboardService.getLeaderboard(query);
+
+      return res.status(HttpStatus.OK).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error(
+        '❌ [LeaderboardController] Error fetching leaderboard:',
+        error,
+      );
+
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'getLeaderboard',
+        'Failed to fetch leaderboard',
+      );
+    }
+  }
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Get overall leaderboard statistics' })
+  @ApiResponse({
+    status: 200,
+    description: 'Overall leaderboard statistics',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          totalUsers: 150,
+          qualifiedUsers: 45,
+          totalCalls: 1250,
+          avgWinRate: 52.3,
+          topMfsScore: 0.892,
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getLeaderboardStats(@Res() res: Response) {
+    try {
+      const stats = await this.leaderboardService.getLeaderboardStats();
+
+      return res.status(HttpStatus.OK).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      console.error(
+        '❌ [LeaderboardController] Error fetching leaderboard stats:',
+        error,
+      );
+
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'getLeaderboardStats',
+        'Failed to fetch leaderboard statistics',
+      );
+    }
+  }
+}

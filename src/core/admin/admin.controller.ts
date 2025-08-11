@@ -19,6 +19,8 @@ import { AuthorizationGuard, QuickAuthPayload } from '../../security/guards';
 import { Session } from '../../security/decorators';
 import { HttpStatus, hasError, hasResponse } from '../../utils';
 import { User } from '../../models';
+import { SignalSchedulerService } from '../signal/signal-scheduler.service';
+import { BlockchainService } from '../blockchain/blockchain.service';
 
 const adminFids = [16098];
 
@@ -29,7 +31,11 @@ export class AdminController {
   private readonly logger = new Logger(AdminController.name);
   private readonly AUTHORIZED_FID = 16098;
 
-  constructor(private readonly adminService: AdminService) {
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly signalSchedulerService: SignalSchedulerService,
+    private readonly blockchainService: BlockchainService,
+  ) {
     console.log('AdminController initialized');
   }
 
@@ -450,6 +456,240 @@ export class AdminController {
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
         'disableUserNotifications',
+        error.message,
+      );
+    }
+  }
+
+  /**
+   * Trigger expired calls settlement manually
+   */
+  @Post('signals/settle-expired')
+  async triggerSettleExpiredCalls(
+    @Session() user: QuickAuthPayload,
+    @Res() res: Response,
+  ) {
+    console.log(`triggerSettleExpiredCalls called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'triggerSettleExpiredCalls',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Triggering expired calls settlement...');
+      await this.signalSchedulerService.triggerExpiredCallsSettlement();
+      console.log('Expired calls settlement triggered successfully');
+
+      return hasResponse(res, {
+        message: 'Expired calls settlement triggered successfully',
+      });
+    } catch (error) {
+      console.error('Error in triggerSettleExpiredCalls:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'triggerSettleExpiredCalls',
+        error.message,
+      );
+    }
+  }
+
+  /**
+   * Trigger leaderboard rank update manually
+   */
+  @Post('leaderboard/update-ranks')
+  async triggerLeaderboardUpdate(
+    @Session() user: QuickAuthPayload,
+    @Res() res: Response,
+  ) {
+    console.log(`triggerLeaderboardUpdate called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'triggerLeaderboardUpdate',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Triggering leaderboard update...');
+      await this.signalSchedulerService.triggerLeaderboardUpdate();
+      console.log('Leaderboard update triggered successfully');
+
+      return hasResponse(res, {
+        message: 'Leaderboard update triggered successfully',
+      });
+    } catch (error) {
+      console.error('Error in triggerLeaderboardUpdate:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'triggerLeaderboardUpdate',
+        error.message,
+      );
+    }
+  }
+
+  /**
+   * Trigger cache cleanup manually
+   */
+  @Post('cache/cleanup')
+  async triggerCacheCleanup(
+    @Session() user: QuickAuthPayload,
+    @Res() res: Response,
+  ) {
+    console.log(`triggerCacheCleanup called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'triggerCacheCleanup',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Triggering cache cleanup...');
+      await this.signalSchedulerService.triggerCacheCleanup();
+      console.log('Cache cleanup triggered successfully');
+
+      return hasResponse(res, {
+        message: 'Cache cleanup triggered successfully',
+      });
+    } catch (error) {
+      console.error('Error in triggerCacheCleanup:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'triggerCacheCleanup',
+        error.message,
+      );
+    }
+  }
+
+  /**
+   * Trigger blockchain sync manually
+   */
+  @Post('blockchain/sync')
+  async triggerBlockchainSync(
+    @Session() user: QuickAuthPayload,
+    @Res() res: Response,
+  ) {
+    console.log(`triggerBlockchainSync called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'triggerBlockchainSync',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Triggering blockchain sync...');
+      await this.signalSchedulerService.triggerBlockchainSync();
+      console.log('Blockchain sync triggered successfully');
+
+      return hasResponse(res, {
+        message: 'Blockchain sync triggered successfully',
+      });
+    } catch (error) {
+      console.error('Error in triggerBlockchainSync:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'triggerBlockchainSync',
+        error.message,
+      );
+    }
+  }
+
+  /**
+   * Trigger blockchain settlement manually
+   */
+  @Post('blockchain/settle')
+  async triggerBlockchainSettlement(
+    @Session() user: QuickAuthPayload,
+    @Res() res: Response,
+  ) {
+    console.log(`triggerBlockchainSettlement called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'triggerBlockchainSettlement',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Triggering blockchain settlement...');
+      await this.signalSchedulerService.triggerBlockchainSettlement();
+      console.log('Blockchain settlement triggered successfully');
+
+      return hasResponse(res, {
+        message: 'Blockchain settlement triggered successfully',
+      });
+    } catch (error) {
+      console.error('Error in triggerBlockchainSettlement:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'triggerBlockchainSettlement',
+        error.message,
+      );
+    }
+  }
+
+  /**
+   * Get blockchain contract statistics
+   */
+  @Get('blockchain/stats')
+  async getBlockchainStats(
+    @Session() user: QuickAuthPayload,
+    @Res() res: Response,
+  ) {
+    console.log(`getBlockchainStats called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'getBlockchainStats',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Fetching blockchain stats...');
+      const stats = await this.blockchainService.getContractStats();
+      console.log('Blockchain stats retrieved successfully');
+
+      return hasResponse(res, {
+        stats,
+      });
+    } catch (error) {
+      console.error('Error in getBlockchainStats:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'getBlockchainStats',
         error.message,
       );
     }

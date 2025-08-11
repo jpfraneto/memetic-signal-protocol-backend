@@ -7,7 +7,6 @@ import {
   Param,
   HttpStatus,
   Res,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';

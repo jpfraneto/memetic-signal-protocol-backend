@@ -69,6 +69,13 @@ export class Call {
   metadata: CallMetadata;
 
   // ================================
+  // FOREIGN KEYS
+  // ================================
+
+  @Column()
+  fid: number;
+
+  // ================================
   // RELATIONSHIPS
   // ================================
 

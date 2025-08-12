@@ -228,6 +228,7 @@ export class BlockchainService {
         status: this.mapStatus(blockchainSignal.status),
         expiresAt: new Date(Number(blockchainSignal.expiresAt) * 1000),
         pnlPercentage: blockchainSignal.pnlBasisPoints !== 0n ? Number(blockchainSignal.pnlBasisPoints) / 100 : null,
+        fid: Number(blockchainSignal.fid),
         user: user,
       };
 

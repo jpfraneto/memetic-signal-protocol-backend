@@ -33,13 +33,13 @@ export const getConfig = () => {
       domain: process.env.SESSION_DOMAIN || '127.0.0.1',
     },
     db: {
-      name: process.env.DATABASE_NAME,
+      name: process.env.DATABASE_NAME || 'sigil_db',
       host: process.env.DATABASE_HOST || 'localhost', // Fixed: better fallback
       port: process.env.DATABASE_PORT
         ? parseInt(process.env.DATABASE_PORT, 10)
         : 3306, // Fixed: proper parsing
-      username: process.env.DATABASE_USER,
-      password: process.env.DATABASE_PASSWORD,
+      username: process.env.DATABASE_USER || 'root',
+      password: process.env.DATABASE_PASSWORD || '1234',
       requireSSL:
         process.env.DATABASE_SSL === 'true' ||
         process.env.NODE_ENV === 'production',

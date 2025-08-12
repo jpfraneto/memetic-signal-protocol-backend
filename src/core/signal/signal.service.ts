@@ -80,6 +80,7 @@ export class SignalService {
         timeframe: createSignalDto.timeframe,
         status: 'active',
         expiresAt,
+        fid: user.fid,
         user: user,
       });
 
@@ -112,39 +113,37 @@ export class SignalService {
 
   async getSignalsFeed(query: GetSignalsFeedDto): Promise<any> {
     try {
-      const queryBuilder = this.callRepository
-        .createQueryBuilder('call')
-        .leftJoinAndSelect('call.user', 'user')
-        .orderBy(`call.${query.sortBy}`, query.sortOrder);
+      this.logger.debug('Fetching signals feed with find options');
+      console.log('the query is ', query);
 
-      // Apply filters
+      // Build find options
+      const findOptions: any = {
+        relations: ['user'],
+
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      };
+      console.log('the find options are ', findOptions);
+
+      // Build where conditions
+      const where: any = {};
       if (query.status) {
-        queryBuilder.andWhere('call.status = :status', {
-          status: query.status,
-        });
+        where.status = query.status;
       }
 
-      if (query.timeframe) {
-        queryBuilder.andWhere('call.timeframe = :timeframe', {
-          timeframe: query.timeframe,
-        });
+      if (Object.keys(where).length > 0) {
+        findOptions.where = where;
       }
 
-      if (query.fid) {
-        queryBuilder.andWhere('call.user.fid = :fid', { fid: query.fid });
-      }
-
-      if (query.tokenAddress) {
-        queryBuilder.andWhere('call.tokenAddress = :tokenAddress', {
-          tokenAddress: query.tokenAddress.toLowerCase(),
-        });
-      }
-
-      // Pagination
-      const skip = (query.page - 1) * query.limit;
-      queryBuilder.skip(skip).take(query.limit);
-
-      const [calls, total] = await queryBuilder.getManyAndCount();
+      this.logger.debug(
+        'Executing find with options:',
+        JSON.stringify(findOptions),
+      );
+      const [calls, total] =
+        await this.callRepository.findAndCount(findOptions);
+      this.logger.debug(
+        `Query executed successfully, found ${total} total records`,
+      );
 
       // Update current prices for active calls
       const activeCalls = calls.filter((call) => call.status === 'active');
@@ -170,8 +169,6 @@ export class SignalService {
 
       const signals = calls.map((call) => ({
         id: call.signalId,
-        fid: call.user.fid,
-        username: call.user.username,
         tokenAddress: call.tokenAddress,
         tokenSymbol: call.ticker,
         direction: call.direction,
@@ -183,6 +180,7 @@ export class SignalService {
         expiresAt: call.expiresAt,
         pnlPercentage: call.pnlPercentage,
         txHash: call.transactionHash,
+        user: call.user,
       }));
 
       return {

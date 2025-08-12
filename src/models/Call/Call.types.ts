@@ -18,5 +18,10 @@ export interface CreateCallData {
   direction: CallDirection;
   timestamp: number;
   callPrice?: number;
+  currentPrice?: number;
+  timeframe?: CallTimeframe;
+  status?: CallStatus;
+  expiresAt?: Date;
+  pnlPercentage?: number;
   metadata?: CallMetadata;
 }

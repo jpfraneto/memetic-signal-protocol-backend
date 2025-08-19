@@ -9,11 +9,11 @@ async function recalculateTotalCalls() {
 
     const userService = new UserService(
       AppDataSource.getRepository('User'),
-      AppDataSource.getRepository('Call'),
+      AppDataSource.getRepository('Signal'),
     );
 
     console.log('🔄 Recalculating total calls for all users...');
-    await userService.recalculateTotalCalls();
+    await userService.recalculateTotalSignals();
     console.log('✅ Total calls recalculation completed');
 
     console.log('🔄 Closing database connection...');

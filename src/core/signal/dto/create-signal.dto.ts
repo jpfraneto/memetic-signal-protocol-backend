@@ -1,15 +1,50 @@
 import {
   IsNumber,
   IsString,
+  IsArray,
   IsEnum,
   IsOptional,
   IsNotEmpty,
   IsPositive,
+  ValidateNested,
+  ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-import { CallDirection, CallTimeframe } from '../../../models/Call/Call.types';
-import { IsEthereumAddress } from '../../call/validators/ethereum-address.validator';
+import { SignalDirection } from '../../../models/Signal/Signal.types';
+
+export class TokenPredictionDto {
+  @ApiProperty({ description: 'Token contract address' })
+  @IsString()
+  @IsNotEmpty()
+  ca: string;
+
+  @ApiProperty({ description: 'Token symbol/ticker' })
+  @IsString()
+  @IsNotEmpty()
+  ticker: string;
+
+  @ApiProperty({ description: 'Market cap at signal time (scaled by 1e18)' })
+  @IsString()
+  @IsNotEmpty()
+  mc: string;
+
+  @ApiProperty({ description: 'Prize amount in USDC (future feature)' })
+  @IsString()
+  @IsNotEmpty()
+  prizeInUSDC: string;
+
+  @ApiProperty({ description: 'Token image URL' })
+  @IsString()
+  @IsNotEmpty()
+  tokenImageUrl: string;
+
+  @ApiProperty({ description: 'Prediction direction', enum: ['UP', 'DOWN'] })
+  @IsEnum(['UP', 'DOWN'])
+  direction: SignalDirection;
+}
 
 export class CreateSignalDto {
   @ApiProperty({ description: "User's Farcaster ID" })
@@ -17,42 +52,25 @@ export class CreateSignalDto {
   @IsPositive()
   fid: number;
 
-  @ApiProperty({ description: "User's username" })
-  @IsString()
-  @IsNotEmpty()
-  username: string;
-
-  @ApiProperty({ description: 'Target token contract address' })
-  @IsString()
-  @IsEthereumAddress()
-  tokenAddress: string;
-
-  @ApiProperty({ description: 'Token symbol/ticker' })
-  @IsString()
-  @IsNotEmpty()
-  tokenSymbol: string;
-
-  @ApiProperty({ description: 'Prediction direction', enum: ['up', 'down'] })
-  @IsEnum(['up', 'down'])
-  direction: CallDirection;
-
   @ApiProperty({
-    description: 'Timeframe for the prediction',
-    enum: ['24h', '7d', '30d'],
+    description: 'Array of 8 token predictions',
+    type: [TokenPredictionDto],
   })
-  @IsEnum(['24h', '7d', '30d'])
-  timeframe: CallTimeframe;
-
-  @ApiProperty({ description: 'Blockchain transaction hash' })
-  @IsString()
-  @IsNotEmpty()
-  txHash: string;
+  @IsArray()
+  @ArrayMinSize(8)
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => TokenPredictionDto)
+  tokens: TokenPredictionDto[];
 
   @ApiPropertyOptional({
-    description: 'Token price at time of signal creation',
+    description: 'Session metadata',
   })
   @IsOptional()
-  @IsNumber()
-  @IsPositive()
-  entryPrice?: number;
+  metadata?: {
+    sessionStartTime?: number;
+    isRetry?: boolean;
+    userAgent?: string;
+    source?: 'miniapp' | 'frame' | 'api';
+  };
 }

@@ -9,7 +9,7 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
-import { CallStatus, CallTimeframe } from '../../../models/Call/Call.types';
+import { SignalStatus } from '../../../models/Signal/Signal.types';
 
 export class GetSignalsFeedDto {
   @ApiPropertyOptional({ description: 'Page number', default: 1 })
@@ -29,13 +29,13 @@ export class GetSignalsFeedDto {
 
   @ApiPropertyOptional({ description: 'Filter by signal status' })
   @IsOptional()
-  @IsEnum(['active', 'won', 'lost', 'expired'])
-  status?: CallStatus;
+  @IsEnum(['ACTIVE', 'WON', 'LOST', 'EXPIRED'])
+  status?: SignalStatus;
 
   @ApiPropertyOptional({ description: 'Filter by timeframe' })
   @IsOptional()
   @IsEnum(['24h', '7d', '30d'])
-  timeframe?: CallTimeframe;
+  timeframe?: '24h' | '7d' | '30d';
 
   @ApiPropertyOptional({ description: 'Filter by user FID' })
   @IsOptional()

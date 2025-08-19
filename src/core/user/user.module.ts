@@ -9,14 +9,14 @@ import { UserController } from './user.controller';
 import { UserService } from './services';
 
 // Models
-import { User, Call } from '../../models';
+import { User, Signal } from '../../models';
 
 // Modules
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Call]),
+    TypeOrmModule.forFeature([User, Signal]),
     forwardRef(() => AuthModule),
   ],
   controllers: [UserController],

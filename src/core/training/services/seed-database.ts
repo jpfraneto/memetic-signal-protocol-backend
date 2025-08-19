@@ -2,7 +2,9 @@
 import * as dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
 import { User } from '../../../models/User/User.model';
-import { Call } from '../../../models/Call/Call.model';
+import { Signal } from '../../../models/Signal/Signal.model';
+import { Token } from '../../../models/Token/Token.model';
+import { NotificationQueue } from '../../../models/NotificationQueue/NotificationQueue.model';
 
 // Load environment variables
 dotenv.config();
@@ -35,7 +37,7 @@ async function seedDatabase() {
     username: dbConfig.username,
     password: dbConfig.password,
     database: dbConfig.database,
-    entities: [User, Call],
+    entities: [User, Signal, Token, NotificationQueue],
     synchronize: false,
     ssl: false,
   });
@@ -45,8 +47,10 @@ async function seedDatabase() {
     await dataSource.initialize();
     console.log('📡 Connected to database successfully');
 
-    // Clear existing data - calls first due to foreign key constraint
-    await dataSource.query('DELETE FROM calls');
+    // Clear existing data - handle foreign key constraints
+    await dataSource.query('DELETE FROM notification_queue');
+    await dataSource.query('DELETE FROM signals');
+    await dataSource.query('DELETE FROM tokens');
     await dataSource.query('DELETE FROM users');
     console.log('🧹 Cleared existing data');
 

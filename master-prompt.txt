@@ -1,373 +1,186 @@
-# Memetic Signal Protocol (MSP) - Complete System Architecture
+SIGIL - Memetic Layer Protocol Backend System Summary
 
-## System Overview
+  System Overview
 
-**Product:** Memetic Signal Protocol (MSP)
-**Platform:** Farcaster Miniapp on Base blockchain
-**Purpose:** Trustless credibility scoring system for crypto signal callers
+  SIGIL (Memetic Layer Protocol API) is a crypto prediction platform that
+  enables users to make token price calls/predictions on the Farcaster
+  social protocol. It operates as a hybrid blockchain-database architecture
+   combining the immutability of blockchain with database performance for
+  real-time operations.
 
-## Core Problem & Solution
+  Architecture
 
-**Problem:** Crypto influencers make predictions without accountability, leading to misinformation and poor investment decisions.
+  Technology Stack
 
-**Solution:** Objective, mathematical scoring system that tracks public predictions and calculates verifiable "Memetic Footprint Scores" (MFS) for signal callers based on simple up/down predictions.
+  - Backend: NestJS (Node.js) with TypeScript
+  - Database: MySQL with TypeORM
+  - Blockchain: Base mainnet smart contract integration
+  - Security: CSRF protection, helmet, CORS
+  - API: RESTful with Swagger documentation
+  - Authentication: Cookie-based with Farcaster integration
 
-## System Architecture
+  Core Components
 
-### Technical Stack:
-- **Backend:** NestJS + TypeScript + TypeORM + MySQL
-- **Frontend:** Vite + React 18 + TypeScript
-- **Blockchain:** Base blockchain (ethereum layer 2)
-- **State Management:** TanStack Query + Zustand
-- **Styling:** Tailwind CSS v4 with custom design system
-- **Routing:** React Router DOM v7
-- **Authentication:** Farcaster Frame SDK with QuickAuth
-- **APIs:** Farcaster (Neynar), CoinGecko, custom backend
+  1. Smart Contract Integration (ProjectLighthouseV3)
 
-### Platform Integration:
-- **Farcaster Miniapp:** Native frame integration with TBA support
-- **Mobile-first:** Responsive design optimized for mobile usage
-- **Haptic feedback:** Enhanced mobile experience
-- **Offline capability:** Cached data for core functionality
+  - Contract Address: 0xdeB0E09366048944aC9033d5517Bf4Dcc39f2C97 (Base
+  mainnet)
+  - Functions: Signal creation, settlement, user stats, MFS scoring
+  - Events: Real-time sync via event listeners
+  - Settlement: Automated batch processing of expired predictions
 
-## Application Structure
+  2. Database Models
 
-### Three-Screen Architecture:
+  - User: Farcaster users with stats, MFS scores, win rates
+  - Call: Prediction records with P&L tracking
+  - NotificationQueue: Push notification management
 
-#### Screen 1: Signal Feed (`/`)
-**Purpose:** Display recent verified calls and top performers
-**Features:**
-- Real-time signal stream
-- Performance indicators (profit/loss percentages)
-- User verification status badges
-- Time-stamped predictions with outcomes
-- Filter and sorting capabilities
-- Trending tokens sidebar
+  3. Core Services
 
-#### Screen 2: Make Call (`/call`)
-**Purpose:** Signal creation interface
-**Features:**
-- Token search and selection
-- Simple up/down prediction selection
-- Current price display
-- MFS impact preview
-- One-click signal broadcast
+  Signal/Call Management:
+  - Create price predictions (up/down) for tokens
+  - Track timeframes: 24h, 7d, 30d
+  - Auto-settlement with price feeds
+  - P&L calculation and user scoring
 
-#### Screen 3: Explore (`/explore`)
-**Purpose:** User discovery and analysis dashboard
-**Features:**
-- Farcaster username search
-- Historical signal analysis
-- MFS score breakdowns
-- Leaderboard rankings
-- User comparison tools
-- Profile verification status
+  User Management:
+  - Farcaster identity integration
+  - Performance tracking and leaderboards
+  - Ban/role management system
 
-## Design System
+  Blockchain Service:
+  - Real-time event listening
+  - Periodic blockchain-to-database sync
+  - Batch settlement operations
+  - Price feed integration (CoinGecko)
 
-### Color Architecture:
-```css
-/* Primary Palette */
---bg-primary: #000000;        /* Pure black backgrounds */
---bg-secondary: #1a1a1a;      /* Card surfaces */
---bg-tertiary: #2a2a2a;       /* Interactive elements */
+  Token Price Service:
+  - Real-time price fetching
+  - Caching layer for performance
+  - Multi-token batch queries
 
-/* Typography */
---text-primary: #ffffff;      /* Headlines and primary text */
---text-secondary: #cccccc;    /* Body text and descriptions */
---text-muted: #666666;        /* Timestamps and metadata */
+  Key Features
 
-/* Brand & Accents */
---accent-primary: #00ff88;    /* Neon green brand color */
---accent-secondary: #00cc66;  /* Darker green variants */
+  Prediction System
 
-/* Status Indicators */
---success: #00ff88;           /* Profits and positive outcomes */
---danger: #ff4444;            /* Losses and negative outcomes */
---warning: #ffcc00;           /* Pending and caution states */
---info: #0088ff;              /* Informational elements */
+  - Users make "calls" predicting token price direction
+  - Support for 24h, 7d, 30d timeframes
+  - Automatic settlement using real market prices
+  - Immutable on-chain record keeping
 
-/* Structural */
---border-color: #333333;      /* Subtle element separation */
---border-hover: #555555;      /* Interactive state borders */
-```
+  Scoring & Leaderboard
 
-### Visual Principles:
-- **Dark cyberpunk aesthetic:** Professional trading terminal appearance
-- **High contrast typography:** Maximum readability on dark backgrounds
-- **Neon accent strategy:** Bright green highlights for key interactions
-- **Monospace financial data:** All numbers and percentages in monospace fonts
-- **Minimal borders:** Subtle gray separations between content areas
+  - MFS (Memetic Footprint Score): Sophisticated scoring algorithm
+    - Win rate (40% weight)
+    - Consistency (20% weight)
+    - Recent performance (30% weight)
+    - Risk-adjusted returns (10% weight)
+  - Real-time leaderboard rankings
+  - Minimum 5 settled calls to qualify
 
-## Data Architecture
+  Social Integration
 
-### Core Data Models:
+  - Built on Farcaster protocol
+  - User profiles with avatars and verification status
+  - Social feeds of predictions
+  - Notification system for settlements
 
-#### Call Entity:
-```typescript
-interface Call {
-  signalId: string;           // Primary key, unique signal identifier
-  transactionHash: string;    // Blockchain transaction hash
-  tokenAddress: string;       // Token contract address
-  ticker: string;            // Token symbol (e.g., "PEPE")
-  direction: 'up' | 'down';  // Simple prediction direction
-  timestamp: number;         // Unix timestamp of the call
-  callPrice?: number;        // Token price at time of call (optional)
-  metadata?: CallMetadata;   // Additional context data
-  
-  // Relationships
-  user: User;               // Associated user via FID
-  createdAt: Date;          // Database creation timestamp
-  updatedAt: Date;          // Last update timestamp
-}
+  Data Flow
 
-interface CallMetadata {
-  userAgent?: string;       // Client user agent
-  clientFid?: number;       // Client Farcaster ID
-  source?: 'miniapp' | 'frame' | 'api'; // Call source
-}
-```
+  1. Signal Creation: Frontend → Smart Contract → Event → Database Sync
+  2. Auto-Settlement: Cron Jobs → Price Feeds → Batch Settlement → Database
+   Update
+  3. Real-time Updates: Contract Events → Service Listeners → Database →
+  API
 
-#### User Entity:
-```typescript
-interface User {
-  fid: number;              // Farcaster ID (primary key)
-  username: string;         // Farcaster username
-  displayName?: string;     // Display name
-  bio?: string;            // User bio
-  avatar?: string;         // Avatar URL
-  pfpUrl?: string;         // Profile picture URL
-  isVerified: boolean;     // Verification status
-  followerCount: number;   // Follower count
-  followingCount: number;  // Following count
-  
-  // Performance metrics
-  mfsScore: number;        // Memetic Footprint Score (0-1)
-  winRate: number;         // Win rate percentage
-  totalCalls: number;      // Total calls made
-  totalStaked: number;     // Total amount staked
-  rank?: number;           // Current ranking
-  
-  // System fields
-  role: 'user' | 'admin';  // User role
-  isBanned: boolean;       // Ban status
-  bannedAt?: Date;         // Ban timestamp
-  notificationsEnabled: boolean;
-  notificationToken?: string;
-  notificationUrl?: string;
-  
-  // Timestamps
-  createdAt: Date;
-  updatedAt: Date;
-  lastActiveAt?: Date;
-  
-  // Relationships
-  calls: Call[];           // User's calls
-}
-```
+  API Structure
 
-#### MemeticFootprintScore Calculation:
-```typescript
-interface MFSComponents {
-  accuracy: number;      // Win/loss ratio (40% weight)
-  recency: number;       // Time-weighted recent performance (25% weight)
-  consistency: number;   // Regular activity pattern (15% weight)
-  volume: number;        // Total call volume (10% weight)
-  riskAdjustment: number; // Volatility penalty (10% weight)
-}
+  Main Endpoints:
 
-const calculateMFS = (calls: Call[]): number => {
-  const components = analyzeCalls(calls);
-  return (
-    components.accuracy * 0.4 +
-    components.recency * 0.25 +
-    components.consistency * 0.15 +
-    components.volume * 0.1 +
-    components.riskAdjustment * 0.1
-  );
-};
-```
+  - Signal Service: /signal-service/* - Create/manage predictions
+  - User Service: /users-service/* - User profiles and stats
+  - Leaderboard: /leaderboard-service - Rankings and performance
+  - Token Service: /tokens-service/* - Price data and metadata
+  - Admin Service: /admin-service/* - Management tools
 
-## API Architecture
+  Key Data Models:
 
-### Core Endpoints:
+  // Signal/Call with blockchain integration
+  interface SignalCall {
+    id: string;
+    fid: number; // Farcaster ID
+    tokenAddress: string;
+    direction: "up" | "down";
+    timeframe: "24h" | "7d" | "30d";
+    status: "active" | "won" | "lost" | "expired";
+    pnlPercentage: number;
+    txHash: string; // Blockchain transaction
+  }
 
-#### Call Management:
-```
-POST   /api/calls              # Create new call
-GET    /api/calls              # Fetch call feed
-GET    /api/calls/:signalId    # Get specific call
-PUT    /api/calls/:signalId    # Update call (admin only)
-DELETE /api/calls/:signalId    # Delete call (admin only)
-```
+  // User with social features
+  interface UserStats {
+    fid: number;
+    username: string;
+    mfsScore: number; // 0-1000 scale
+    winRate: number;
+    totalCalls: number;
+    rank: number;
+  }
 
-#### User Operations:
-```
-GET    /api/users/:fid         # Get user profile
-GET    /api/users/:fid/calls   # User's call history
-PUT    /api/users/:fid         # Update user profile
-POST   /api/users/verify       # Opt into verification system
-```
+  Automation & Scheduling
 
-#### Discovery & Analytics:
-```
-GET    /api/search/users       # Search Farcaster users
-GET    /api/leaderboard        # Top performers by MFS
-GET    /api/trending           # Trending tokens and calls
-GET    /api/analytics/:fid     # Detailed user analytics
-```
+  Background Jobs:
 
-#### Farcaster Integration:
-```
-GET    /api/farcaster/user/:username    # Lookup by username
-GET    /api/farcaster/casts/:fid        # Historical cast analysis
-POST   /api/farcaster/analyze/:fid      # Generate MFS from casts
-```
+  - Every 5 min: Settle expired signals on blockchain
+  - Every 10 min: Fallback database settlement
+  - Every hour: Sync blockchain to database
+  - Every 30 min: Clean price cache
 
-#### Token & Market Data:
-```
-GET    /api/tokens/search      # Token search with autocomplete
-GET    /api/tokens/:address/price # Real-time price data
-GET    /api/market/trending    # Trending tokens across platforms
-```
+  Event Processing:
 
-## Component Architecture
+  - Real-time blockchain event listeners
+  - Automatic user stat recalculation
+  - MFS score updates on settlements
 
-### Page Components:
-```
-src/pages/
-├── LandingFeed/
-│   ├── index.tsx
-│   ├── FeedFilters.tsx
-│   ├── SignalStream.tsx
-│   └── TrendingSidebar.tsx
-├── ProtocolPage/
-│   ├── index.tsx
-│   ├── TokenSelector.tsx
-│   ├── PredictionForm.tsx
-│   └── SignalPreview.tsx
-├── UserProfilePage/
-│   ├── index.tsx
-│   ├── UserSearch.tsx
-│   ├── Leaderboard.tsx
-│   ├── UserProfile.tsx
-│   └── AnalyticsDashboard.tsx
-```
+  Security & Production Features
 
-### Shared Components:
-```
-src/shared/components/
-├── SignalCard.tsx           # Individual signal display
-├── UserProfileCard.tsx      # User profile summary
-├── MFSBadge.tsx            # Score visualization
-├── PerformanceChart.tsx     # Win/loss charts
-├── VerificationBadge.tsx   # Verified status indicator
-├── ProfitLossIndicator.tsx # P&L visualization
-├── NavigationBar.tsx       # Three-tab navigation
-└── LoadingStates.tsx       # Skeleton screens
-```
+  Security:
 
-### Hooks & State Management:
-```
-src/shared/hooks/
-├── useCalls.ts             # Call CRUD operations
-├── useUserProfile.ts       # Profile management
-├── useMFSCalculation.ts    # Real-time score updates
-├── useTokenPrices.ts       # Price tracking
-├── useFarcasterLookup.ts   # User search and analysis
-├── useRealTimeUpdates.ts   # WebSocket connections
-└── useAnalytics.ts         # Performance tracking
-```
+  - CSRF protection with token validation
+  - Helmet security headers
+  - IP logging middleware
+  - Admin role-based access control
+  - SSL database connections
 
-## Real-Time Features
+  Performance:
 
-### Live Data Streams:
-- **Price Updates:** WebSocket connections to price oracles
-- **Call Outcomes:** Automated settlement based on price movements
-- **User Rankings:** Real-time leaderboard updates
-- **Feed Updates:** Live call creation and resolution
+  - Connection pooling (10 connections)
+  - Price caching (5-minute intervals)
+  - Batch blockchain operations
+  - Pagination for large datasets
 
-### Performance Optimization:
-- **Caching Strategy:** Redis for frequently accessed data
-- **CDN Distribution:** Global edge caching for static assets
-- **Lazy Loading:** Progressive content loading for mobile
-- **Background Sync:** Offline-first data synchronization
+  Use Cases & Business Logic
 
-## Security & Privacy
+  Primary Use Case:
 
-### Data Protection:
-- **Opt-in Analytics:** Users control what data is analyzed
-- **Pseudonymous Operation:** FID-based identification only
-- **Encrypted Storage:** Sensitive user data encrypted at rest
-- **Rate Limiting:** API protection against abuse
+  Platform for crypto prediction competitions where users make public token
+   price calls, compete on leaderboards, and build reputation through
+  accurate predictions.
 
-### Authentication & Authorization:
-- **Farcaster Integration:** Native Farcaster authentication
-- **Role-based Access:** Admin and user role management
-- **Ban System:** User suspension capabilities
-- **CSRF Protection:** Cross-site request forgery prevention
+  Target Users:
 
-## Scalability Design
+  - Crypto traders and analysts
+  - Farcaster community members
+  - Social prediction enthusiasts
+  - DeFi participants
 
-### Performance Targets:
-- **Page Load:** Under 2 seconds initial load
-- **API Response:** Under 500ms for all endpoints
-- **Concurrent Users:** Support 10,000+ simultaneous users
-- **Uptime:** 99.9% availability target
+  Monetization Potential:
 
-### Growth Architecture:
-- **Horizontal Scaling:** Microservices architecture for component scaling
-- **Database Sharding:** User data partitioned by FID ranges
-- **CDN Strategy:** Global content distribution
-- **Mobile Optimization:** Progressive Web App capabilities
+  - Premium features
+  - Prediction staking mechanisms
+  - Social tipping integration
+  - Analytics subscriptions
 
-## Database Schema
-
-### Calls Table:
-```sql
-CREATE TABLE calls (
-  signalId VARCHAR(255) PRIMARY KEY,
-  transactionHash VARCHAR(255) UNIQUE NOT NULL,
-  tokenAddress VARCHAR(255) NOT NULL,
-  ticker VARCHAR(50) NOT NULL,
-  direction ENUM('up', 'down') NOT NULL,
-  timestamp BIGINT NOT NULL,
-  callPrice DECIMAL(18,8) NULL,
-  metadata JSON NULL,
-  fid INT NOT NULL,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (fid) REFERENCES users(fid) ON DELETE CASCADE
-);
-```
-
-### Users Table:
-```sql
-CREATE TABLE users (
-  fid INT PRIMARY KEY,
-  username VARCHAR(255) NOT NULL,
-  displayName VARCHAR(255) NULL,
-  bio TEXT NULL,
-  avatar VARCHAR(500) NULL,
-  pfpUrl VARCHAR(500) NULL,
-  isVerified BOOLEAN DEFAULT FALSE,
-  followerCount INT DEFAULT 0,
-  followingCount INT DEFAULT 0,
-  mfsScore DECIMAL(5,3) DEFAULT 0,
-  winRate DECIMAL(5,2) DEFAULT 0,
-  totalCalls INT DEFAULT 0,
-  totalStaked DECIMAL(15,2) DEFAULT 0,
-  rank INT NULL,
-  role ENUM('user', 'admin') DEFAULT 'user',
-  isBanned BOOLEAN DEFAULT FALSE,
-  bannedAt TIMESTAMP NULL,
-  notificationsEnabled BOOLEAN DEFAULT FALSE,
-  notificationToken VARCHAR(255) NULL,
-  notificationUrl VARCHAR(500) NULL,
-  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  lastActiveAt TIMESTAMP NULL
-);
-```
-
-This architecture provides a complete foundation for building a professional, scalable credibility scoring system for crypto signal callers within the Farcaster ecosystem, focusing on simple up/down predictions for maximum clarity and accountability.
+  This system combines social media engagement with DeFi prediction 
+  markets, leveraging blockchain immutability while maintaining traditional
+   database performance for a compelling user experience.

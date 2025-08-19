@@ -483,7 +483,7 @@ export class AdminController {
 
     try {
       console.log('Triggering expired calls settlement...');
-      await this.signalSchedulerService.triggerExpiredCallsSettlement();
+      await this.signalSchedulerService.triggerExpiredSignalsSettlement();
       console.log('Expired calls settlement triggered successfully');
 
       return hasResponse(res, {

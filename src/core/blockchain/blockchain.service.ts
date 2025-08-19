@@ -1,160 +1,224 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ethers, Contract, JsonRpcProvider } from 'ethers';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Call } from '../../models/Call/Call.model';
+import { Signal } from '../../models/Signal/Signal.model';
 import { User } from '../../models/User/User.model';
-import { CallDirection, CallTimeframe, CallStatus } from '../../models/Call/Call.types';
-
-// Smart contract ABI for ProjectLighthouseV3
-const CONTRACT_ABI = [
-  // Events
-  'event SignalCreated(uint256 indexed signalId, uint256 indexed fid, address indexed token, string ticker, uint8 direction, uint8 timeframe, uint256 entryPrice, uint256 expiresAt, uint256 timestamp)',
-  'event SignalSettled(uint256 indexed signalId, uint256 indexed fid, address indexed token, uint8 status, uint256 exitPrice, int256 pnlBasisPoints, uint256 settledAt)',
-  'event MFSUpdated(uint256 indexed fid, uint256 newScore, uint256 totalCalls, uint256 wonCalls, uint256 timestamp)',
-  
-  // Write functions
-  'function makeCall(uint256 fid, address token, string ticker, uint8 direction, uint8 timeframe, uint256 entryPrice) external',
-  'function settleSignal(uint256 signalId, uint256 exitPrice) external',
-  'function batchSettleSignals(uint256[] signalIds, uint256[] exitPrices) external',
-  
-  // Read functions
-  'function getSignal(uint256 signalId) external view returns (tuple(uint256 fid, address token, string ticker, uint8 direction, uint8 timeframe, uint256 entryPrice, uint256 exitPrice, uint256 createdAt, uint256 expiresAt, uint256 settledAt, uint8 status, int256 pnlBasisPoints))',
-  'function getUserSignals(uint256 fid) external view returns (uint256[])',
-  'function getUserStats(uint256 fid) external view returns (tuple(uint256 totalCalls, uint256 settledCalls, uint256 wonCalls, int256 totalPnlBasisPoints, uint256 lastCallAt, uint256 mfsScore, uint256 mfsLastUpdated))',
-  'function getActiveSignals(uint256 fid) external view returns (tuple(uint256 fid, address token, string ticker, uint8 direction, uint8 timeframe, uint256 entryPrice, uint256 exitPrice, uint256 createdAt, uint256 expiresAt, uint256 settledAt, uint8 status, int256 pnlBasisPoints)[])',
-  'function getRecentSignals(uint256 offset, uint256 limit) external view returns (tuple(uint256 fid, address token, string ticker, uint8 direction, uint8 timeframe, uint256 entryPrice, uint256 exitPrice, uint256 createdAt, uint256 expiresAt, uint256 settledAt, uint8 status, int256 pnlBasisPoints)[])',
-  'function getExpiredSignals(uint256 maxResults) external view returns (uint256[])',
-  'function getUserMFS(uint256 fid) external view returns (uint256)',
-  'function getUserWinRate(uint256 fid) external view returns (uint256)',
-  'function nextSignalId() external view returns (uint256)',
-  'function totalSignals() external view returns (uint256)',
-  'function totalActiveSignals() external view returns (uint256)',
-  'function totalSettledSignals() external view returns (uint256)'
-];
+import {
+  SignalDirection,
+  SignalStatus,
+  TokenPrediction,
+} from '../../models/Signal/Signal.types';
+import { ABI } from './abi';
+import { UserStateOnTheSystemEnum } from '../../models/User/User.types';
 
 interface BlockchainSignal {
   fid: bigint;
-  token: string;
-  ticker: string;
-  direction: number;
-  timeframe: number;
-  entryPrice: bigint;
-  exitPrice: bigint;
+  tokens: TokenPrediction[];
   createdAt: bigint;
   expiresAt: bigint;
-  settledAt: bigint;
   status: number;
-  pnlBasisPoints: bigint;
+  correctPredictions: number;
 }
 
-interface BlockchainUserStats {
-  totalCalls: bigint;
-  settledCalls: bigint;
-  wonCalls: bigint;
-  totalPnlBasisPoints: bigint;
-  lastCallAt: bigint;
-  mfsScore: bigint;
-  mfsLastUpdated: bigint;
+interface BlockchainAccount {
+  fid: bigint;
+  pfpUrl: string;
+  username: string;
+  isBanned: boolean;
+  createdAt: bigint;
 }
 
 @Injectable()
-export class BlockchainService {
+export class BlockchainService implements OnModuleInit {
   private readonly logger = new Logger(BlockchainService.name);
   private readonly provider: JsonRpcProvider;
   private contract: Contract;
   private readonly signer?: ethers.Wallet;
-  
-  // Contract address on Base mainnet
-  private readonly CONTRACT_ADDRESS = '0xdeB0E09366048944aC9033d5517Bf4Dcc39f2C97';
-  private readonly BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
-  private readonly PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY;
+
+  // Contract address on Base mainnet - ProjectLighthouseV11
+  private readonly CONTRACT_ADDRESS =
+    '0x3026797C50F63636e0147F5D28DE312989c2B417';
+  private readonly BASE_RPC_URL = process.env.BASE_RPC_URL;
+  private readonly PRIVATE_KEY = process.env.PRIVATE_KEY;
 
   constructor(
-    @InjectRepository(Call)
-    private callRepository: Repository<Call>,
+    @InjectRepository(Signal)
+    private signalRepository: Repository<Signal>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {
-    // Initialize provider
-    this.provider = new JsonRpcProvider(this.BASE_RPC_URL);
-    
+    // Initialize provider with retry configuration
+    this.provider = new JsonRpcProvider(this.BASE_RPC_URL, undefined, {
+      staticNetwork: true,
+      polling: true,
+      pollingInterval: 4000,
+    });
+
     // Initialize contract
-    this.contract = new Contract(this.CONTRACT_ADDRESS, CONTRACT_ABI, this.provider);
-    
+    this.contract = new Contract(this.CONTRACT_ADDRESS, ABI, this.provider);
+
     // Initialize signer if private key is provided (for settlement operations)
     if (this.PRIVATE_KEY) {
       this.signer = new ethers.Wallet(this.PRIVATE_KEY, this.provider);
       this.contract = this.contract.connect(this.signer) as Contract;
-      this.logger.log('Blockchain service initialized with signer for settlement operations');
+      this.logger.log(
+        'Blockchain service initialized with signer for settlement operations',
+      );
     } else {
-      this.logger.warn('No private key provided - settlement operations will be disabled');
+      this.logger.warn(
+        'No private key provided - settlement operations will be disabled',
+      );
     }
 
-    this.logger.log(`Contract initialized at ${this.CONTRACT_ADDRESS} on Base network`);
+    this.logger.log(
+      `Contract initialized at ${this.CONTRACT_ADDRESS} on Base network`,
+    );
+  }
+
+  /**
+   * Initialize the blockchain service and start real-time event listening
+   */
+  async onModuleInit(): Promise<void> {
+    this.logger.log(
+      '🚀 BLOCKCHAIN SERVICE: Initializing blockchain service...',
+    );
+
+    try {
+      this.logger.log(
+        `🔗 BLOCKCHAIN SERVICE: Connected to contract ${this.CONTRACT_ADDRESS} on Base network`,
+      );
+      this.logger.log(
+        `💰 BLOCKCHAIN SERVICE: Signer available: ${!!this.signer} (settlement operations ${this.signer ? 'enabled' : 'disabled'})`,
+      );
+
+      // Start real-time event listening only
+      await this.startEventListening();
+
+      this.logger.log(
+        '✅ BLOCKCHAIN SERVICE: Blockchain service fully initialized and operational',
+      );
+    } catch (error) {
+      this.logger.error(
+        '❌ BLOCKCHAIN SERVICE: Error initializing blockchain service:',
+        error,
+      );
+    }
   }
 
   /**
    * Convert blockchain direction enum to our internal type
    */
-  private mapDirection(direction: number): CallDirection {
-    return direction === 0 ? 'up' : 'down';
-  }
-
-  /**
-   * Convert blockchain timeframe enum to our internal type
-   */
-  private mapTimeframe(timeframe: number): CallTimeframe {
-    switch (timeframe) {
-      case 0: return '24h';
-      case 1: return '7d';  
-      case 2: return '30d';
-      default: return '24h';
-    }
+  private mapDirection(direction: number): SignalDirection {
+    return direction === 0 ? 'UP' : 'DOWN';
   }
 
   /**
    * Convert blockchain status enum to our internal type
    */
-  private mapStatus(status: number): CallStatus {
+  private mapStatus(status: number): SignalStatus {
     switch (status) {
-      case 0: return 'active';
-      case 1: return 'won';
-      case 2: return 'lost';
-      case 3: return 'expired';
-      default: return 'active';
+      case 0:
+        return 'ACTIVE';
+      case 1:
+        return 'WON';
+      case 2:
+        return 'LOST';
+      case 3:
+        return 'EXPIRED';
+      default:
+        return 'ACTIVE';
     }
   }
 
   /**
    * Convert our internal direction to blockchain enum
    */
-  private mapDirectionToEnum(direction: CallDirection): number {
-    return direction === 'up' ? 0 : 1;
-  }
-
-  /**
-   * Convert our internal timeframe to blockchain enum
-   */
-  private mapTimeframeToEnum(timeframe: CallTimeframe): number {
-    switch (timeframe) {
-      case '24h': return 0;
-      case '7d': return 1;
-      case '30d': return 2;
-      default: return 0;
-    }
+  private mapDirectionToEnum(direction: SignalDirection): number {
+    return direction === 'UP' ? 0 : 1;
   }
 
   /**
    * Get signal data from blockchain by signal ID
    */
-  async getSignalFromBlockchain(signalId: number): Promise<BlockchainSignal | null> {
+  async getSignalFromBlockchain(
+    signalId: number,
+  ): Promise<BlockchainSignal | null> {
     try {
-      const signal = await this.contract.getSignal(signalId);
+      const signal = await this.executeWithRetry(() =>
+        this.contract.getSignal(signalId),
+      );
       return signal;
     } catch (error) {
-      this.logger.error(`Error fetching signal ${signalId} from blockchain:`, error);
+      this.logger.error(
+        `Error fetching signal ${signalId} from blockchain:`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  private async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    delayMs: number = 1000,
+  ): Promise<T> {
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+
+        if (this.isRetryableError(error) && attempt < maxRetries) {
+          this.logger.warn(
+            `Blockchain operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delayMs}ms: ${error.message}`,
+          );
+          await this.delay(delayMs);
+          delayMs *= 2;
+        } else {
+          break;
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+  private isRetryableError(error: any): boolean {
+    const retryableMessages = [
+      'filter not found',
+      'no backend is currently healthy',
+      'connection timeout',
+      'network error',
+      'rate limit',
+      'internal error',
+    ];
+
+    const errorMessage = error?.message?.toLowerCase() || '';
+    return retryableMessages.some((msg) => errorMessage.includes(msg));
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get account data from blockchain
+   */
+  async getAccountFromBlockchain(
+    walletAddress: string,
+  ): Promise<BlockchainAccount | null> {
+    try {
+      const account = await this.contract.getAccount(walletAddress);
+      return account;
+    } catch (error) {
+      this.logger.error(
+        `Error fetching account ${walletAddress} from blockchain:`,
+        error,
+      );
       return null;
     }
   }
@@ -173,14 +237,22 @@ export class BlockchainService {
   }
 
   /**
-   * Get user stats from blockchain
+   * Get contract stats from blockchain
    */
-  async getUserStatsFromBlockchain(fid: number): Promise<BlockchainUserStats | null> {
+  async getContractStatsFromBlockchain(): Promise<{
+    totalSignals: number;
+    totalAccounts: number;
+    deploymentTimestamp: number;
+  } | null> {
     try {
-      const stats = await this.contract.getUserStats(fid);
-      return stats;
+      const stats = await this.contract.getContractStats();
+      return {
+        totalSignals: Number(stats._totalSignals),
+        totalAccounts: Number(stats._totalAccounts),
+        deploymentTimestamp: Number(stats._deploymentTimestamp),
+      };
     } catch (error) {
-      this.logger.error(`Error fetching user stats for FID ${fid}:`, error);
+      this.logger.error('Error fetching contract stats:', error);
       return null;
     }
   }
@@ -188,7 +260,7 @@ export class BlockchainService {
   /**
    * Sync a specific signal from blockchain to database
    */
-  async syncSignalFromBlockchain(signalId: number): Promise<Call | null> {
+  async syncSignalFromBlockchain(signalId: number): Promise<Signal | null> {
     try {
       const blockchainSignal = await this.getSignalFromBlockchain(signalId);
       if (!blockchainSignal) {
@@ -196,53 +268,51 @@ export class BlockchainService {
       }
 
       // Check if signal already exists in database
-      let existingCall = await this.callRepository.findOne({
+      let existingSignal = await this.signalRepository.findOne({
         where: { signalId: signalId.toString() },
-        relations: ['user']
+        relations: ['user'],
       });
 
       // Get or create user
       let user = await this.userRepository.findOne({
-        where: { fid: Number(blockchainSignal.fid) }
+        where: { fid: Number(blockchainSignal.fid) },
       });
 
       if (!user) {
         // Create user if doesn't exist
         user = this.userRepository.create({
           fid: Number(blockchainSignal.fid),
-          username: `user_${blockchainSignal.fid}`, // Placeholder, should be updated from Farcaster
+          username: `user_${blockchainSignal.fid}`,
+          stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
         });
         await this.userRepository.save(user);
       }
 
-      const callData = {
+      const signalData = {
         signalId: signalId.toString(),
-        transactionHash: '', // Will be filled when we have the transaction hash
-        tokenAddress: blockchainSignal.token.toLowerCase(),
-        ticker: blockchainSignal.ticker,
-        direction: this.mapDirection(blockchainSignal.direction),
+        tokens: blockchainSignal.tokens,
         timestamp: Number(blockchainSignal.createdAt),
-        callPrice: Number(ethers.formatEther(blockchainSignal.entryPrice)),
-        currentPrice: blockchainSignal.exitPrice > 0n ? Number(ethers.formatEther(blockchainSignal.exitPrice)) : null,
-        timeframe: this.mapTimeframe(blockchainSignal.timeframe),
         status: this.mapStatus(blockchainSignal.status),
         expiresAt: new Date(Number(blockchainSignal.expiresAt) * 1000),
-        pnlPercentage: blockchainSignal.pnlBasisPoints !== 0n ? Number(blockchainSignal.pnlBasisPoints) / 100 : null,
+        correctPredictions: blockchainSignal.correctPredictions,
         fid: Number(blockchainSignal.fid),
         user: user,
       };
 
-      if (existingCall) {
-        // Update existing call
-        Object.assign(existingCall, callData);
-        return await this.callRepository.save(existingCall);
+      if (existingSignal) {
+        // Update existing signal
+        Object.assign(existingSignal, signalData);
+        return await this.signalRepository.save(existingSignal);
       } else {
-        // Create new call
-        const newCall = this.callRepository.create(callData);
-        return await this.callRepository.save(newCall);
+        // Create new signal
+        const newSignal = this.signalRepository.create(signalData);
+        return await this.signalRepository.save(newSignal);
       }
     } catch (error) {
-      this.logger.error(`Error syncing signal ${signalId} from blockchain:`, error);
+      this.logger.error(
+        `Error syncing signal ${signalId} from blockchain:`,
+        error,
+      );
       return null;
     }
   }
@@ -250,56 +320,32 @@ export class BlockchainService {
   /**
    * Settle signals on blockchain (requires signer)
    */
-  async settleSignalOnBlockchain(signalId: number, exitPrice: number): Promise<boolean> {
+  async settleSignalOnBlockchain(
+    signalId: number,
+    exitMarketCap: string,
+  ): Promise<boolean> {
     if (!this.signer) {
       this.logger.error('Cannot settle signal: no signer available');
       return false;
     }
 
     try {
-      const exitPriceWei = ethers.parseEther(exitPrice.toString());
-      
-      const tx = await this.contract.settleSignal(signalId, exitPriceWei);
+      const tx = await this.contract.settleSignal(signalId, exitMarketCap);
       const receipt = await tx.wait();
-      
-      this.logger.log(`Signal ${signalId} settled on blockchain. TX: ${receipt.hash}`);
-      
+
+      this.logger.log(
+        `Signal ${signalId} settled on blockchain. TX: ${receipt.hash}`,
+      );
+
       // Sync the updated signal back to our database
       await this.syncSignalFromBlockchain(signalId);
-      
+
       return true;
     } catch (error) {
-      this.logger.error(`Error settling signal ${signalId} on blockchain:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Batch settle signals on blockchain
-   */
-  async batchSettleSignalsOnBlockchain(settlements: Array<{signalId: number, exitPrice: number}>): Promise<boolean> {
-    if (!this.signer) {
-      this.logger.error('Cannot batch settle signals: no signer available');
-      return false;
-    }
-
-    try {
-      const signalIds = settlements.map(s => s.signalId);
-      const exitPrices = settlements.map(s => ethers.parseEther(s.exitPrice.toString()));
-      
-      const tx = await this.contract.batchSettleSignals(signalIds, exitPrices);
-      const receipt = await tx.wait();
-      
-      this.logger.log(`Batch settled ${settlements.length} signals. TX: ${receipt.hash}`);
-      
-      // Sync all updated signals back to our database
-      for (const settlement of settlements) {
-        await this.syncSignalFromBlockchain(settlement.signalId);
-      }
-      
-      return true;
-    } catch (error) {
-      this.logger.error(`Error batch settling signals:`, error);
+      this.logger.error(
+        `Error settling signal ${signalId} on blockchain:`,
+        error,
+      );
       return false;
     }
   }
@@ -307,121 +353,374 @@ export class BlockchainService {
   /**
    * Get expired signals from blockchain
    */
-  async getExpiredSignalsFromBlockchain(maxResults: number = 50): Promise<number[]> {
+  async getExpiredSignalsFromBlockchain(limit: number = 20): Promise<Signal[]> {
     try {
-      const expiredIds = await this.contract.getExpiredSignals(maxResults);
-      return expiredIds.map((id: bigint) => Number(id));
-    } catch (error) {
-      this.logger.error('Error fetching expired signals from blockchain:', error);
-      return [];
-    }
-  }
+      // Get recent signals and filter for expired ones
+      const nextSignalId = Number(await this.contract.nextSignalId());
+      const signals: Signal[] = [];
+      const currentTime = Math.floor(Date.now() / 1000);
 
-  /**
-   * Get recent signals from blockchain with pagination
-   */
-  async getRecentSignalsFromBlockchain(offset: number = 0, limit: number = 20): Promise<Call[]> {
-    try {
-      const signals = await this.contract.getRecentSignals(offset, limit);
-      const calls: Call[] = [];
-
-      for (const signal of signals) {
-        const call = await this.syncSignalFromBlockchain(Number(await this.contract.nextSignalId()) - 1 - offset);
-        if (call) {
-          calls.push(call);
+      for (
+        let i = nextSignalId - 1;
+        i >= Math.max(1, nextSignalId - limit * 2);
+        i--
+      ) {
+        const signal = await this.getSignalFromBlockchain(i);
+        if (
+          signal &&
+          signal.status === 0 &&
+          Number(signal.expiresAt) <= currentTime
+        ) {
+          // ACTIVE and expired
+          const syncedSignal = await this.syncSignalFromBlockchain(i);
+          if (syncedSignal) signals.push(syncedSignal);
+          if (signals.length >= limit) break;
         }
       }
 
-      return calls;
+      return signals;
     } catch (error) {
-      this.logger.error('Error fetching recent signals from blockchain:', error);
+      this.logger.error(
+        'Error fetching expired signals from blockchain:',
+        error,
+      );
       return [];
     }
   }
 
   /**
-   * Sync user stats from blockchain to database
+   * Batch settle signals on blockchain
    */
-  async syncUserStatsFromBlockchain(fid: number): Promise<void> {
+  async batchSettleSignalsOnBlockchain(
+    settlements: Array<{ signalId: number; exitMarketCap: string }>,
+  ): Promise<boolean> {
+    if (!this.signer) {
+      this.logger.error('Cannot batch settle signals: no signer available');
+      return false;
+    }
+
     try {
-      const blockchainStats = await this.getUserStatsFromBlockchain(fid);
-      if (!blockchainStats) {
-        return;
+      // For now, settle them one by one since the contract doesn't have batch settlement
+      let allSuccessful = true;
+
+      for (const settlement of settlements) {
+        const success = await this.settleSignalOnBlockchain(
+          settlement.signalId,
+          settlement.exitMarketCap,
+        );
+        if (!success) {
+          allSuccessful = false;
+        }
       }
 
-      let user = await this.userRepository.findOne({
-        where: { fid }
-      });
-
-      if (!user) {
-        user = this.userRepository.create({
-          fid,
-          username: `user_${fid}`, // Placeholder
-        });
-      }
-
-      // Update user stats from blockchain
-      user.totalCalls = Number(blockchainStats.totalCalls);
-      user.settledCalls = Number(blockchainStats.settledCalls);
-      user.activeCalls = user.totalCalls - user.settledCalls;
-      
-      // Calculate win rate
-      if (user.settledCalls > 0) {
-        user.winRate = (Number(blockchainStats.wonCalls) / user.settledCalls) * 100;
-      }
-      
-      // MFS score from blockchain (convert from basis points)
-      user.mfsScore = Number(blockchainStats.mfsScore) / 10000;
-
-      await this.userRepository.save(user);
-      
-      this.logger.log(`Synced user stats for FID ${fid} from blockchain`);
+      this.logger.log(
+        `Batch settled ${settlements.length} signals. All successful: ${allSuccessful}`,
+      );
+      return allSuccessful;
     } catch (error) {
-      this.logger.error(`Error syncing user stats for FID ${fid}:`, error);
+      this.logger.error('Error batch settling signals on blockchain:', error);
+      return false;
     }
   }
 
   /**
-   * Listen for blockchain events (for real-time updates)
+   * Get recent signals from blockchain
    */
-  startEventListening(): void {
-    this.logger.log('Starting blockchain event listening...');
+  async getRecentSignalsFromBlockchain(limit: number = 20): Promise<Signal[]> {
+    try {
+      const signals = await this.contract.getRecentSignals(limit);
+      const syncedSignals: Signal[] = [];
+
+      for (const signal of signals) {
+        // Find the signal ID by iterating through recent IDs
+        const nextSignalId = Number(await this.contract.nextSignalId());
+        for (
+          let i = nextSignalId - 1;
+          i >= Math.max(1, nextSignalId - limit);
+          i--
+        ) {
+          const blockchainSignal = await this.getSignalFromBlockchain(i);
+          if (blockchainSignal && blockchainSignal.fid === signal.fid) {
+            const syncedSignal = await this.syncSignalFromBlockchain(i);
+            if (syncedSignal) syncedSignals.push(syncedSignal);
+            break;
+          }
+        }
+      }
+
+      return syncedSignals;
+    } catch (error) {
+      this.logger.error(
+        'Error fetching recent signals from blockchain:',
+        error,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Sync user account from blockchain to database when AccountCreated event is emitted
+   */
+  async syncUserAccountFromBlockchain(
+    walletAddress: string,
+    fid: number,
+  ): Promise<void> {
+    try {
+      this.logger.log(
+        `🔗 SYNC: Starting user account sync for FID ${fid} with wallet ${walletAddress}`,
+      );
+
+      const blockchainAccount =
+        await this.getAccountFromBlockchain(walletAddress);
+      if (!blockchainAccount) {
+        this.logger.error(
+          `❌ SYNC: No blockchain account found for wallet ${walletAddress}`,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `📋 SYNC: Retrieved blockchain account data - Username: ${blockchainAccount.username}, PFP: ${blockchainAccount.pfpUrl}, Banned: ${blockchainAccount.isBanned}`,
+      );
+
+      let user = await this.userRepository.findOne({
+        where: { fid },
+      });
+
+      if (!user) {
+        this.logger.log(`👤 SYNC: Creating NEW user for FID ${fid}`);
+        user = this.userRepository.create({
+          fid,
+          username: blockchainAccount.username,
+          pfpUrl: blockchainAccount.pfpUrl,
+          walletAddress: walletAddress.toLowerCase(),
+          stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
+          isBanned: blockchainAccount.isBanned,
+        });
+
+        await this.userRepository.save(user);
+        this.logger.log(
+          `✅ SYNC: Created new user FID ${fid} with state WITH_ACCOUNT`,
+        );
+      } else {
+        const previousState = user.stateOnTheSystem;
+        const previousWallet = user.walletAddress;
+
+        // Update existing user
+        user.username = blockchainAccount.username;
+        user.pfpUrl = blockchainAccount.pfpUrl;
+        user.walletAddress = walletAddress.toLowerCase();
+        user.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
+        user.isBanned = blockchainAccount.isBanned;
+
+        await this.userRepository.save(user);
+        this.logger.log(`🔄 SYNC: Updated existing user FID ${fid}`);
+        this.logger.log(
+          `📊 SYNC: State transition: ${previousState} → ${user.stateOnTheSystem}`,
+        );
+        this.logger.log(
+          `💳 SYNC: Wallet update: ${previousWallet || 'null'} → ${user.walletAddress}`,
+        );
+      }
+
+      this.logger.log(
+        `✅ SYNC: Successfully synced user account for FID ${fid} - User is now ready for blockchain interactions`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ SYNC: Error syncing user account for FID ${fid}:`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Update user stats based on their signals
+   */
+  async updateUserStats(fid: number): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { fid },
+        relations: ['signals'],
+      });
+
+      if (!user) return;
+
+      // Calculate stats from user's signals
+      const totalSignals = user.signals.length;
+      const activeSignals = user.signals.filter(
+        (signal) => signal.status === 'ACTIVE',
+      ).length;
+      const settledSignals = user.signals.filter((signal) =>
+        ['WON', 'LOST', 'EXPIRED'].includes(signal.status),
+      ).length;
+      const wonSignals = user.signals.filter(
+        (signal) => signal.status === 'WON',
+      ).length;
+      const winRate =
+        settledSignals > 0 ? (wonSignals / settledSignals) * 100 : 0;
+
+      // Update user stats
+      user.totalSignals = totalSignals;
+      user.activeSignals = activeSignals;
+      user.settledSignals = settledSignals;
+      user.winRate = winRate;
+
+      // Calculate MFS Score (0-1 scale based on win rate and settled signals)
+      if (user.settledSignals >= 5) {
+        const winRateWeight = user.winRate / 100;
+        const volumeWeight = Math.min(user.settledSignals / 100, 1); // Cap at 100 signals
+        user.mfsScore = winRateWeight * 0.7 + volumeWeight * 0.3;
+      }
+
+      await this.userRepository.save(user);
+      this.logger.log(`Updated stats for user FID ${fid}`);
+    } catch (error) {
+      this.logger.error(`Error updating user stats for FID ${fid}:`, error);
+    }
+  }
+
+  /**
+   * Listen for blockchain events (real-time only)
+   */
+  async startEventListening(): Promise<void> {
+    this.logger.log(
+      '🎧 EVENT LISTENER: Starting real-time blockchain event listening...',
+    );
+
+    // Listen for AccountCreated events
+    this.contract.on(
+      'AccountCreated',
+      async (user, fid, pfpUrl, username, timestamp, event) => {
+        console.log('AccountCreated event', event);
+        const blockNumber = event?.blockNumber || 'unknown';
+        const transactionHash = event?.transactionHash || 'unknown';
+        this.logger.log(
+          `🔥 REAL-TIME: AccountCreated event detected - FID ${fid}, Wallet ${user}, Block ${blockNumber}, TX ${transactionHash}`,
+        );
+        try {
+          await this.syncUserAccountFromBlockchain(user, Number(fid));
+          this.logger.log(
+            `✅ REAL-TIME: Successfully processed AccountCreated event for FID ${fid}`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `❌ REAL-TIME: Error processing AccountCreated event for FID ${fid}:`,
+            error,
+          );
+        }
+      },
+    );
+
+    // Listen for AccountBanned events
+    this.contract.on('AccountBanned', async (user, fid, timestamp, event) => {
+      const blockNumber = event?.blockNumber || 'unknown';
+      const transactionHash = event?.transactionHash || 'unknown';
+      this.logger.log(
+        `🔥 REAL-TIME: AccountBanned event detected - FID ${fid}, Wallet ${user}, Block ${blockNumber}, TX ${transactionHash}`,
+      );
+      try {
+        const dbUser = await this.userRepository.findOne({
+          where: { fid: Number(fid) },
+        });
+        if (dbUser) {
+          const wasAlreadyBanned = dbUser.isBanned;
+          dbUser.isBanned = true;
+          dbUser.bannedAt = new Date(Number(timestamp) * 1000);
+          await this.userRepository.save(dbUser);
+          this.logger.log(
+            `✅ REAL-TIME: User FID ${fid} banned status updated - Was banned: ${wasAlreadyBanned} → Now banned: true`,
+          );
+        } else {
+          this.logger.warn(
+            `⚠️  REAL-TIME: AccountBanned event for unknown user FID ${fid}`,
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `❌ REAL-TIME: Error processing AccountBanned event for FID ${fid}:`,
+          error,
+        );
+      }
+    });
 
     // Listen for SignalCreated events
-    this.contract.on('SignalCreated', async (signalId, fid, token, ticker, direction, timeframe, entryPrice, expiresAt, timestamp, event) => {
-      this.logger.log(`New signal created: ${signalId} by FID ${fid}`);
-      try {
-        // Sync the new signal to our database
-        await this.syncSignalFromBlockchain(Number(signalId));
-        await this.syncUserStatsFromBlockchain(Number(fid));
-      } catch (error) {
-        this.logger.error('Error processing SignalCreated event:', error);
-      }
-    });
+    this.contract.on(
+      'SignalCreated',
+      async (signalId, fid, tokens, expiresAt, timestamp, event) => {
+        const blockNumber = event?.blockNumber || 'unknown';
+        const transactionHash = event?.transactionHash || 'unknown';
+        this.logger.log(
+          `🔥 REAL-TIME: SignalCreated event detected - Signal ${signalId}, FID ${fid}, Tokens: ${tokens.length}, Block ${blockNumber}, TX ${transactionHash}`,
+        );
+        try {
+          const syncedSignal = await this.syncSignalFromBlockchain(
+            Number(signalId),
+          );
+          if (syncedSignal) {
+            this.logger.log(
+              `✅ REAL-TIME: Successfully synced Signal ${signalId} with ${tokens.length} token predictions`,
+            );
+            await this.updateUserStats(Number(fid));
+            this.logger.log(`📈 REAL-TIME: Updated user stats for FID ${fid}`);
+          } else {
+            this.logger.error(
+              `❌ REAL-TIME: Failed to sync Signal ${signalId}`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `❌ REAL-TIME: Error processing SignalCreated event for Signal ${signalId}:`,
+            error,
+          );
+        }
+      },
+    );
 
     // Listen for SignalSettled events
-    this.contract.on('SignalSettled', async (signalId, fid, token, status, exitPrice, pnlBasisPoints, settledAt, event) => {
-      this.logger.log(`Signal settled: ${signalId} for FID ${fid} with status ${status}`);
-      try {
-        // Sync the updated signal to our database
-        await this.syncSignalFromBlockchain(Number(signalId));
-        await this.syncUserStatsFromBlockchain(Number(fid));
-      } catch (error) {
-        this.logger.error('Error processing SignalSettled event:', error);
-      }
-    });
+    this.contract.on(
+      'SignalSettled',
+      async (signalId, fid, status, correctPredictions, timestamp, event) => {
+        const blockNumber = event?.blockNumber || 'unknown';
+        const transactionHash = event?.transactionHash || 'unknown';
+        this.logger.log(
+          `🔥 REAL-TIME: SignalSettled event detected - Signal ${signalId}, FID ${fid}, Status ${status}, Correct: ${correctPredictions}/8, Block ${blockNumber}, TX ${transactionHash}`,
+        );
+        try {
+          // Update the existing signal in database
+          const existingSignal = await this.signalRepository.findOne({
+            where: { signalId: signalId.toString() },
+          });
+          if (existingSignal) {
+            const previousStatus = existingSignal.status;
+            const previousCorrect = existingSignal.correctPredictions;
 
-    // Listen for MFSUpdated events
-    this.contract.on('MFSUpdated', async (fid, newScore, totalCalls, wonCalls, timestamp, event) => {
-      this.logger.log(`MFS updated for FID ${fid}: ${newScore}`);
-      try {
-        await this.syncUserStatsFromBlockchain(Number(fid));
-      } catch (error) {
-        this.logger.error('Error processing MFSUpdated event:', error);
-      }
-    });
+            existingSignal.correctPredictions = correctPredictions;
+            existingSignal.status = this.mapStatus(status);
+            await this.signalRepository.save(existingSignal);
 
-    this.logger.log('Blockchain event listeners started');
+            this.logger.log(
+              `✅ REAL-TIME: Updated Signal ${signalId} - Status: ${previousStatus} → ${existingSignal.status}, Correct: ${previousCorrect} → ${existingSignal.correctPredictions}`,
+            );
+            await this.updateUserStats(Number(fid));
+            this.logger.log(`📈 REAL-TIME: Updated user stats for FID ${fid}`);
+          } else {
+            this.logger.warn(
+              `⚠️  REAL-TIME: SignalSettled event for unknown Signal ${signalId}`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `❌ REAL-TIME: Error processing SignalSettled event for Signal ${signalId}:`,
+            error,
+          );
+        }
+      },
+    );
+
+    this.logger.log(
+      '✅ EVENT LISTENER: All blockchain event listeners are now active and monitoring for real-time events',
+    );
   }
 
   /**
@@ -435,24 +734,182 @@ export class BlockchainService {
   /**
    * Get contract statistics
    */
-  async getContractStats(): Promise<{totalSignals: number, activeSignals: number, settledSignals: number, nextSignalId: number}> {
+  async getContractStats(): Promise<{
+    totalSignals: number;
+    totalAccounts: number;
+    nextSignalId: number;
+  }> {
     try {
-      const [totalSignals, activeSignals, settledSignals, nextSignalId] = await Promise.all([
+      const [totalSignals, totalAccounts, nextSignalId] = await Promise.all([
         this.contract.totalSignals(),
-        this.contract.totalActiveSignals(),
-        this.contract.totalSettledSignals(),
-        this.contract.nextSignalId()
+        this.contract.totalAccounts(),
+        this.contract.nextSignalId(),
       ]);
 
       return {
         totalSignals: Number(totalSignals),
-        activeSignals: Number(activeSignals),
-        settledSignals: Number(settledSignals),
-        nextSignalId: Number(nextSignalId)
+        totalAccounts: Number(totalAccounts),
+        nextSignalId: Number(nextSignalId),
       };
     } catch (error) {
       this.logger.error('Error fetching contract stats:', error);
-      return {totalSignals: 0, activeSignals: 0, settledSignals: 0, nextSignalId: 0};
+      return {
+        totalSignals: 0,
+        totalAccounts: 0,
+        nextSignalId: 0,
+      };
+    }
+  }
+
+  /**
+   * Check if a transaction hash represents a session start (SignalCreated event)
+   */
+  async verifySessionStartTransaction(
+    transactionHash: string,
+  ): Promise<boolean> {
+    try {
+      this.logger.log(
+        `Verifying session start transaction: ${transactionHash}`,
+      );
+
+      const receipt =
+        await this.provider.getTransactionReceipt(transactionHash);
+      if (!receipt) {
+        this.logger.warn(
+          `No receipt found for transaction: ${transactionHash}`,
+        );
+        return false;
+      }
+
+      // Check if the transaction was successful
+      if (receipt.status !== 1) {
+        this.logger.warn(`Transaction failed: ${transactionHash}`);
+        return false;
+      }
+
+      // Check if the transaction contains a SignalCreated event from our contract
+      const signalCreatedTopic =
+        this.contract.interface.getEvent('SignalCreated').topicHash;
+      const hasSignalCreatedEvent = receipt.logs.some(
+        (log) =>
+          log.address.toLowerCase() === this.CONTRACT_ADDRESS.toLowerCase() &&
+          log.topics[0] === signalCreatedTopic,
+      );
+
+      if (hasSignalCreatedEvent) {
+        this.logger.log(
+          `Session start verified for transaction: ${transactionHash}`,
+        );
+        return true;
+      } else {
+        this.logger.warn(
+          `No SignalCreated event found in transaction: ${transactionHash}`,
+        );
+        return false;
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error verifying session start transaction ${transactionHash}:`,
+        error,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Get recent signals for a user's home feed
+   * This includes signals from followed users and recent popular signals
+   */
+  async getLastSignalsForUsersHomeFeed(fid: number): Promise<any[]> {
+    try {
+      this.logger.log(`Getting home feed signals for user ${fid}`);
+
+      // Get recent signals from the last 24 hours, ordered by timestamp
+      const recentSignals = await this.signalRepository
+        .createQueryBuilder('signal')
+        .leftJoinAndSelect('signal.user', 'user')
+        .where('signal.timestamp >= :cutoff', {
+          cutoff: Date.now() - 24 * 60 * 60 * 1000, // Last 24 hours
+        })
+        .orderBy('signal.timestamp', 'DESC')
+        .limit(22) // Limit to 22 recent signals
+        .getMany();
+
+      // Transform signals to include user info and token details
+      const feedSignals = recentSignals.map((signal) => {
+        const primaryToken = signal.tokens?.[0]; // Get the first token as primary
+        return {
+          signalId: signal.signalId,
+          fid: signal.fid,
+          username: signal.user?.username || 'Unknown',
+          displayName:
+            signal.user?.displayName || signal.user?.username || 'Unknown',
+          pfpUrl: signal.user?.pfpUrl || '',
+          isVerified: signal.user?.isVerified || false,
+          tokenAddress: primaryToken?.ca || '',
+          ticker: primaryToken?.ticker || '',
+          direction: primaryToken?.direction || '',
+          timestamp: signal.timestamp,
+          status: signal.status,
+          expiresAt: signal.timestamp + 1000 * 60 * 60 * 24,
+        };
+      });
+
+      this.logger.log(`Retrieved ${feedSignals.length} signals for home feed`);
+      return feedSignals;
+    } catch (error) {
+      this.logger.error(
+        `Error getting home feed signals for user ${fid}:`,
+        error,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Get the user's favorite 20 signalers (users they follow or favorite)
+   * For now, this returns the top 20 users by MFS score as a placeholder
+   */
+  async getFavoriteTwentySignelersForFid(fid: number): Promise<any[]> {
+    try {
+      this.logger.log(`Getting favorite signalers for user ${fid}`);
+
+      // Get top 20 users by MFS score as favorite signalers
+      // In a real implementation, this would be based on user's follows/favorites
+      const favoriteSignalers = await this.userRepository
+        .createQueryBuilder('user')
+        .where('user.fid != :currentFid', { currentFid: fid }) // Exclude current user
+        .andWhere('user.settledSignals >= 5') // Only users with some activity
+        .orderBy('user.mfsScore', 'DESC')
+        .addOrderBy('user.settledSignals', 'DESC')
+        .limit(20)
+        .getMany();
+
+      // Transform to include relevant user info
+      const signalers = favoriteSignalers.map((user) => ({
+        fid: user.fid,
+        username: user.username,
+        displayName: user.displayName || user.username,
+        pfpUrl: user.pfpUrl || '',
+        isVerified: user.isVerified || false,
+        mfsScore: Number(user.mfsScore),
+        winRate: Number(user.winRate),
+        settledSignals: user.settledSignals,
+        totalSignals: user.totalSignals,
+        followerCount: user.followerCount,
+        followingCount: user.followingCount,
+      }));
+
+      this.logger.log(
+        `Retrieved ${signalers.length} favorite signalers for user ${fid}`,
+      );
+      return signalers;
+    } catch (error) {
+      this.logger.error(
+        `Error getting favorite signalers for user ${fid}:`,
+        error,
+      );
+      return [];
     }
   }
 }

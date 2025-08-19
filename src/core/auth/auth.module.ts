@@ -14,9 +14,16 @@ import { AdminGuard } from 'src/security/guards';
 
 // Modules
 import { UserModule } from '../user/user.module';
+import { BlockchainModule } from '../blockchain/blockchain.module';
+import { ZapperModule } from '../zapper/zapper.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), forwardRef(() => UserModule)],
+  imports: [
+    TypeOrmModule.forFeature([User]),
+    forwardRef(() => UserModule),
+    BlockchainModule,
+    ZapperModule,
+  ],
   controllers: [AuthController],
   providers: [AuthService, AdminGuard],
   exports: [AuthService, AdminGuard],

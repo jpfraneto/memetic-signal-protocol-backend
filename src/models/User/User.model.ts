@@ -13,8 +13,8 @@ import {
 } from 'typeorm';
 
 // Types
-import { UserRoleEnum } from './User.types';
-import { Call } from '../Call/Call.model';
+import { UserRoleEnum, UserStateOnTheSystemEnum } from './User.types';
+import { Signal } from '../Signal/Signal.model';
 
 /**
  * @class User
@@ -94,19 +94,19 @@ export class User {
     type: 'int',
     default: 0,
   })
-  totalCalls: number;
+  totalSignals: number;
 
   @Column({
     type: 'int',
     default: 0,
   })
-  activeCalls: number;
+  activeSignals: number;
 
   @Column({
     type: 'int',
     default: 0,
   })
-  settledCalls: number;
+  settledSignals: number;
 
   @Column({
     type: 'decimal',
@@ -178,6 +178,57 @@ export class User {
   // RELATIONSHIPS
   // ================================
 
-  @OneToMany(() => Call, (call) => call.user)
-  calls: Call[];
+  @OneToMany(() => Signal, (signal) => signal.user)
+  signals: Signal[];
+
+  // ================================
+  // DAILY SIGNAL TRACKING
+  // ================================
+
+  @Column({ type: 'date', nullable: true })
+  lastSignalDate: Date;
+
+  @Column({ default: false })
+  usedRetryToday: boolean;
+
+  @Column({ default: false })
+  submittedSignalToday: boolean;
+
+  // ================================
+  // DEFAULT TOKENS
+  // ================================
+
+  @Column({ type: 'json', nullable: true })
+  defaultTokens: Array<{
+    ca: string;
+    ticker: string;
+  }>;
+
+  @Column({
+    type: 'enum',
+    enum: UserStateOnTheSystemEnum,
+    default: UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
+  })
+  stateOnTheSystem: UserStateOnTheSystemEnum;
+
+  @Column({
+    type: 'varchar',
+    length: 42,
+    nullable: true,
+    unique: true,
+  })
+  walletAddress: string;
+
+  // ================================
+  // JBM TOKEN BALANCE
+  // ================================
+
+  @Column({
+    type: 'decimal',
+    precision: 65,
+    scale: 0,
+    default: '0',
+    nullable: true,
+  })
+  jbmBalance: string;
 }

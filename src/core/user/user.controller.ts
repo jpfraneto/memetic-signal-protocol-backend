@@ -118,7 +118,7 @@ export class UserController {
     @Res() res: Response,
   ) {
     try {
-      const result = await this.userService.getUserCalls(fid, query);
+      const result = await this.userService.getUserSignals(fid, query);
 
       return res.status(HttpStatus.OK).json({
         success: true,
@@ -149,7 +149,7 @@ export class UserController {
     @Res() res: Response,
   ) {
     try {
-      await this.userService.recalculateUserTotalCalls(fid);
+      await this.userService.recalculateUserTotalSignals(fid);
 
       return res.status(HttpStatus.OK).json({
         success: true,

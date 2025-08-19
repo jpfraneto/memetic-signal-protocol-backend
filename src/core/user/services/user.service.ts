@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 // Models
-import { User, UserRoleEnum, Call } from '../../../models';
+import { User, UserRoleEnum, Signal } from '../../../models';
 
 // Utils
 import NeynarService from '../../../utils/neynar';
@@ -12,18 +12,15 @@ import NeynarService from '../../../utils/neynar';
 // DTOs
 import { GetUsersQueryDto } from '../dto/get-users-query.dto';
 import { UserCallsQueryDto } from '../dto/user-calls-query.dto';
-import {
-  UserDto,
-  CallDto,
-} from '../dto/user-response.dto';
+import { UserDto, CallDto } from '../dto/user-response.dto';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Call)
-    private readonly callRepository: Repository<Call>,
+    @InjectRepository(Signal)
+    private readonly signalRepository: Repository<Signal>,
   ) {}
 
   /**
@@ -176,6 +173,27 @@ export class UserService {
     return true;
   }
 
+  /**
+   * Creates a new user with the provided data.
+   *
+   * @param {User['fid']} fid - The Farcaster ID of the user to create.
+   * @param {Partial<User>} data - The data to create the user with.
+   * @returns {Promise<{user: User}>} An object containing the created user entity.
+   */
+  async create(fid: User['fid'], data: Partial<User>): Promise<{ user: User }> {
+    const user = this.userRepository.create({
+      fid,
+      ...data,
+      role: UserRoleEnum.USER,
+    });
+
+    const savedUser = await this.userRepository.save(user);
+
+    return {
+      user: savedUser,
+    };
+  }
+
   async getUsers(query: GetUsersQueryDto): Promise<{
     users: UserDto[];
     total: number;
@@ -185,7 +203,7 @@ export class UserService {
 
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.calls', 'call');
+      .leftJoinAndSelect('user.signals', 'signal');
 
     if (search) {
       queryBuilder.andWhere(
@@ -215,11 +233,7 @@ export class UserService {
       isVerified: user.isVerified,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
-      mfsScore: Number(user.mfsScore),
-      winRate: Number(user.winRate),
-      totalCalls: user.totalCalls,
-      totalStaked: Number(user.totalStaked),
-      rank: offset + index + 1,
+      totalCalls: user.totalSignals,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     }));
@@ -235,18 +249,18 @@ export class UserService {
 
   async getUserWithDetails(fid: number): Promise<{
     user: UserDto;
-    recentCalls: CallDto[];
+    recentSignals: CallDto[];
   }> {
     const user = await this.userRepository.findOne({
       where: { fid },
-      relations: ['calls'],
+      relations: ['signals'],
     });
 
     if (!user) {
       throw new Error(`User with FID ${fid} not found`);
     }
 
-    const recentCalls = await this.callRepository
+    const recentSignals = await this.signalRepository
       .createQueryBuilder('call')
       .leftJoin('call.user', 'user')
       .where('user.fid = :fid', { fid })
@@ -254,8 +268,8 @@ export class UserService {
       .limit(10)
       .getMany();
 
-    const callDtos: CallDto[] = recentCalls.map((call) =>
-      this.mapCallToDto(call),
+    const signalDtos: CallDto[] = recentSignals.map((signal) =>
+      this.mapSignalToDto(signal),
     );
 
     const userDto: UserDto = {
@@ -268,103 +282,113 @@ export class UserService {
       isVerified: user.isVerified,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
-      totalCalls: user.totalCalls,
+      totalCalls: user.totalSignals,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };
 
     const result = {
       user: userDto,
-      recentCalls: callDtos,
+      recentSignals: signalDtos,
     };
 
     return result;
   }
 
-  async getUserCalls(
+  async getUserSignals(
     fid: number,
     query: UserCallsQueryDto,
   ): Promise<{
-    calls: CallDto[];
+    signals: CallDto[];
     total: number;
     hasMore: boolean;
   }> {
     const { limit, offset, status } = query;
 
-    const queryBuilder = this.callRepository
-      .createQueryBuilder('call')
-      .leftJoin('call.user', 'user')
+    const queryBuilder = this.signalRepository
+      .createQueryBuilder('signal')
+      .leftJoin('signal.user', 'user')
       .where('user.fid = :fid', { fid });
 
     if (status) {
-      queryBuilder.andWhere('call.status = :status', { status });
+      queryBuilder.andWhere('signal.status = :status', { status });
     }
 
-    queryBuilder.orderBy('call.timestamp', 'DESC').limit(limit).offset(offset);
+    queryBuilder
+      .orderBy('signal.timestamp', 'DESC')
+      .limit(limit)
+      .offset(offset);
 
-    const [calls, total] = await queryBuilder.getManyAndCount();
+    const [signals, total] = await queryBuilder.getManyAndCount();
 
-    const callDtos: CallDto[] = calls.map((call) => this.mapCallToDto(call));
+    const signalDtos: CallDto[] = signals.map((signal) =>
+      this.mapSignalToDto(signal),
+    );
 
     return {
-      calls: callDtos,
+      signals: signalDtos,
       total,
       hasMore: offset + limit < total,
     };
   }
 
-  private mapCallToDto(call: Call): CallDto {
+  private mapSignalToDto(signal: Signal): CallDto {
+    // Get the first token from the tokens array as the primary token
+    const primaryToken = signal.tokens?.[0];
+
     return {
-      id: call.signalId,
-      signalId: call.signalId,
-      fid: call.user?.fid || 0,
-      tokenAddress: call.tokenAddress,
-      ticker: call.ticker,
-      direction: call.direction,
-      timestamp: call.timestamp,
-      callPrice: call.callPrice,
-      transactionHash: call.transactionHash,
+      id: signal.signalId,
+      signalId: signal.signalId,
+      fid: signal.user?.fid || signal.fid,
+      tokenAddress: primaryToken?.ca || '',
+      ticker: primaryToken?.ticker || '',
+      direction: primaryToken?.direction || '',
+      timestamp: signal.timestamp,
+      callPrice: parseFloat(primaryToken?.mc || '0') / 1e18, // Convert from scaled market cap
+      transactionHash: '', // Not available in current metadata structure
     };
   }
 
   /**
-   * Recalculates and updates the total calls count for all users
+   * Recalculates and updates the total signals count for all users
    * This is useful for fixing data inconsistencies
    */
-  async recalculateTotalCalls(): Promise<void> {
+  async recalculateTotalSignals(): Promise<void> {
     const users = await this.userRepository.find();
 
     for (const user of users) {
-      const callCount = await this.callRepository.count({
-        where: { user: { fid: user.fid } },
+      const signalCount = await this.signalRepository.count({
+        where: { fid: user.fid },
       });
 
-      if (callCount !== user.totalCalls) {
-        await this.userRepository.update(user.fid, { totalCalls: callCount });
+      if (signalCount !== user.totalSignals) {
+        await this.userRepository.update(user.fid, {
+          totalSignals: signalCount,
+        });
         console.log(
-          `Updated user ${user.username} (FID: ${user.fid}) total calls from ${user.totalCalls} to ${callCount}`,
+          `Updated user ${user.username} (FID: ${user.fid}) total signals from ${user.totalSignals} to ${signalCount}`,
         );
       }
     }
   }
 
   /**
-   * Recalculates and updates the total calls count for a specific user
+   * Recalculates and updates the total signals count for a specific user
    */
-  async recalculateUserTotalCalls(fid: number): Promise<void> {
+  async recalculateUserTotalSignals(fid: number): Promise<void> {
     const user = await this.userRepository.findOne({ where: { fid } });
     if (!user) {
       throw new Error(`User with FID ${fid} not found`);
     }
 
-    const callCount = await this.callRepository.count({
-      where: { user: { fid: user.fid } },
+    const signalCount = await this.signalRepository.count({
+      where: { fid: user.fid },
     });
 
-    if (callCount !== user.totalCalls) {
-      await this.userRepository.update(user.fid, { totalCalls: callCount });
+    if (signalCount !== user.totalSignals) {
+      await this.userRepository.update(user.fid, { totalSignals: signalCount });
       console.log(
-        `Updated user ${user.username} (FID: ${user.fid}) total calls from ${user.totalCalls} to ${callCount}`,
+        `Updated user ${user.username} (FID: ${user.fid}) total signals from ${user.totalSignals} to ${signalCount}`,
       );
     }
   }

@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { BlockchainService } from './blockchain.service';
-import { Call } from '../../models/Call/Call.model';
+import { Signal } from '../../models/Signal/Signal.model';
 import { User } from '../../models/User/User.model';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Call, User])],
+  imports: [TypeOrmModule.forFeature([Signal, User])],
   providers: [BlockchainService],
   exports: [BlockchainService],
 })

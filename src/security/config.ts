@@ -181,6 +181,7 @@ const domains: Domains = {
     'http://127.0.0.1:5173',
     'http://localhost:5173',
     'https://sigil.app',
+    'https://sigil.lat',
     'https://www.sigil.lat',
     'https://www.sigil.app',
     'https://frame.sigil.app',

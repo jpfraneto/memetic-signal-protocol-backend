@@ -231,4 +231,17 @@ export class User {
     nullable: true,
   })
   jbmBalance: string;
+
+  // ================================
+  // SUBSCRIPTION STATUS
+  // ================================
+
+  @Column({ default: false })
+  isSubscriber: boolean; // Whether user has active subscription
+
+  @Column({ type: 'timestamp', nullable: true })
+  subscriptionExpiresAt: Date; // When subscription expires
+
+  @Column({ type: 'timestamp', nullable: true })
+  subscribedAt: Date; // When subscription was purchased
 }

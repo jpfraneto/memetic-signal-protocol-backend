@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ZapperService } from './services';
+import { ZapperService, PortfolioService } from './services';
 
 @Module({
-  providers: [ZapperService],
-  exports: [ZapperService],
+  providers: [ZapperService, PortfolioService],
+  exports: [ZapperService, PortfolioService],
 })
 export class ZapperModule {}

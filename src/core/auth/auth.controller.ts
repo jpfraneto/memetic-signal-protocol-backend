@@ -8,6 +8,7 @@ import {
   UseGuards,
   Body,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 
@@ -87,7 +88,11 @@ export class AuthController {
    */
   @Get('/me')
   @UseGuards(AuthorizationGuard)
-  async getMe(@Session() session: QuickAuthPayload, @Res() res: Response) {
+  async getMe(
+    @Session() session: QuickAuthPayload,
+    @Res() res: Response,
+    @Req() req: Request,
+  ) {
     try {
       logger.log('Processing user profile request for FID:', session.sub);
 
@@ -119,45 +124,142 @@ export class AuthController {
         user = newUser;
       }
 
-      // Check if user has an account on the smart contract
-      logger.log(
-        'Checking smart contract account for wallet:',
-        session.address,
-      );
-      const blockchainAccount =
-        await this.blockchainService.getAccountFromBlockchain(session.address);
+      // Handle query parameters from frontend (smart contract data)
+      const queryParams = req.query;
+      console.log('🔍 [GET /me] Query parameters:', queryParams);
 
-      if (blockchainAccount && blockchainAccount.fid > 0) {
-        // User has an account on smart contract, update database state
-        logger.log(
-          'User has smart contract account, updating state to WITH_ACCOUNT',
+      // Process contract account data from query params if provided
+      if (queryParams.fid || queryParams.isBanned !== undefined) {
+        console.log(
+          '📄 [GET /me] Processing contract account data from query params...',
         );
 
-        // Update user state if it's currently WITHOUT_ACCOUNT
+        const contractAccount = {
+          fid: queryParams.fid ? parseInt(queryParams.fid as string) : 0,
+          isBanned: queryParams.isBanned === 'true',
+        };
+
+        console.log('🏗️ [GET /me] Contract account details:', contractAccount);
+
+        // Validate that contract account FID matches authenticated user
+        if (contractAccount.fid !== session.sub) {
+          console.log('❌ [GET /me] FID mismatch detected!');
+          logger.warn(
+            `Contract account FID mismatch: ${contractAccount.fid} vs ${session.sub}`,
+          );
+          return hasError(
+            res,
+            HttpStatus.BAD_REQUEST,
+            'getMe',
+            'Contract account FID does not match authenticated user.',
+          );
+        }
+
+        // Update user with contract account data
+        const updateData: any = {
+          walletAddress: session.address.toLowerCase(),
+          updatedAt: new Date(),
+          isSubscriber: false, // Default to false, will be updated by blockchain events
+        };
+
+        // Set appropriate state based on current user state
         if (
           user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
         ) {
-          const updatedData = {
-            stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
-            walletAddress: session.address.toLowerCase(),
-            updatedAt: new Date(),
-          };
-
-          await this.userService.update(session.sub, updatedData);
-
-          // Update the local user object to reflect the changes
-          user.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
-          user.walletAddress = session.address.toLowerCase();
-
-          logger.log(
-            `Updated user FID ${session.sub} state to WITH_ACCOUNT with wallet ${session.address}`,
+          updateData.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
+          console.log(
+            '🎉 [GET /me] Setting WITH_ACCOUNT state for new account!',
           );
         }
+
+        await this.userService.update(session.sub, updateData);
+        Object.assign(user, updateData);
+
+        console.log(
+          '✅ [GET /me] Contract account data updated from query params',
+        );
       } else {
+        // Fallback: Check if user has an account on the smart contract
         logger.log(
-          'No smart contract account found for wallet:',
+          'Checking smart contract account for wallet:',
           session.address,
         );
+        const blockchainAccount =
+          await this.blockchainService.getAccountFromBlockchain(
+            session.address,
+          );
+
+        if (blockchainAccount && blockchainAccount.fid > 0) {
+          // User has an account on smart contract, update database state
+          logger.log(
+            'User has smart contract account, updating state to WITH_ACCOUNT',
+          );
+
+          // Update user state if it's currently WITHOUT_ACCOUNT
+          if (
+            user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
+          ) {
+            const updatedData = {
+              stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
+              walletAddress: session.address.toLowerCase(),
+              updatedAt: new Date(),
+              isSubscriber: blockchainAccount.isSubscriber,
+            };
+
+            await this.userService.update(session.sub, updatedData);
+
+            // Update the local user object to reflect the changes
+            user.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
+            user.walletAddress = session.address.toLowerCase();
+            user.isSubscriber = blockchainAccount.isSubscriber;
+
+            logger.log(
+              `Updated user FID ${session.sub} state to WITH_ACCOUNT with wallet ${session.address}`,
+            );
+          }
+        } else {
+          logger.log(
+            'No smart contract account found for wallet:',
+            session.address,
+          );
+        }
+      }
+
+      // Process daily status from query params if provided
+      if (
+        queryParams.hasSignaledToday !== undefined ||
+        queryParams.hasUsedRetry !== undefined
+      ) {
+        console.log(
+          '📅 [GET /me] Processing daily status from query params...',
+        );
+
+        const dailyUpdateData: any = {
+          submittedSignalToday: queryParams.hasSignaledToday === 'true',
+          usedRetryToday: queryParams.hasUsedRetry === 'true',
+          updatedAt: new Date(),
+        };
+
+        await this.userService.update(session.sub, dailyUpdateData);
+        Object.assign(user, dailyUpdateData);
+
+        console.log('✅ [GET /me] Daily status updated from query params');
+      }
+
+      // Process JBM balance from query params if provided
+      if (queryParams.jbmBalance) {
+        console.log('💰 [GET /me] Processing JBM balance from query params...');
+        console.log('💰 [GET /me] JBM balance value:', queryParams.jbmBalance);
+
+        const jbmUpdateData: any = {
+          jbmBalance: queryParams.jbmBalance,
+          updatedAt: new Date(),
+        };
+
+        await this.userService.update(session.sub, jbmUpdateData);
+        Object.assign(user, jbmUpdateData);
+
+        console.log('✅ [GET /me] JBM balance updated from query params');
       }
       const userFeedOfSignals =
         await this.blockchainService.getLastSignalsForUsersHomeFeed(
@@ -169,13 +271,23 @@ export class AuthController {
         );
 
       // Fetch trending tokens from Zapper API
-      const trendingTokens = await this.zapperService.getTrendingTokens(session.sub, 8);
+      const trendingTokens = await this.zapperService.getTrendingTokens(
+        session.sub,
+        8,
+      );
+
+      // Check subscription status
+      const subscriptionStatus =
+        await this.blockchainService.checkUserSubscriptionStatus(session.sub);
 
       return hasResponse(res, {
         ...user,
         userFeedOfSignals,
         favoriteTwentySignelers,
         trendingTokens,
+        subscriptionStatus,
+        isNewUser:
+          user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
       });
     } catch (error) {
       logger.error('Failed to process user profile request:', error);
@@ -530,13 +642,24 @@ export class AuthController {
       );
 
       // Fetch trending tokens from Zapper API
-      const trendingTokens = await this.zapperService.getTrendingTokens(session.sub, 8);
+      const trendingTokens = await this.zapperService.getTrendingTokens(
+        session.sub,
+        8,
+      );
+
+      // Check subscription status
+      const subscriptionStatus =
+        await this.blockchainService.checkUserSubscriptionStatus(session.sub);
 
       const responseData = {
         ...updatedUser,
         userFeedOfSignals,
         favoriteTwentySignelers,
         trendingTokens,
+        subscriptionStatus,
+        isNewUser:
+          updatedUser.stateOnTheSystem ===
+          UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
         syncStatus: {
           contractAccountSynced: !!body.contractAccount,
           dailyStatusSynced: !!body.userDailyStatus,

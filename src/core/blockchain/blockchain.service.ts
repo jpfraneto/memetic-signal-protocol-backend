@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ethers, Contract, JsonRpcProvider } from 'ethers';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { RateLimitedProvider } from './rate-limited-provider';
 
 import { Signal } from '../../models/Signal/Signal.model';
 import { User } from '../../models/User/User.model';
@@ -32,9 +33,13 @@ interface BlockchainAccount {
 @Injectable()
 export class BlockchainService implements OnModuleInit {
   private readonly logger = new Logger(BlockchainService.name);
-  private readonly provider: JsonRpcProvider;
+  private readonly provider: RateLimitedProvider;
   private contract: Contract;
   private readonly signer?: ethers.Wallet;
+
+  // Event processing queue
+  private eventQueue: Array<{ type: string; data: any; timestamp: number }> = [];
+  private isProcessingEvents = false;
 
   // Contract address on Base mainnet - ProjectLighthouseV12
   private readonly CONTRACT_ADDRESS =
@@ -48,11 +53,14 @@ export class BlockchainService implements OnModuleInit {
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {
-    // Initialize provider with retry configuration and better error handling
-    this.provider = new JsonRpcProvider(this.BASE_RPC_URL, undefined, {
+    // Initialize rate-limited provider with retry configuration
+    this.provider = new RateLimitedProvider(this.BASE_RPC_URL, undefined, {
       staticNetwork: true,
       polling: true,
       pollingInterval: 4000,
+      minDelay: 150, // 150ms between requests
+      maxConcurrent: 2, // Max 2 concurrent requests
+      maxRetries: 3, // Retry up to 3 times on rate limits
     });
 
     // Initialize contract
@@ -139,6 +147,103 @@ export class BlockchainService implements OnModuleInit {
   }
 
   /**
+   * Queue an event for sequential processing
+   */
+  private async queueEvent(type: string, data: any): Promise<void> {
+    const event = {
+      type,
+      data,
+      timestamp: Date.now(),
+    };
+    
+    this.eventQueue.push(event);
+    this.logger.log(`Queued ${type} event - Queue length: ${this.eventQueue.length}`);
+    
+    // Start processing if not already running
+    if (!this.isProcessingEvents) {
+      this.processEventQueue();
+    }
+  }
+
+  /**
+   * Process events sequentially from the queue
+   */
+  private async processEventQueue(): Promise<void> {
+    if (this.isProcessingEvents || this.eventQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingEvents = true;
+    this.logger.log(`Starting event queue processing - ${this.eventQueue.length} events queued`);
+
+    while (this.eventQueue.length > 0) {
+      const event = this.eventQueue.shift();
+      if (!event) break;
+
+      try {
+        await this.processQueuedEvent(event);
+        // Add delay between event processing to prevent overwhelming the system
+        await this.delay(300);
+      } catch (error) {
+        this.logger.error(`Error processing queued ${event.type} event:`, error);
+      }
+    }
+
+    this.isProcessingEvents = false;
+    this.logger.log('Event queue processing completed');
+  }
+
+  /**
+   * Process a single queued event
+   */
+  private async processQueuedEvent(event: { type: string; data: any; timestamp: number }): Promise<void> {
+    const { type, data } = event;
+
+    switch (type) {
+      case 'AccountCreated':
+        await this.syncUserAccountFromBlockchain(data.user, data.fid);
+        break;
+      
+      case 'Subscribed':
+        const dbUser = await this.userRepository.findOne({
+          where: { fid: data.fid },
+        });
+        if (dbUser) {
+          dbUser.isSubscriber = true;
+          dbUser.subscriptionExpiresAt = data.expiresAt;
+          dbUser.subscribedAt = new Date();
+          await this.userRepository.save(dbUser);
+          this.logger.log(`✅ QUEUED: User FID ${data.fid} subscription updated`);
+        }
+        break;
+      
+      case 'SignalCreated':
+        const syncedSignal = await this.syncSignalFromBlockchain(data.signalId);
+        if (syncedSignal) {
+          this.logger.log(`✅ QUEUED: Successfully synced Signal ${data.signalId}`);
+          await this.updateUserStats(data.fid);
+        }
+        break;
+      
+      case 'SignalSettled':
+        const existingSignal = await this.signalRepository.findOne({
+          where: { signalId: data.signalId.toString() },
+        });
+        if (existingSignal) {
+          existingSignal.correctPredictions = data.correctPredictions;
+          existingSignal.status = this.mapStatus(data.status);
+          await this.signalRepository.save(existingSignal);
+          this.logger.log(`✅ QUEUED: Updated Signal ${data.signalId}`);
+          await this.updateUserStats(data.fid);
+        }
+        break;
+      
+      default:
+        this.logger.warn(`Unknown event type in queue: ${type}`);
+    }
+  }
+
+  /**
    * Get signal data from blockchain by signal ID
    */
   async getSignalFromBlockchain(
@@ -172,11 +277,16 @@ export class BlockchainService implements OnModuleInit {
         lastError = error;
 
         if (this.isRetryableError(error) && attempt < maxRetries) {
+          // Enhanced exponential backoff with jitter
+          const baseDelay = delayMs * Math.pow(2, attempt - 1);
+          const jitter = Math.random() * 500; // Add up to 500ms jitter
+          const finalDelay = baseDelay + jitter;
+          
           this.logger.warn(
-            `Blockchain operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delayMs}ms: ${error.message}`,
+            `Blockchain operation failed (attempt ${attempt}/${maxRetries}), retrying in ${Math.round(finalDelay)}ms: ${error.message}`,
           );
-          await this.delay(delayMs);
-          delayMs *= 2;
+          
+          await this.delay(finalDelay);
         } else {
           break;
         }
@@ -193,18 +303,26 @@ export class BlockchainService implements OnModuleInit {
       'connection timeout',
       'network error',
       'rate limit',
+      'too many requests',
       'internal error',
       'exceeded its compute units per second capacity',
+      'compute units per second capacity',
+      'rate limited',
+      'throttled',
       '429',
     ];
 
     const errorMessage = error?.message?.toLowerCase() || '';
     const errorCode = error?.code?.toString() || '';
+    const errorBody = error?.body?.toLowerCase() || '';
 
     return (
-      retryableMessages.some((msg) => errorMessage.includes(msg)) ||
+      retryableMessages.some((msg) => 
+        errorMessage.includes(msg) || errorBody.includes(msg)
+      ) ||
       errorCode === '429' ||
-      error?.error?.code === 429
+      error?.error?.code === 429 ||
+      error?.status === 429
     );
   }
 
@@ -362,33 +480,64 @@ export class BlockchainService implements OnModuleInit {
   }
 
   /**
-   * Get expired signals from blockchain
+   * Get expired signals from blockchain (optimized with batching)
    */
   async getExpiredSignalsFromBlockchain(limit: number = 20): Promise<Signal[]> {
     try {
-      // Get recent signals and filter for expired ones
-      const nextSignalId = Number(await this.contract.nextSignalId());
-      const signals: Signal[] = [];
-      const currentTime = Math.floor(Date.now() / 1000);
+      // First, check database for potentially expired signals to reduce blockchain calls
+      const currentTime = new Date();
+      const potentiallyExpiredSignals = await this.signalRepository.find({
+        where: {
+          status: 'ACTIVE',
+          expiresAt: { $lte: currentTime } as any,
+        },
+        order: { timestamp: 'DESC' },
+        take: limit * 2, // Get more from DB to account for false positives
+      });
 
-      for (
-        let i = nextSignalId - 1;
-        i >= Math.max(1, nextSignalId - limit * 2);
-        i--
-      ) {
-        const signal = await this.getSignalFromBlockchain(i);
-        if (
-          signal &&
-          signal.status === 0 &&
-          Number(signal.expiresAt) <= currentTime
-        ) {
-          // ACTIVE and expired
-          const syncedSignal = await this.syncSignalFromBlockchain(i);
-          if (syncedSignal) signals.push(syncedSignal);
-          if (signals.length >= limit) break;
+      this.logger.log(`Found ${potentiallyExpiredSignals.length} potentially expired signals in database`);
+
+      const signals: Signal[] = [];
+      const batchSize = 3;
+      
+      // Process in batches of 3 to prevent overwhelming Alchemy
+      for (let i = 0; i < potentiallyExpiredSignals.length && signals.length < limit; i += batchSize) {
+        const batch = potentiallyExpiredSignals.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (dbSignal) => {
+          try {
+            const blockchainSignal = await this.getSignalFromBlockchain(Number(dbSignal.signalId));
+            if (
+              blockchainSignal &&
+              blockchainSignal.status === 0 &&
+              Number(blockchainSignal.expiresAt) <= Math.floor(Date.now() / 1000)
+            ) {
+              const syncedSignal = await this.syncSignalFromBlockchain(Number(dbSignal.signalId));
+              return syncedSignal;
+            }
+            return null;
+          } catch (error) {
+            this.logger.warn(`Error checking signal ${dbSignal.signalId}:`, error);
+            return null;
+          }
+        });
+
+        const batchResults = await Promise.allSettled(batchPromises);
+        
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value) {
+            signals.push(result.value);
+            if (signals.length >= limit) break;
+          }
+        }
+
+        // Add delay between batches
+        if (i + batchSize < potentiallyExpiredSignals.length && signals.length < limit) {
+          await this.delay(400);
         }
       }
 
+      this.logger.log(`Retrieved ${signals.length} expired signals from blockchain`);
       return signals;
     } catch (error) {
       this.logger.error(
@@ -435,31 +584,60 @@ export class BlockchainService implements OnModuleInit {
   }
 
   /**
-   * Get recent signals from blockchain
+   * Get recent signals from blockchain (optimized with batching)
    */
   async getRecentSignalsFromBlockchain(limit: number = 20): Promise<Signal[]> {
     try {
-      const signals = await this.contract.getRecentSignals(limit);
+      const nextSignalId = Number(await this.contract.nextSignalId());
       const syncedSignals: Signal[] = [];
-
-      for (const signal of signals) {
-        // Find the signal ID by iterating through recent IDs
-        const nextSignalId = Number(await this.contract.nextSignalId());
-        for (
-          let i = nextSignalId - 1;
-          i >= Math.max(1, nextSignalId - limit);
-          i--
-        ) {
-          const blockchainSignal = await this.getSignalFromBlockchain(i);
-          if (blockchainSignal && blockchainSignal.fid === signal.fid) {
-            const syncedSignal = await this.syncSignalFromBlockchain(i);
-            if (syncedSignal) syncedSignals.push(syncedSignal);
-            break;
+      const batchSize = 5;
+      
+      // Limit the total range to prevent excessive calls
+      const maxSignalsToCheck = Math.min(limit * 2, 100);
+      const startId = Math.max(1, nextSignalId - maxSignalsToCheck);
+      
+      this.logger.log(`Checking signals from ${startId} to ${nextSignalId - 1} in batches of ${batchSize}`);
+      
+      // Process signals in batches to prevent rate limiting
+      for (let i = nextSignalId - 1; i >= startId && syncedSignals.length < limit; i -= batchSize) {
+        const batchIds = [];
+        for (let j = 0; j < batchSize && i - j >= startId; j++) {
+          batchIds.push(i - j);
+        }
+        
+        // Process batch in parallel with Promise.allSettled for better error handling
+        const batchPromises = batchIds.map(async (signalId) => {
+          try {
+            const blockchainSignal = await this.getSignalFromBlockchain(signalId);
+            if (blockchainSignal) {
+              const syncedSignal = await this.syncSignalFromBlockchain(signalId);
+              return syncedSignal;
+            }
+            return null;
+          } catch (error) {
+            this.logger.warn(`Error processing signal ${signalId}:`, error);
+            return null;
           }
+        });
+
+        const batchResults = await Promise.allSettled(batchPromises);
+        
+        // Collect successful results
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value) {
+            syncedSignals.push(result.value);
+            if (syncedSignals.length >= limit) break;
+          }
+        }
+
+        // Add delay between batches to prevent rate limiting
+        if (i - batchSize >= startId && syncedSignals.length < limit) {
+          await this.delay(500);
         }
       }
 
-      return syncedSignals;
+      this.logger.log(`Retrieved ${syncedSignals.length} recent signals from blockchain`);
+      return syncedSignals.slice(0, limit);
     } catch (error) {
       this.logger.error(
         'Error fetching recent signals from blockchain:',
@@ -610,13 +788,13 @@ export class BlockchainService implements OnModuleInit {
             `🔥 REAL-TIME: AccountCreated event detected - FID ${fid}, Wallet ${user}, Block ${blockNumber}, TX ${transactionHash}`,
           );
           try {
-            await this.syncUserAccountFromBlockchain(user, Number(fid));
+            await this.queueEvent('AccountCreated', { user, fid: Number(fid) });
             this.logger.log(
-              `✅ REAL-TIME: Successfully processed AccountCreated event for FID ${fid}`,
+              `✅ REAL-TIME: AccountCreated event queued for FID ${fid}`,
             );
           } catch (error) {
             this.logger.error(
-              `❌ REAL-TIME: Error processing AccountCreated event for FID ${fid}:`,
+              `❌ REAL-TIME: Error queuing AccountCreated event for FID ${fid}:`,
               error,
             );
           }
@@ -631,26 +809,16 @@ export class BlockchainService implements OnModuleInit {
           `🔥 REAL-TIME: Subscribed event detected - FID ${fid}, Wallet ${user}, Expires: ${new Date(Number(expiresAt) * 1000).toISOString()}, Block ${blockNumber}, TX ${transactionHash}`,
         );
         try {
-          const dbUser = await this.userRepository.findOne({
-            where: { fid: Number(fid) },
+          await this.queueEvent('Subscribed', {
+            fid: Number(fid),
+            expiresAt: new Date(Number(expiresAt) * 1000),
           });
-          if (dbUser) {
-            const wasSubscriber = dbUser.isSubscriber;
-            dbUser.isSubscriber = true;
-            dbUser.subscriptionExpiresAt = new Date(Number(expiresAt) * 1000);
-            dbUser.subscribedAt = new Date();
-            await this.userRepository.save(dbUser);
-            this.logger.log(
-              `✅ REAL-TIME: User FID ${fid} subscription updated - Was subscriber: ${wasSubscriber} → Now subscriber: true, Expires: ${dbUser.subscriptionExpiresAt.toISOString()}`,
-            );
-          } else {
-            this.logger.warn(
-              `⚠️  REAL-TIME: Subscribed event for unknown user FID ${fid}`,
-            );
-          }
+          this.logger.log(
+            `✅ REAL-TIME: Subscribed event queued for FID ${fid}`,
+          );
         } catch (error) {
           this.logger.error(
-            `❌ REAL-TIME: Error processing Subscribed event for FID ${fid}:`,
+            `❌ REAL-TIME: Error queuing Subscribed event for FID ${fid}:`,
             error,
           );
         }
@@ -697,25 +865,16 @@ export class BlockchainService implements OnModuleInit {
             `🔥 REAL-TIME: SignalCreated event detected - Signal ${signalId}, FID ${fid}, Tokens: ${tokens.length}, Block ${blockNumber}, TX ${transactionHash}`,
           );
           try {
-            const syncedSignal = await this.syncSignalFromBlockchain(
-              Number(signalId),
+            await this.queueEvent('SignalCreated', {
+              signalId: Number(signalId),
+              fid: Number(fid),
+            });
+            this.logger.log(
+              `✅ REAL-TIME: SignalCreated event queued - Signal ${signalId}`,
             );
-            if (syncedSignal) {
-              this.logger.log(
-                `✅ REAL-TIME: Successfully synced Signal ${signalId} with ${tokens.length} token predictions`,
-              );
-              await this.updateUserStats(Number(fid));
-              this.logger.log(
-                `📈 REAL-TIME: Updated user stats for FID ${fid}`,
-              );
-            } else {
-              this.logger.error(
-                `❌ REAL-TIME: Failed to sync Signal ${signalId}`,
-              );
-            }
           } catch (error) {
             this.logger.error(
-              `❌ REAL-TIME: Error processing SignalCreated event for Signal ${signalId}:`,
+              `❌ REAL-TIME: Error queuing SignalCreated event for Signal ${signalId}:`,
               error,
             );
           }
@@ -732,33 +891,18 @@ export class BlockchainService implements OnModuleInit {
             `🔥 REAL-TIME: SignalSettled event detected - Signal ${signalId}, FID ${fid}, Status ${status}, Correct: ${correctPredictions}/8, Block ${blockNumber}, TX ${transactionHash}`,
           );
           try {
-            // Update the existing signal in database
-            const existingSignal = await this.signalRepository.findOne({
-              where: { signalId: signalId.toString() },
+            await this.queueEvent('SignalSettled', {
+              signalId: Number(signalId),
+              fid: Number(fid),
+              status,
+              correctPredictions,
             });
-            if (existingSignal) {
-              const previousStatus = existingSignal.status;
-              const previousCorrect = existingSignal.correctPredictions;
-
-              existingSignal.correctPredictions = correctPredictions;
-              existingSignal.status = this.mapStatus(status);
-              await this.signalRepository.save(existingSignal);
-
-              this.logger.log(
-                `✅ REAL-TIME: Updated Signal ${signalId} - Status: ${previousStatus} → ${existingSignal.status}, Correct: ${previousCorrect} → ${existingSignal.correctPredictions}`,
-              );
-              await this.updateUserStats(Number(fid));
-              this.logger.log(
-                `📈 REAL-TIME: Updated user stats for FID ${fid}`,
-              );
-            } else {
-              this.logger.warn(
-                `⚠️  REAL-TIME: SignalSettled event for unknown Signal ${signalId}`,
-              );
-            }
+            this.logger.log(
+              `✅ REAL-TIME: SignalSettled event queued - Signal ${signalId}`,
+            );
           } catch (error) {
             this.logger.error(
-              `❌ REAL-TIME: Error processing SignalSettled event for Signal ${signalId}:`,
+              `❌ REAL-TIME: Error queuing SignalSettled event for Signal ${signalId}:`,
               error,
             );
           }

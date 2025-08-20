@@ -157,7 +157,9 @@ export class AuthController {
 
         // Update user with contract account data
         const updateData: any = {
-          walletAddress: session.address.toLowerCase(),
+          walletAddress: queryParams.userAddress
+            ? (queryParams.userAddress as string).toLowerCase()
+            : null,
           updatedAt: new Date(),
           isSubscriber: false, // Default to false, will be updated by blockchain events
         };
@@ -180,48 +182,54 @@ export class AuthController {
         );
       } else {
         // Fallback: Check if user has an account on the smart contract
-        logger.log(
-          'Checking smart contract account for wallet:',
-          session.address,
-        );
-        const blockchainAccount =
-          await this.blockchainService.getAccountFromBlockchain(
-            session.address,
-          );
-
-        if (blockchainAccount && blockchainAccount.fid > 0) {
-          // User has an account on smart contract, update database state
+        if (queryParams.userAddress) {
           logger.log(
-            'User has smart contract account, updating state to WITH_ACCOUNT',
+            'Checking smart contract account for wallet:',
+            queryParams.userAddress,
           );
+          const blockchainAccount =
+            await this.blockchainService.getAccountFromBlockchain(
+              queryParams.userAddress as string,
+            );
 
-          // Update user state if it's currently WITHOUT_ACCOUNT
-          if (
-            user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
-          ) {
-            const updatedData = {
-              stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
-              walletAddress: session.address.toLowerCase(),
-              updatedAt: new Date(),
-              isSubscriber: blockchainAccount.isSubscriber,
-            };
-
-            await this.userService.update(session.sub, updatedData);
-
-            // Update the local user object to reflect the changes
-            user.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
-            user.walletAddress = session.address.toLowerCase();
-            user.isSubscriber = blockchainAccount.isSubscriber;
-
+          if (blockchainAccount && blockchainAccount.fid > 0) {
+            // User has an account on smart contract, update database state
             logger.log(
-              `Updated user FID ${session.sub} state to WITH_ACCOUNT with wallet ${session.address}`,
+              'User has smart contract account, updating state to WITH_ACCOUNT',
+            );
+
+            // Update user state if it's currently WITHOUT_ACCOUNT
+            if (
+              user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
+            ) {
+              const updatedData = {
+                stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
+                walletAddress: (
+                  queryParams.userAddress as string
+                ).toLowerCase(),
+                updatedAt: new Date(),
+                isSubscriber: blockchainAccount.isSubscriber,
+              };
+
+              await this.userService.update(session.sub, updatedData);
+
+              // Update the local user object to reflect the changes
+              user.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
+              user.walletAddress = (
+                queryParams.userAddress as string
+              ).toLowerCase();
+              user.isSubscriber = blockchainAccount.isSubscriber;
+
+              logger.log(
+                `Updated user FID ${session.sub} state to WITH_ACCOUNT with wallet ${queryParams.userAddress}`,
+              );
+            }
+          } else {
+            logger.log(
+              'No smart contract account found for wallet:',
+              queryParams.userAddress,
             );
           }
-        } else {
-          logger.log(
-            'No smart contract account found for wallet:',
-            session.address,
-          );
         }
       }
 

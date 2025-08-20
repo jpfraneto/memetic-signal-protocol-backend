@@ -66,7 +66,7 @@ export class AuthService implements OnModuleInit {
     await this.ensureFarcasterClient();
 
     try {
-      const domain = 'runnercoin.lat';
+      const domain = 'sigil.lat';
       const payload = await this.farcasterClient.verifyJwt({ token, domain });
 
       if (!payload || !payload.sub) {

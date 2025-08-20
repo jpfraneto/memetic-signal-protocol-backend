@@ -101,10 +101,11 @@ export const getConfig = () => {
         ║                                                                              ║
         ║  🚀 SIGIL SYSTEM STATUS:                                                     ║
         ║                                                                              ║
-        ║    ✅ Memetic Analysis        ✅ Agent Coordination                          ║
-        ║    ✅ Signal Processing       ✅ Social Integration                          ║
-        ║    ✅ Token Rewards           ✅ Farcaster Integration                       ║
-        ║    ✅ Protocol Analytics      ✅ Community Features                          ║
+        ║    ✅ Memetic Analysis                                                       ║
+        ║    ✅ Signal Processing                                                       ║
+        ║    ✅ Token Rewards                                                           ║
+        ║    ✅ Farcaster Integration                                                    ║
+        ║    ✅ Community Features                                                      ║
         ║    ${process.env.NODE_ENV === 'production' ? '🌐 PRODUCTION MODE' : '🔧 DEVELOPMENT MODE'}              ║
         ║                                                                              ║
         ║  🌐 Server listening on: http://localhost:${config.runtime.port}                             ║
@@ -131,10 +132,7 @@ export const getConfig = () => {
         ╚══════════════════════════════════════════════════════════════════════════════╝
         
         🔗 API Documentation: ${process.env.NODE_ENV === 'production' ? 'Disabled in production' : 'Available in development mode'}
-        📊 Health Check: All systems operational and ready for runners
-        🧠 Memetic Analysis: AI agent ready to process social signals
-        📡 Signal Processing: Protocol coordination engine activated
-        🎁 Token Rewards: $SIGIL tokens ready for memetic achievements
+        📊 Health Check: All systems operational and ready for signalers
         
       `);
     },

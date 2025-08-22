@@ -10,6 +10,7 @@ import { getConfig } from './security/config';
 import { HealthModule } from './health';
 // Models
 import { User, Signal, NotificationQueue, Token } from './models';
+import { BlockchainSignal } from './models/BlockchainSignal/BlockchainSignal.model';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { User, Signal, NotificationQueue, Token } from './models';
       username: getConfig().db.username,
       password: getConfig().db.password,
       database: getConfig().db.name,
-      entities: [User, Signal, NotificationQueue, Token],
+      entities: [User, Signal, NotificationQueue, Token, BlockchainSignal],
       // Important: Set synchronize to false in production for safety
       synchronize: true,
       //synchronize: !getConfig().isProduction,

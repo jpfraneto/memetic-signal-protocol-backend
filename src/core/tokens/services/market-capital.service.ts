@@ -39,178 +39,73 @@ export class MarketCapitalService {
 
   async updateMarketCapData(tokenAddress: string): Promise<Token> {
     try {
+      // Get fresh token data from CoinGecko
       const token = await this.simpleTokenService.getTokenInfo(tokenAddress);
       
       if (!token) {
         throw new Error(`Token not found: ${tokenAddress}`);
       }
 
-      const existingToken = await this.tokenRepository.findOne({
-        where: { address: tokenAddress }
-      });
+      // The token already has all market data from CoinGecko
+      // Just update the market cap rank if needed
+      await this.updateMarketCapRanks();
 
-      const now = new Date();
-      const marketCapHistory = existingToken?.marketCapHistory || [];
-      
-      // Add current market cap to history
-      if (token.marketCap) {
-        marketCapHistory.push({
-          timestamp: now,
-          marketCap: token.marketCap
-        });
-
-        // Keep only last 90 days of history
-        const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        token.marketCapHistory = marketCapHistory.filter(
-          entry => entry.timestamp > ninetyDaysAgo
-        );
-      }
-
-      // Calculate market cap changes
-      if (marketCapHistory.length > 0) {
-        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-        const oneDayMarketCap = this.findClosestMarketCap(marketCapHistory, oneDayAgo);
-        const sevenDayMarketCap = this.findClosestMarketCap(marketCapHistory, sevenDaysAgo);
-        const thirtyDayMarketCap = this.findClosestMarketCap(marketCapHistory, thirtyDaysAgo);
-
-        if (oneDayMarketCap && token.marketCap) {
-          token.marketCapChange24h = ((token.marketCap - oneDayMarketCap) / oneDayMarketCap) * 100;
-        }
-
-        if (sevenDayMarketCap && token.marketCap) {
-          token.marketCapChange7d = ((token.marketCap - sevenDayMarketCap) / sevenDayMarketCap) * 100;
-        }
-
-        if (thirtyDayMarketCap && token.marketCap) {
-          token.marketCapChange30d = ((token.marketCap - thirtyDayMarketCap) / thirtyDayMarketCap) * 100;
-        }
-
-        // Calculate averages
-        const sevenDayEntries = marketCapHistory.filter(entry => entry.timestamp > sevenDaysAgo);
-        const thirtyDayEntries = marketCapHistory.filter(entry => entry.timestamp > thirtyDaysAgo);
-
-        if (sevenDayEntries.length > 0) {
-          token.avgMarketCap7d = sevenDayEntries.reduce((sum, entry) => sum + entry.marketCap, 0) / sevenDayEntries.length;
-        }
-
-        if (thirtyDayEntries.length > 0) {
-          token.avgMarketCap30d = thirtyDayEntries.reduce((sum, entry) => sum + entry.marketCap, 0) / thirtyDayEntries.length;
-        }
-      }
-
-      // Update peak market cap
-      if (!existingToken?.peakMarketCap || (token.marketCap && token.marketCap > existingToken.peakMarketCap)) {
-        token.peakMarketCap = token.marketCap;
-        token.peakMarketCapDate = now;
-      } else if (existingToken) {
-        token.peakMarketCap = existingToken.peakMarketCap;
-        token.peakMarketCapDate = existingToken.peakMarketCapDate;
-      }
-
-      // Update existing token or create new one
-      if (existingToken) {
-        // Update existing token with new data
-        Object.assign(existingToken, {
-          marketCap: token.marketCap,
-          marketCapHistory: token.marketCapHistory,
-          marketCapChange24h: token.marketCapChange24h,
-          marketCapChange7d: token.marketCapChange7d,
-          marketCapChange30d: token.marketCapChange30d,
-          avgMarketCap7d: token.avgMarketCap7d,
-          avgMarketCap30d: token.avgMarketCap30d,
-          peakMarketCap: token.peakMarketCap,
-          peakMarketCapDate: token.peakMarketCapDate,
-          lastMarketCapUpdate: now,
-          price: token.price,
-          change24h: token.change24h,
-          image: token.image,
-          name: token.name,
-          symbol: token.symbol,
-          decimals: token.decimals,
-          totalSupply: token.totalSupply,
-        });
-        
-        return await this.tokenRepository.save(existingToken);
-      } else {
-        // Create new token entity
-        const newToken = this.tokenRepository.create({
-          address: token.address,
-          name: token.name,
-          symbol: token.symbol,
-          decimals: token.decimals,
-          totalSupply: token.totalSupply,
-          image: token.image,
-          price: token.price,
-          change24h: token.change24h,
-          marketCap: token.marketCap,
-          marketCapHistory: token.marketCapHistory,
-          marketCapChange24h: token.marketCapChange24h,
-          marketCapChange7d: token.marketCapChange7d,
-          marketCapChange30d: token.marketCapChange30d,
-          avgMarketCap7d: token.avgMarketCap7d,
-          avgMarketCap30d: token.avgMarketCap30d,
-          peakMarketCap: token.peakMarketCap,
-          peakMarketCapDate: token.peakMarketCapDate,
-          lastMarketCapUpdate: now,
-        });
-        
-        return await this.tokenRepository.save(newToken);
-      }
+      return token;
     } catch (error) {
       this.logger.error(`Failed to update market cap data for ${tokenAddress}:`, error);
       throw error;
     }
   }
 
-  private findClosestMarketCap(history: { timestamp: Date; marketCap: number }[], targetDate: Date): number | null {
-    if (history.length === 0) return null;
-
-    let closest = history[0];
-    let minDiff = Math.abs(closest.timestamp.getTime() - targetDate.getTime());
-
-    for (const entry of history) {
-      const diff = Math.abs(entry.timestamp.getTime() - targetDate.getTime());
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = entry;
-      }
-    }
-
-    return closest.marketCap;
-  }
-
   async getMarketCapAnalytics(): Promise<MarketCapAnalytics> {
+    // Get all tokens with market data
     const tokens = await this.tokenRepository.find({
-      where: { marketCap: MoreThan(0) },
-      order: { marketCap: 'DESC' }
+      where: { market_data: MoreThan(null) }
     });
 
-    const totalMarketCap = tokens.reduce((sum, token) => sum + (token.marketCap || 0), 0);
-    const averageMarketCap = tokens.length > 0 ? totalMarketCap / tokens.length : 0;
+    // Filter tokens that have market cap data
+    const tokensWithMarketCap = tokens.filter(token => 
+      token.market_data?.market_cap && token.market_data.market_cap > 0
+    );
 
-    const topGainers24h = tokens
-      .filter(token => token.marketCapChange24h && token.marketCapChange24h > 0)
-      .sort((a, b) => (b.marketCapChange24h || 0) - (a.marketCapChange24h || 0))
+    const totalMarketCap = tokensWithMarketCap.reduce((sum, token) => 
+      sum + (token.market_data?.market_cap || 0), 0
+    );
+    const averageMarketCap = tokensWithMarketCap.length > 0 ? totalMarketCap / tokensWithMarketCap.length : 0;
+
+    // Sort by market cap for further analysis
+    const sortedTokens = tokensWithMarketCap.sort((a, b) => 
+      (b.market_data?.market_cap || 0) - (a.market_data?.market_cap || 0)
+    );
+
+    // Top gainers and losers based on 24h price change
+    const topGainers24h = tokensWithMarketCap
+      .filter(token => token.market_data?.price_change_24h && token.market_data.price_change_24h > 0)
+      .sort((a, b) => (b.market_data?.price_change_24h || 0) - (a.market_data?.price_change_24h || 0))
       .slice(0, 10);
 
-    const topLosers24h = tokens
-      .filter(token => token.marketCapChange24h && token.marketCapChange24h < 0)
-      .sort((a, b) => (a.marketCapChange24h || 0) - (b.marketCapChange24h || 0))
+    const topLosers24h = tokensWithMarketCap
+      .filter(token => token.market_data?.price_change_24h && token.market_data.price_change_24h < 0)
+      .sort((a, b) => (a.market_data?.price_change_24h || 0) - (b.market_data?.price_change_24h || 0))
       .slice(0, 10);
 
     const distribution = {
-      micro: tokens.filter(t => (t.marketCap || 0) < 1_000_000).length,
-      small: tokens.filter(t => (t.marketCap || 0) >= 1_000_000 && (t.marketCap || 0) < 100_000_000).length,
-      mid: tokens.filter(t => (t.marketCap || 0) >= 100_000_000 && (t.marketCap || 0) < 1_000_000_000).length,
-      large: tokens.filter(t => (t.marketCap || 0) >= 1_000_000_000).length,
+      micro: tokensWithMarketCap.filter(t => (t.market_data?.market_cap || 0) < 1_000_000).length,
+      small: tokensWithMarketCap.filter(t => {
+        const mc = t.market_data?.market_cap || 0;
+        return mc >= 1_000_000 && mc < 100_000_000;
+      }).length,
+      mid: tokensWithMarketCap.filter(t => {
+        const mc = t.market_data?.market_cap || 0;
+        return mc >= 100_000_000 && mc < 1_000_000_000;
+      }).length,
+      large: tokensWithMarketCap.filter(t => (t.market_data?.market_cap || 0) >= 1_000_000_000).length,
     };
 
-    const trending = tokens
-      .filter(token => token.marketCapChange24h && Math.abs(token.marketCapChange24h) > 10)
-      .sort((a, b) => Math.abs(b.marketCapChange24h || 0) - Math.abs(a.marketCapChange24h || 0))
+    // Trending tokens with significant 24h price changes
+    const trending = tokensWithMarketCap
+      .filter(token => token.market_data?.price_change_24h && Math.abs(token.market_data.price_change_24h) > 10)
+      .sort((a, b) => Math.abs(b.market_data?.price_change_24h || 0) - Math.abs(a.market_data?.price_change_24h || 0))
       .slice(0, 20);
 
     return {
@@ -224,26 +119,34 @@ export class MarketCapitalService {
   }
 
   async getMarketCapLeaderboard(limit = 100): Promise<Token[]> {
-    return await this.tokenRepository.find({
-      where: { marketCap: MoreThan(0) },
-      order: { marketCap: 'DESC' },
-      take: limit,
+    const tokens = await this.tokenRepository.find({
+      where: { market_data: MoreThan(null) }
     });
+
+    // Filter and sort by market cap
+    return tokens
+      .filter(token => token.market_data?.market_cap && token.market_data.market_cap > 0)
+      .sort((a, b) => (b.market_data?.market_cap || 0) - (a.market_data?.market_cap || 0))
+      .slice(0, limit);
   }
 
   async updateMarketCapRanks(): Promise<void> {
     const tokens = await this.tokenRepository.find({
-      where: { marketCap: MoreThan(0) },
-      order: { marketCap: 'DESC' },
+      where: { market_data: MoreThan(null) }
     });
 
-    const updatePromises = tokens.map((token, index) => {
-      token.marketCapRank = index + 1;
+    // Filter and sort by market cap
+    const tokensWithMarketCap = tokens
+      .filter(token => token.market_data?.market_cap && token.market_data.market_cap > 0)
+      .sort((a, b) => (b.market_data?.market_cap || 0) - (a.market_data?.market_cap || 0));
+
+    const updatePromises = tokensWithMarketCap.map((token, index) => {
+      token.market_cap_rank = index + 1;
       return this.tokenRepository.save(token);
     });
 
     await Promise.all(updatePromises);
-    this.logger.log(`Updated market cap ranks for ${tokens.length} tokens`);
+    this.logger.log(`Updated market cap ranks for ${tokensWithMarketCap.length} tokens`);
   }
 
   async getMarketCapPredictions(tokenAddress: string): Promise<MarketCapPrediction[]> {
@@ -251,41 +154,35 @@ export class MarketCapitalService {
       where: { address: tokenAddress }
     });
 
-    if (!token || !token.marketCapHistory) {
+    if (!token || !token.market_data?.market_cap) {
       return [];
     }
 
     const predictions: MarketCapPrediction[] = [];
-    const history = token.marketCapHistory;
+    const currentMarketCap = token.market_data.market_cap;
+    const priceChange24h = token.market_data.price_change_24h || 0;
 
-    if (history.length < 7) {
-      return predictions;
-    }
+    // Simple predictions based on current price trends
+    // 24h prediction based on current momentum
+    const trend24h = priceChange24h / 100; // Convert percentage to decimal
+    const prediction24h = currentMarketCap * (1 + trend24h * 0.5); // Conservative estimate
 
-    // Simple trend-based predictions
-    const recentData = history.slice(-7);
-    const trend = this.calculateTrend(recentData.map(h => h.marketCap));
-    
-    const currentMarketCap = token.marketCap || 0;
-
-    // 24h prediction
-    const prediction24h = currentMarketCap * (1 + trend * 0.1);
     predictions.push({
       tokenAddress: token.address,
       currentMarketCap,
       predictedMarketCap: prediction24h,
-      confidence: this.calculateConfidence(recentData),
+      confidence: this.calculateBasicConfidence(priceChange24h),
       timeframe: '24h',
       factors: this.analyzePredictionFactors(token),
     });
 
-    // 7d prediction
-    const prediction7d = currentMarketCap * (1 + trend * 0.5);
+    // 7d prediction with dampened momentum
+    const prediction7d = currentMarketCap * (1 + trend24h * 0.3);
     predictions.push({
       tokenAddress: token.address,
       currentMarketCap,
       predictedMarketCap: prediction7d,
-      confidence: this.calculateConfidence(recentData) * 0.8,
+      confidence: this.calculateBasicConfidence(priceChange24h) * 0.7,
       timeframe: '7d',
       factors: this.analyzePredictionFactors(token),
     });
@@ -293,46 +190,45 @@ export class MarketCapitalService {
     return predictions;
   }
 
-  private calculateTrend(values: number[]): number {
-    if (values.length < 2) return 0;
-    
-    const n = values.length;
-    const sumX = (n * (n - 1)) / 2;
-    const sumY = values.reduce((sum, val) => sum + val, 0);
-    const sumXY = values.reduce((sum, val, index) => sum + index * val, 0);
-    const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
-    
-    return (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  }
-
-  private calculateConfidence(data: { timestamp: Date; marketCap: number }[]): number {
-    if (data.length < 3) return 0.1;
-    
-    const values = data.map(d => d.marketCap);
-    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
-    const volatility = Math.sqrt(variance) / mean;
-    
-    return Math.max(0.1, Math.min(0.9, 1 - volatility));
+  private calculateBasicConfidence(priceChange24h: number): number {
+    // Lower confidence for high volatility
+    const volatility = Math.abs(priceChange24h);
+    if (volatility > 50) return 0.2;
+    if (volatility > 25) return 0.4;
+    if (volatility > 10) return 0.6;
+    return 0.8;
   }
 
   private analyzePredictionFactors(token: Token): string[] {
     const factors = [];
+    const priceChange24h = token.market_data?.price_change_24h || 0;
+    const athChangePercentage = token.market_data?.ath_change_percentage || 0;
     
-    if (token.marketCapChange24h && token.marketCapChange24h > 10) {
+    if (priceChange24h > 10) {
       factors.push('Strong 24h momentum');
+    } else if (priceChange24h < -10) {
+      factors.push('Negative 24h momentum');
     }
     
-    if (token.marketCapChange7d && token.marketCapChange7d > 20) {
-      factors.push('Positive weekly trend');
-    }
-    
-    if (token.peakMarketCap && token.marketCap && token.marketCap > token.peakMarketCap * 0.8) {
+    if (athChangePercentage > -20) {
       factors.push('Near all-time high');
+    } else if (athChangePercentage < -80) {
+      factors.push('Far from all-time high');
     }
     
-    if (token.marketCapRank && token.marketCapRank <= 100) {
+    if (token.market_cap_rank && token.market_cap_rank <= 100) {
       factors.push('Top 100 by market cap');
+    }
+
+    const marketCap = token.market_data?.market_cap || 0;
+    if (marketCap > 1_000_000_000) {
+      factors.push('Large cap token');
+    } else if (marketCap > 100_000_000) {
+      factors.push('Mid cap token');
+    } else if (marketCap > 1_000_000) {
+      factors.push('Small cap token');
+    } else {
+      factors.push('Micro cap token');
     }
     
     return factors;

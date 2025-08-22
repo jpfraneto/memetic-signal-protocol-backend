@@ -7,6 +7,7 @@ import { TokensModule } from './tokens/tokens.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { ZapperModule } from './zapper/zapper.module';
+import { IndexerModule } from './indexer/indexer.module';
 
 /**
  * Core modules for the SIGIL Memetic Layer Protocol
@@ -19,6 +20,7 @@ import { ZapperModule } from './zapper/zapper.module';
  * - LeaderboardModule: User rankings and MFS scoring
  * - BlockchainModule: Smart contract integration and event sync
  * - ZapperModule: Trending tokens from Zapper API integration
+ * - IndexerModule: Blockchain signal indexing and enriched feed
  * - AdminModule: Administrative functions
  */
 const CoreModules = [
@@ -30,6 +32,7 @@ const CoreModules = [
   LeaderboardModule, // User rankings and scoring
   BlockchainModule, // Blockchain integration and sync
   ZapperModule, // Trending tokens from Zapper API
+  IndexerModule, // Blockchain signal indexing and enriched feed
 ];
 
 export default CoreModules;

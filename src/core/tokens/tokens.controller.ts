@@ -1,18 +1,10 @@
-import {
-  Controller,
-  Get,
-  Param,
-  HttpStatus,
-  Res,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Param, HttpStatus, Res, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 
 import { TokenPriceService } from '../signal/services/token-price.service';
 import { SimpleTokenService } from './services/simple-token.service';
 import { MarketCapitalService } from './services/market-capital.service';
-import { TokenResponseDto } from './dto/token-response.dto';
 import { hasError } from '../../utils';
 
 @ApiTags('token-service')
@@ -212,12 +204,8 @@ export class TokensController {
   @Get('ca/:ca')
   @ApiOperation({
     summary: 'Get comprehensive token information by contract address',
-    description: 'Fetches token metadata, price, market cap and other information for a given contract address on Base network',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Token information successfully retrieved',
-    type: TokenResponseDto,
+    description:
+      'Fetches token metadata, price, market cap and other information for a given contract address on Base network',
   })
   @ApiResponse({ status: 400, description: 'Invalid contract address format' })
   @ApiResponse({ status: 404, description: 'Token not found' })
@@ -227,7 +215,8 @@ export class TokensController {
     @Res() res: Response,
   ) {
     try {
-      const tokenInfo = await this.simpleTokenService.getTokenInfo(contractAddress);
+      const tokenInfo =
+        await this.simpleTokenService.getTokenInfo(contractAddress);
 
       return res.status(HttpStatus.OK).json({
         success: true,
@@ -267,7 +256,8 @@ export class TokensController {
   @ApiOperation({ summary: 'Get market capital analytics' })
   @ApiResponse({
     status: 200,
-    description: 'Market capital analytics including top gainers, losers, and distribution',
+    description:
+      'Market capital analytics including top gainers, losers, and distribution',
     schema: {
       example: {
         success: true,
@@ -280,9 +270,9 @@ export class TokensController {
             micro: 150,
             small: 50,
             mid: 10,
-            large: 5
+            large: 5,
           },
-          trending: []
+          trending: [],
         },
       },
     },
@@ -290,14 +280,17 @@ export class TokensController {
   async getMarketCapAnalytics(@Res() res: Response) {
     try {
       const analytics = await this.marketCapitalService.getMarketCapAnalytics();
-      
+
       return res.status(HttpStatus.OK).json({
         success: true,
         data: analytics,
       });
     } catch (error) {
-      console.error('❌ [TokensController] Error fetching market cap analytics:', error);
-      
+      console.error(
+        '❌ [TokensController] Error fetching market cap analytics:',
+        error,
+      );
+
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -322,8 +315,8 @@ export class TokensController {
             name: 'Token One',
             marketCap: 1000000000,
             marketCapRank: 1,
-            marketCapChange24h: 5.2
-          }
+            marketCapChange24h: 5.2,
+          },
         ],
       },
     },
@@ -333,17 +326,19 @@ export class TokensController {
     @Res() res: Response,
   ) {
     try {
-      const leaderboard = await this.marketCapitalService.getMarketCapLeaderboard(
-        limit || 100
-      );
-      
+      const leaderboard =
+        await this.marketCapitalService.getMarketCapLeaderboard(limit || 100);
+
       return res.status(HttpStatus.OK).json({
         success: true,
         data: leaderboard,
       });
     } catch (error) {
-      console.error('❌ [TokensController] Error fetching market cap leaderboard:', error);
-      
+      console.error(
+        '❌ [TokensController] Error fetching market cap leaderboard:',
+        error,
+      );
+
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -368,8 +363,8 @@ export class TokensController {
             predictedMarketCap: 1200000,
             confidence: 0.75,
             timeframe: '24h',
-            factors: ['Strong 24h momentum', 'Positive weekly trend']
-          }
+            factors: ['Strong 24h momentum', 'Positive weekly trend'],
+          },
         ],
       },
     },
@@ -379,15 +374,21 @@ export class TokensController {
     @Res() res: Response,
   ) {
     try {
-      const predictions = await this.marketCapitalService.getMarketCapPredictions(contractAddress);
-      
+      const predictions =
+        await this.marketCapitalService.getMarketCapPredictions(
+          contractAddress,
+        );
+
       return res.status(HttpStatus.OK).json({
         success: true,
         data: predictions,
       });
     } catch (error) {
-      console.error('❌ [TokensController] Error fetching market cap predictions:', error);
-      
+      console.error(
+        '❌ [TokensController] Error fetching market cap predictions:',
+        error,
+      );
+
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -410,7 +411,7 @@ export class TokensController {
           marketCap: 1000000,
           marketCapChange24h: 5.2,
           marketCapRank: 42,
-          lastMarketCapUpdate: '2024-01-01T00:00:00.000Z'
+          lastMarketCapUpdate: '2024-01-01T00:00:00.000Z',
         },
       },
     },
@@ -420,15 +421,19 @@ export class TokensController {
     @Res() res: Response,
   ) {
     try {
-      const updatedToken = await this.marketCapitalService.updateMarketCapData(contractAddress);
-      
+      const updatedToken =
+        await this.marketCapitalService.updateMarketCapData(contractAddress);
+
       return res.status(HttpStatus.OK).json({
         success: true,
         data: updatedToken,
       });
     } catch (error) {
-      console.error('❌ [TokensController] Error updating market cap data:', error);
-      
+      console.error(
+        '❌ [TokensController] Error updating market cap data:',
+        error,
+      );
+
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,

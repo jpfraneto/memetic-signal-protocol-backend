@@ -38,12 +38,13 @@ export class BlockchainService implements OnModuleInit {
   private readonly signer?: ethers.Wallet;
 
   // Event processing queue
-  private eventQueue: Array<{ type: string; data: any; timestamp: number }> = [];
+  private eventQueue: Array<{ type: string; data: any; timestamp: number }> =
+    [];
   private isProcessingEvents = false;
 
-  // Contract address on Base mainnet - ProjectLighthouseV12
+  // Contract address on Base mainnet - ProjectLighthouseV14
   private readonly CONTRACT_ADDRESS =
-    '0xE6EA0276F2efEAe42dE1DeE0A6C4a4bE3cC85bEB';
+    '0xb3f1234c27c04b59c27dc4118c8c340a9dceef03';
   private readonly BASE_RPC_URL = process.env.BASE_RPC_URL;
   private readonly PRIVATE_KEY = process.env.PRIVATE_KEY;
 
@@ -155,10 +156,12 @@ export class BlockchainService implements OnModuleInit {
       data,
       timestamp: Date.now(),
     };
-    
+
     this.eventQueue.push(event);
-    this.logger.log(`Queued ${type} event - Queue length: ${this.eventQueue.length}`);
-    
+    this.logger.log(
+      `Queued ${type} event - Queue length: ${this.eventQueue.length}`,
+    );
+
     // Start processing if not already running
     if (!this.isProcessingEvents) {
       this.processEventQueue();
@@ -174,7 +177,9 @@ export class BlockchainService implements OnModuleInit {
     }
 
     this.isProcessingEvents = true;
-    this.logger.log(`Starting event queue processing - ${this.eventQueue.length} events queued`);
+    this.logger.log(
+      `Starting event queue processing - ${this.eventQueue.length} events queued`,
+    );
 
     while (this.eventQueue.length > 0) {
       const event = this.eventQueue.shift();
@@ -185,7 +190,10 @@ export class BlockchainService implements OnModuleInit {
         // Add delay between event processing to prevent overwhelming the system
         await this.delay(300);
       } catch (error) {
-        this.logger.error(`Error processing queued ${event.type} event:`, error);
+        this.logger.error(
+          `Error processing queued ${event.type} event:`,
+          error,
+        );
       }
     }
 
@@ -196,14 +204,18 @@ export class BlockchainService implements OnModuleInit {
   /**
    * Process a single queued event
    */
-  private async processQueuedEvent(event: { type: string; data: any; timestamp: number }): Promise<void> {
+  private async processQueuedEvent(event: {
+    type: string;
+    data: any;
+    timestamp: number;
+  }): Promise<void> {
     const { type, data } = event;
 
     switch (type) {
       case 'AccountCreated':
         await this.syncUserAccountFromBlockchain(data.user, data.fid);
         break;
-      
+
       case 'Subscribed':
         const dbUser = await this.userRepository.findOne({
           where: { fid: data.fid },
@@ -213,18 +225,22 @@ export class BlockchainService implements OnModuleInit {
           dbUser.subscriptionExpiresAt = data.expiresAt;
           dbUser.subscribedAt = new Date();
           await this.userRepository.save(dbUser);
-          this.logger.log(`✅ QUEUED: User FID ${data.fid} subscription updated`);
+          this.logger.log(
+            `✅ QUEUED: User FID ${data.fid} subscription updated`,
+          );
         }
         break;
-      
+
       case 'SignalCreated':
         const syncedSignal = await this.syncSignalFromBlockchain(data.signalId);
         if (syncedSignal) {
-          this.logger.log(`✅ QUEUED: Successfully synced Signal ${data.signalId}`);
+          this.logger.log(
+            `✅ QUEUED: Successfully synced Signal ${data.signalId}`,
+          );
           await this.updateUserStats(data.fid);
         }
         break;
-      
+
       case 'SignalSettled':
         const existingSignal = await this.signalRepository.findOne({
           where: { signalId: data.signalId.toString() },
@@ -237,7 +253,7 @@ export class BlockchainService implements OnModuleInit {
           await this.updateUserStats(data.fid);
         }
         break;
-      
+
       default:
         this.logger.warn(`Unknown event type in queue: ${type}`);
     }
@@ -281,11 +297,11 @@ export class BlockchainService implements OnModuleInit {
           const baseDelay = delayMs * Math.pow(2, attempt - 1);
           const jitter = Math.random() * 500; // Add up to 500ms jitter
           const finalDelay = baseDelay + jitter;
-          
+
           this.logger.warn(
             `Blockchain operation failed (attempt ${attempt}/${maxRetries}), retrying in ${Math.round(finalDelay)}ms: ${error.message}`,
           );
-          
+
           await this.delay(finalDelay);
         } else {
           break;
@@ -317,8 +333,8 @@ export class BlockchainService implements OnModuleInit {
     const errorBody = error?.body?.toLowerCase() || '';
 
     return (
-      retryableMessages.some((msg) => 
-        errorMessage.includes(msg) || errorBody.includes(msg)
+      retryableMessages.some(
+        (msg) => errorMessage.includes(msg) || errorBody.includes(msg),
       ) ||
       errorCode === '429' ||
       error?.error?.code === 429 ||
@@ -495,35 +511,49 @@ export class BlockchainService implements OnModuleInit {
         take: limit * 2, // Get more from DB to account for false positives
       });
 
-      this.logger.log(`Found ${potentiallyExpiredSignals.length} potentially expired signals in database`);
+      this.logger.log(
+        `Found ${potentiallyExpiredSignals.length} potentially expired signals in database`,
+      );
 
       const signals: Signal[] = [];
       const batchSize = 3;
-      
+
       // Process in batches of 3 to prevent overwhelming Alchemy
-      for (let i = 0; i < potentiallyExpiredSignals.length && signals.length < limit; i += batchSize) {
+      for (
+        let i = 0;
+        i < potentiallyExpiredSignals.length && signals.length < limit;
+        i += batchSize
+      ) {
         const batch = potentiallyExpiredSignals.slice(i, i + batchSize);
-        
+
         const batchPromises = batch.map(async (dbSignal) => {
           try {
-            const blockchainSignal = await this.getSignalFromBlockchain(Number(dbSignal.signalId));
+            const blockchainSignal = await this.getSignalFromBlockchain(
+              Number(dbSignal.signalId),
+            );
             if (
               blockchainSignal &&
               blockchainSignal.status === 0 &&
-              Number(blockchainSignal.expiresAt) <= Math.floor(Date.now() / 1000)
+              Number(blockchainSignal.expiresAt) <=
+                Math.floor(Date.now() / 1000)
             ) {
-              const syncedSignal = await this.syncSignalFromBlockchain(Number(dbSignal.signalId));
+              const syncedSignal = await this.syncSignalFromBlockchain(
+                Number(dbSignal.signalId),
+              );
               return syncedSignal;
             }
             return null;
           } catch (error) {
-            this.logger.warn(`Error checking signal ${dbSignal.signalId}:`, error);
+            this.logger.warn(
+              `Error checking signal ${dbSignal.signalId}:`,
+              error,
+            );
             return null;
           }
         });
 
         const batchResults = await Promise.allSettled(batchPromises);
-        
+
         for (const result of batchResults) {
           if (result.status === 'fulfilled' && result.value) {
             signals.push(result.value);
@@ -532,12 +562,17 @@ export class BlockchainService implements OnModuleInit {
         }
 
         // Add delay between batches
-        if (i + batchSize < potentiallyExpiredSignals.length && signals.length < limit) {
+        if (
+          i + batchSize < potentiallyExpiredSignals.length &&
+          signals.length < limit
+        ) {
           await this.delay(400);
         }
       }
 
-      this.logger.log(`Retrieved ${signals.length} expired signals from blockchain`);
+      this.logger.log(
+        `Retrieved ${signals.length} expired signals from blockchain`,
+      );
       return signals;
     } catch (error) {
       this.logger.error(
@@ -591,26 +626,34 @@ export class BlockchainService implements OnModuleInit {
       const nextSignalId = Number(await this.contract.nextSignalId());
       const syncedSignals: Signal[] = [];
       const batchSize = 5;
-      
+
       // Limit the total range to prevent excessive calls
       const maxSignalsToCheck = Math.min(limit * 2, 100);
       const startId = Math.max(1, nextSignalId - maxSignalsToCheck);
-      
-      this.logger.log(`Checking signals from ${startId} to ${nextSignalId - 1} in batches of ${batchSize}`);
-      
+
+      this.logger.log(
+        `Checking signals from ${startId} to ${nextSignalId - 1} in batches of ${batchSize}`,
+      );
+
       // Process signals in batches to prevent rate limiting
-      for (let i = nextSignalId - 1; i >= startId && syncedSignals.length < limit; i -= batchSize) {
+      for (
+        let i = nextSignalId - 1;
+        i >= startId && syncedSignals.length < limit;
+        i -= batchSize
+      ) {
         const batchIds = [];
         for (let j = 0; j < batchSize && i - j >= startId; j++) {
           batchIds.push(i - j);
         }
-        
+
         // Process batch in parallel with Promise.allSettled for better error handling
         const batchPromises = batchIds.map(async (signalId) => {
           try {
-            const blockchainSignal = await this.getSignalFromBlockchain(signalId);
+            const blockchainSignal =
+              await this.getSignalFromBlockchain(signalId);
             if (blockchainSignal) {
-              const syncedSignal = await this.syncSignalFromBlockchain(signalId);
+              const syncedSignal =
+                await this.syncSignalFromBlockchain(signalId);
               return syncedSignal;
             }
             return null;
@@ -621,7 +664,7 @@ export class BlockchainService implements OnModuleInit {
         });
 
         const batchResults = await Promise.allSettled(batchPromises);
-        
+
         // Collect successful results
         for (const result of batchResults) {
           if (result.status === 'fulfilled' && result.value) {
@@ -636,7 +679,9 @@ export class BlockchainService implements OnModuleInit {
         }
       }
 
-      this.logger.log(`Retrieved ${syncedSignals.length} recent signals from blockchain`);
+      this.logger.log(
+        `Retrieved ${syncedSignals.length} recent signals from blockchain`,
+      );
       return syncedSignals.slice(0, limit);
     } catch (error) {
       this.logger.error(
@@ -824,50 +869,25 @@ export class BlockchainService implements OnModuleInit {
         }
       });
 
-      // Listen for SessionStarted events
-      this.contract.on(
-        'SessionStarted',
-        async (user, fid, startTime, expiresAt, event) => {
-          const blockNumber = event?.blockNumber || 'unknown';
-          const transactionHash = event?.transactionHash || 'unknown';
-          this.logger.log(
-            `🔥 REAL-TIME: SessionStarted event detected - FID ${fid}, Wallet ${user}, Start: ${new Date(Number(startTime) * 1000).toISOString()}, Expires: ${new Date(Number(expiresAt) * 1000).toISOString()}, Block ${blockNumber}, TX ${transactionHash}`,
-          );
-          try {
-            const dbUser = await this.userRepository.findOne({
-              where: { fid: Number(fid) },
-            });
-            if (dbUser) {
-              this.logger.log(
-                `✅ REAL-TIME: Session started for user FID ${fid} - Session active until ${new Date(Number(expiresAt) * 1000).toISOString()}`,
-              );
-            } else {
-              this.logger.warn(
-                `⚠️  REAL-TIME: SessionStarted event for unknown user FID ${fid}`,
-              );
-            }
-          } catch (error) {
-            this.logger.error(
-              `❌ REAL-TIME: Error processing SessionStarted event for FID ${fid}:`,
-              error,
-            );
-          }
-        },
-      );
 
       // Listen for SignalCreated events
       this.contract.on(
         'SignalCreated',
-        async (signalId, fid, tokens, expiresAt, timestamp, event) => {
+        async (signalId, fid, ca, direction, timeframe, expiresAt, isSubscriber, event) => {
           const blockNumber = event?.blockNumber || 'unknown';
           const transactionHash = event?.transactionHash || 'unknown';
           this.logger.log(
-            `🔥 REAL-TIME: SignalCreated event detected - Signal ${signalId}, FID ${fid}, Tokens: ${tokens.length}, Block ${blockNumber}, TX ${transactionHash}`,
+            `🔥 REAL-TIME: SignalCreated event detected - Signal ${signalId}, FID ${fid}, CA ${ca}, Direction ${direction}, Block ${blockNumber}, TX ${transactionHash}`,
           );
           try {
             await this.queueEvent('SignalCreated', {
               signalId: Number(signalId),
               fid: Number(fid),
+              ca,
+              direction: Number(direction),
+              timeframe: Number(timeframe),
+              expiresAt: Number(expiresAt),
+              isSubscriber,
             });
             this.logger.log(
               `✅ REAL-TIME: SignalCreated event queued - Signal ${signalId}`,
@@ -881,28 +901,27 @@ export class BlockchainService implements OnModuleInit {
         },
       );
 
-      // Listen for SignalSettled events
+      // Listen for SignalResolved events
       this.contract.on(
-        'SignalSettled',
-        async (signalId, fid, status, correctPredictions, timestamp, event) => {
+        'SignalResolved',
+        async (signalId, fid, won, event) => {
           const blockNumber = event?.blockNumber || 'unknown';
           const transactionHash = event?.transactionHash || 'unknown';
           this.logger.log(
-            `🔥 REAL-TIME: SignalSettled event detected - Signal ${signalId}, FID ${fid}, Status ${status}, Correct: ${correctPredictions}/8, Block ${blockNumber}, TX ${transactionHash}`,
+            `🔥 REAL-TIME: SignalResolved event detected - Signal ${signalId}, FID ${fid}, Won: ${won}, Block ${blockNumber}, TX ${transactionHash}`,
           );
           try {
-            await this.queueEvent('SignalSettled', {
+            await this.queueEvent('SignalResolved', {
               signalId: Number(signalId),
               fid: Number(fid),
-              status,
-              correctPredictions,
+              won,
             });
             this.logger.log(
-              `✅ REAL-TIME: SignalSettled event queued - Signal ${signalId}`,
+              `✅ REAL-TIME: SignalResolved event queued - Signal ${signalId}`,
             );
           } catch (error) {
             this.logger.error(
-              `❌ REAL-TIME: Error queuing SignalSettled event for Signal ${signalId}:`,
+              `❌ REAL-TIME: Error queuing SignalResolved event for Signal ${signalId}:`,
               error,
             );
           }

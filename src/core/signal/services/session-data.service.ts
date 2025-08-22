@@ -131,8 +131,8 @@ export class SessionDataService {
                 ca: token.ca,
                 ticker: token.ticker,
                 imageUrl: tokenData?.image || '',
-                priceInUSDC: Number(tokenData?.price) || 0,
-                mcInUSDC: Number(tokenData?.marketCap) || 0,
+                priceInUSDC: Number(tokenData?.market_data?.current_price) || 0,
+                mcInUSDC: Number(tokenData?.market_data?.market_cap) || 0,
               });
             }
 

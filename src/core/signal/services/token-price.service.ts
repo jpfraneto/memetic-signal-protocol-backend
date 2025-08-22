@@ -33,7 +33,7 @@ export class TokenPriceService {
       
       // Fetch from SimpleTokenService
       const tokenInfo = await this.simpleTokenService.getTokenInfo(contractAddress);
-      const price = tokenInfo.price || 0;
+      const price = tokenInfo.market_data?.current_price || 0;
       
       // Cache the result
       this.priceCache.set(contractAddress, { price, timestamp: Date.now() });

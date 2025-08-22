@@ -79,10 +79,10 @@ export class MarketCapLeaderboardController {
           tokenAddress: token.address,
           symbol: token.symbol,
           name: token.name,
-          marketCap: token.marketCap,
-          marketCapChange24h: token.marketCapChange24h,
-          marketCapChange7d: token.marketCapChange7d,
-          peakMarketCap: token.peakMarketCap,
+          marketCap: token.market_data?.market_cap || 0,
+          marketCapChange24h: token.market_data?.price_change_24h || 0,
+          marketCapChange7d: 0, // Not available in simplified model
+          peakMarketCap: token.market_data?.ath || 0,
           image: token.image,
         })),
         totalTokens: leaderboard.length,
@@ -138,8 +138,8 @@ export class MarketCapLeaderboardController {
           tokenAddress: token.address,
           symbol: token.symbol,
           name: token.name,
-          marketCap: token.marketCap,
-          marketCapChange24h: token.marketCapChange24h,
+          marketCap: token.market_data?.market_cap || 0,
+          marketCapChange24h: token.market_data?.price_change_24h || 0,
           image: token.image,
         })),
         losers24h: analytics.topLosers24h.map((token, index) => ({
@@ -147,8 +147,8 @@ export class MarketCapLeaderboardController {
           tokenAddress: token.address,
           symbol: token.symbol,
           name: token.name,
-          marketCap: token.marketCap,
-          marketCapChange24h: token.marketCapChange24h,
+          marketCap: token.market_data?.market_cap || 0,
+          marketCapChange24h: token.market_data?.price_change_24h || 0,
           image: token.image,
         })),
         trending: analytics.trending.map((token, index) => ({
@@ -156,8 +156,8 @@ export class MarketCapLeaderboardController {
           tokenAddress: token.address,
           symbol: token.symbol,
           name: token.name,
-          marketCap: token.marketCap,
-          marketCapChange24h: token.marketCapChange24h,
+          marketCap: token.market_data?.market_cap || 0,
+          marketCapChange24h: token.market_data?.price_change_24h || 0,
           image: token.image,
         })),
         distribution: analytics.marketCapDistribution,
@@ -216,7 +216,7 @@ export class MarketCapLeaderboardController {
         topPerformers: {
           byGrowth24h: analytics.topGainers24h.slice(0, 5),
           byGrowth7d: analytics.topGainers24h.filter(token => 
-            token.marketCapChange7d && token.marketCapChange7d > 0
+            token.market_data?.price_change_24h && token.market_data.price_change_24h > 0
           ).slice(0, 5),
           byVolatility: analytics.trending.slice(0, 5),
         }

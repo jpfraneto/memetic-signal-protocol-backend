@@ -95,11 +95,11 @@ export class SessionDataService {
           signal.user?.displayName || signal.user?.username || 'Unknown',
         pfpUrl: signal.user?.pfpUrl || '',
         isVerified: signal.user?.isVerified || false,
-        tokens: signal.tokens,
+        tokenAddress: signal.tokenAddress,
+        symbol: signal.symbol,
         timestamp: signal.timestamp,
         status: signal.status,
         expiresAt: signal.expiresAt,
-        correctPredictions: signal.correctPredictions,
       }));
     } catch (error) {
       this.logger.error('Error fetching last 20 signals from feed:', error);
@@ -119,26 +119,21 @@ export class SessionDataService {
       const uniqueTokens = new Map();
 
       for (const signal of userSignals) {
-        if (signal.tokens && Array.isArray(signal.tokens)) {
-          for (const token of signal.tokens) {
-            if (!uniqueTokens.has(token.ca) && uniqueTokens.size < 8) {
-              // Try to get current price and market cap from Token table
-              const tokenData = await this.tokenRepository.findOne({
-                where: { address: token.ca },
-              });
+        if (signal.tokenAddress && !uniqueTokens.has(signal.tokenAddress) && uniqueTokens.size < 8) {
+          // Try to get current price and market cap from Token table
+          const tokenData = await this.tokenRepository.findOne({
+            where: { address: signal.tokenAddress },
+          });
 
-              uniqueTokens.set(token.ca, {
-                ca: token.ca,
-                ticker: token.ticker,
-                imageUrl: tokenData?.image || '',
-                priceInUSDC: Number(tokenData?.market_data?.current_price) || 0,
-                mcInUSDC: Number(tokenData?.market_data?.market_cap) || 0,
-              });
-            }
-
-            if (uniqueTokens.size >= 8) break;
-          }
+          uniqueTokens.set(signal.tokenAddress, {
+            ca: signal.tokenAddress,
+            ticker: signal.symbol,
+            imageUrl: tokenData?.image || '',
+            priceInUSDC: Number(tokenData?.market_data?.current_price) || 0,
+            mcInUSDC: Number(tokenData?.market_data?.market_cap) || 0,
+          });
         }
+
         if (uniqueTokens.size >= 8) break;
       }
 

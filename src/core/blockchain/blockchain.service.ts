@@ -246,7 +246,6 @@ export class BlockchainService implements OnModuleInit {
           where: { signalId: data.signalId.toString() },
         });
         if (existingSignal) {
-          existingSignal.correctPredictions = data.correctPredictions;
           existingSignal.status = this.mapStatus(data.status);
           await this.signalRepository.save(existingSignal);
           this.logger.log(`✅ QUEUED: Updated Signal ${data.signalId}`);
@@ -1063,7 +1062,6 @@ export class BlockchainService implements OnModuleInit {
 
       // Transform signals to include user info and token details
       const feedSignals = recentSignals.map((signal) => {
-        const primaryToken = signal.tokens?.[0]; // Get the first token as primary
         return {
           signalId: signal.signalId,
           fid: signal.fid,
@@ -1072,9 +1070,9 @@ export class BlockchainService implements OnModuleInit {
             signal.user?.displayName || signal.user?.username || 'Unknown',
           pfpUrl: signal.user?.pfpUrl || '',
           isVerified: signal.user?.isVerified || false,
-          tokenAddress: primaryToken?.ca || '',
-          ticker: primaryToken?.ticker || '',
-          direction: primaryToken?.direction || '',
+          tokenAddress: signal.tokenAddress || '',
+          ticker: signal.symbol || '',
+          direction: signal.direction || '',
           timestamp: signal.timestamp,
           status: signal.status,
           expiresAt: signal.timestamp + 1000 * 60 * 60 * 24,

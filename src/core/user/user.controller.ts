@@ -9,7 +9,7 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 
 // Services
 import { UserService } from './services';
@@ -40,11 +40,11 @@ export class UserController {
   })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getUsers(@Query() query: GetUsersQueryDto, @Res() res: Response) {
+  async getUsers(@Query() query: GetUsersQueryDto, @Res() res: FastifyReply) {
     try {
       const result = await this.userService.getUsers(query);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: result,
       });
@@ -73,12 +73,12 @@ export class UserController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getUserById(
     @Param('fid', ParseIntPipe) fid: number,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const result = await this.userService.getUserWithDetails(fid);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: result,
       });
@@ -115,12 +115,12 @@ export class UserController {
   async getUserCalls(
     @Param('fid', ParseIntPipe) fid: number,
     @Query() query: UserCallsQueryDto,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const result = await this.userService.getUserSignals(fid, query);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: result,
       });
@@ -146,12 +146,12 @@ export class UserController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async recalculateUserCalls(
     @Param('fid', ParseIntPipe) fid: number,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       await this.userService.recalculateUserTotalSignals(fid);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         message: `Total calls recalculated for user ${fid}`,
       });

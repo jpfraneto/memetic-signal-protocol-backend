@@ -227,8 +227,6 @@ export class UserService {
       fid: user.fid,
       username: user.username,
       displayName: user.displayName || user.username,
-      bio: user.bio,
-      avatar: user.avatar,
       pfpUrl: user.pfpUrl,
       isVerified: user.isVerified,
       followerCount: user.followerCount,
@@ -276,8 +274,6 @@ export class UserService {
       fid: user.fid,
       username: user.username,
       displayName: user.displayName || user.username,
-      bio: user.bio,
-      avatar: user.avatar,
       pfpUrl: user.pfpUrl,
       isVerified: user.isVerified,
       followerCount: user.followerCount,
@@ -333,18 +329,15 @@ export class UserService {
   }
 
   private mapSignalToDto(signal: Signal): CallDto {
-    // Get the first token from the tokens array as the primary token
-    const primaryToken = signal.tokens?.[0];
-
     return {
       id: signal.signalId,
       signalId: signal.signalId,
       fid: signal.user?.fid || signal.fid,
-      tokenAddress: primaryToken?.ca || '',
-      ticker: primaryToken?.ticker || '',
-      direction: primaryToken?.direction || '',
+      tokenAddress: signal.tokenAddress,
+      ticker: signal.symbol,
+      direction: signal.direction,
       timestamp: signal.timestamp,
-      callPrice: parseFloat(primaryToken?.mc || '0') / 1e18, // Convert from scaled market cap
+      callPrice: Number(signal.initialMarketCap),
       transactionHash: '', // Not available in current metadata structure
     };
   }

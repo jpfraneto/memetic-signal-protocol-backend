@@ -11,7 +11,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Request, Response } from 'express';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { hasResponse, hasError } from '../../utils';
 import { NotificationService } from './services';
 
@@ -31,8 +31,8 @@ export class NotificationController {
   @Post('/webhook')
   async handleWebhook(
     @Body() webhookData: any,
-    @Req() req: Request,
-    @Res() res: Response,
+    @Req() req: FastifyRequest,
+    @Res() res: FastifyReply,
   ): Promise<Response> {
     const requestId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -227,7 +227,7 @@ export class NotificationController {
    * Provides system health information for uptime monitoring
    */
   @Get('/health')
-  async healthCheck(@Res() res: Response): Promise<Response> {
+  async healthCheck(@Res() res: FastifyReply): Promise<Response> {
     try {
       const config = getConfig();
 
@@ -253,7 +253,7 @@ export class NotificationController {
    * Used for debugging webhook delivery issues
    */
   @Get('/webhook-test')
-  async webhookTest(@Res() res: Response): Promise<Response> {
+  async webhookTest(@Res() res: FastifyReply): Promise<Response> {
     this.logger.log('Webhook test endpoint accessed');
     return hasResponse(res, {
       message: 'Webhook endpoint is accessible',

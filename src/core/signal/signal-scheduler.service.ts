@@ -52,9 +52,7 @@ export class SignalSchedulerService {
       // Get unique token addresses to batch fetch prices
       const uniqueTokenAddresses = [
         ...new Set(
-          expiredSignals.flatMap((signal) =>
-            signal.tokens.map((token) => token.ca),
-          ),
+          expiredSignals.map((signal) => signal.tokenAddress),
         ),
       ];
       const priceMap =
@@ -65,42 +63,37 @@ export class SignalSchedulerService {
 
       for (const signal of expiredSignals) {
         try {
-          // Process each token in the signal
+          // Process the single token in the signal
           let totalCorrect = 0;
-          let totalTokens = signal.tokens.length;
+          let totalTokens = 1;
 
-          for (const token of signal.tokens) {
-            const currentPrice = priceMap[token.ca];
+          const currentPrice = priceMap[signal.tokenAddress];
 
-            if (!currentPrice) {
-              this.logger.warn(
-                `Could not fetch price for ${token.ca}, skipping token`,
-              );
-              continue;
-            }
-
-            // Calculate if this token prediction was correct
-            const entryPrice = +token.mc / 1e18; // Convert from scaled market cap
-            const pnlPercentage = this.tokenPriceService.calculatePnL(
-              entryPrice,
-              currentPrice,
+          if (!currentPrice) {
+            this.logger.warn(
+              `Could not fetch price for ${signal.tokenAddress}, skipping signal`,
             );
+            continue;
+          }
 
-            // Determine if this token prediction was correct
-            const isCorrect =
-              (token.direction === 'UP' && pnlPercentage > 0) ||
-              (token.direction === 'DOWN' && pnlPercentage < 0);
+          // Calculate if this token prediction was correct
+          const entryPrice = Number(signal.initialMarketCap);
+          const pnlPercentage = this.tokenPriceService.calculatePnL(
+            entryPrice,
+            currentPrice,
+          );
 
-            if (isCorrect) {
-              totalCorrect++;
-            }
+          // Determine if this token prediction was correct
+          const isCorrect =
+            (signal.direction === 'UP' && pnlPercentage > 0) ||
+            (signal.direction === 'DOWN' && pnlPercentage < 0);
+
+          if (isCorrect) {
+            totalCorrect++;
           }
 
           // Determine overall signal result
-          const winThreshold = Math.ceil(totalTokens * 0.6); // 60% correct threshold
-          const isWin = totalCorrect >= winThreshold;
-
-          signal.correctPredictions = totalCorrect;
+          const isWin = totalCorrect >= 1; // Since we only have 1 token now
           signal.status = isWin ? 'WON' : 'LOST';
 
           settledSignals.push(signal);
@@ -291,14 +284,12 @@ export class SignalSchedulerService {
       const signalDetails: Array<{ signalId: string; tokens: string[] }> = [];
 
       for (const signal of expiredSignals) {
-        if (signal.tokens && signal.tokens.length > 0) {
-          const tokenAddresses = signal.tokens.map((token) =>
-            token.ca.toLowerCase(),
-          );
-          tokenAddresses.forEach((addr) => tokenAddressSet.add(addr));
+        if (signal.tokenAddress) {
+          const tokenAddress = signal.tokenAddress.toLowerCase();
+          tokenAddressSet.add(tokenAddress);
           signalDetails.push({
             signalId: signal.signalId,
-            tokens: tokenAddresses,
+            tokens: [tokenAddress],
           });
         }
       }

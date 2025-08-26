@@ -1,6 +1,6 @@
 import { Controller, Get, Query, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 
 import { LeaderboardService } from './leaderboard.service';
 import { GetLeaderboardDto } from './dto/get-leaderboard.dto';
@@ -46,12 +46,12 @@ export class LeaderboardController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getLeaderboard(
     @Query() query: GetLeaderboardDto,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const result = await this.leaderboardService.getLeaderboard(query);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: result,
       });
@@ -89,11 +89,11 @@ export class LeaderboardController {
     },
   })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getLeaderboardStats(@Res() res: Response) {
+  async getLeaderboardStats(@Res() res: FastifyReply) {
     try {
       const stats = await this.leaderboardService.getLeaderboardStats();
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: stats,
       });

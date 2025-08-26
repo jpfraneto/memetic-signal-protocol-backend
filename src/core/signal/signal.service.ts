@@ -223,7 +223,10 @@ export class SignalService {
       canRetry: !user.usedRetryToday && !user.submittedSignalToday,
       hasSignaledToday: user.submittedSignalToday,
       hasUsedRetry: user.usedRetryToday,
-      defaultTokens: user.defaultTokens || null,
+      suggestedTokens: user.defaultTokens?.map(token => ({
+        address: token.ca,
+        ticker: token.ticker,
+      })) || null,
     };
   }
 
@@ -252,7 +255,7 @@ export class SignalService {
   async createSignal(
     createSignalDto: CreateSignalDto,
   ): Promise<SignalResponseDto> {
-    const { fid, tokens, metadata } = createSignalDto;
+    const { fid, tokenAddress, symbol, initialMarketCap, direction } = createSignalDto;
 
     // Validate session
     const session = this.activeSessions.get(fid);
@@ -276,10 +279,10 @@ export class SignalService {
       throw new ConflictException('Already signaled today');
     }
 
-    // Validate exactly 8 tokens
-    if (tokens.length !== 8) {
+    // Validate token data
+    if (!tokenAddress || !symbol || !initialMarketCap) {
       throw new HttpException(
-        'Must provide exactly 8 token predictions',
+        'Token address, symbol, and initial market cap are required',
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -293,14 +296,15 @@ export class SignalService {
     // Create signal
     const signal = this.signalRepository.create({
       signalId,
-      tokens,
+      tokenAddress,
+      symbol,
+      initialMarketCap: Number(initialMarketCap),
+      direction,
       timestamp: Date.now(),
       expiresAt,
       status: 'ACTIVE',
-      correctPredictions: 0,
       fid,
       user,
-      metadata,
     });
 
     const savedSignal = await this.signalRepository.save(signal);
@@ -409,7 +413,6 @@ export class SignalService {
 
     // Update signal
     signal.status = newStatus;
-    signal.correctPredictions = correctPredictions;
 
     const savedSignal = await this.signalRepository.save(signal);
 
@@ -468,11 +471,13 @@ export class SignalService {
     return {
       signalId: signal.signalId,
       fid: signal.fid,
-      tokens: signal.tokens,
+      tokenAddress: signal.tokenAddress,
+      symbol: signal.symbol,
+      initialMarketCap: signal.initialMarketCap.toString(),
+      direction: signal.direction,
       timestamp: signal.timestamp,
       expiresAt: signal.expiresAt,
       status: signal.status,
-      correctPredictions: signal.correctPredictions,
       createdAt: signal.createdAt,
       user: {
         fid: signal.user.fid,

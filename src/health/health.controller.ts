@@ -1,7 +1,8 @@
 // src/health/health.controller.ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseInterceptors } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { CacheService, CacheInterceptor, CacheKey, CacheTTL } from '../cache';
 
 interface HealthStatus {
   status: 'healthy' | 'unhealthy';
@@ -11,6 +12,7 @@ interface HealthStatus {
   environment: string;
   services: {
     database: 'healthy' | 'unhealthy';
+    redis: 'healthy' | 'unhealthy';
     openai: 'healthy' | 'unhealthy';
     neynar: 'healthy' | 'unhealthy';
   };
@@ -31,6 +33,7 @@ export class HealthController {
   constructor(
     @InjectDataSource()
     private dataSource: DataSource,
+    private cacheService: CacheService,
   ) {}
 
   @Get()
@@ -42,6 +45,19 @@ export class HealthController {
       databaseStatus = 'healthy';
     } catch (error) {
       console.error('Database health check failed:', error);
+    }
+
+    // Check Redis connectivity
+    let redisStatus: 'healthy' | 'unhealthy' = 'unhealthy';
+    try {
+      await this.cacheService.set('health_check', 'ok', 10);
+      const testValue = await this.cacheService.get('health_check');
+      if (testValue === 'ok') {
+        redisStatus = 'healthy';
+      }
+      await this.cacheService.del('health_check');
+    } catch (error) {
+      console.error('Redis health check failed:', error);
     }
 
     // Check OpenAI API (simple check)
@@ -82,6 +98,7 @@ export class HealthController {
 
     const allServicesHealthy =
       databaseStatus === 'healthy' &&
+      redisStatus === 'healthy' &&
       openaiStatus === 'healthy' &&
       neynarStatus === 'healthy';
 
@@ -93,6 +110,7 @@ export class HealthController {
       environment: process.env.NODE_ENV || 'development',
       services: {
         database: databaseStatus,
+        redis: redisStatus,
         openai: openaiStatus,
         neynar: neynarStatus,
       },
@@ -170,6 +188,18 @@ export class HealthController {
     return {
       ...health,
       responseTime,
+    };
+  }
+
+  @Get('cached')
+  @UseInterceptors(CacheInterceptor)
+  @CacheKey('health_cached')
+  @CacheTTL(30)
+  async getCachedHealth(): Promise<HealthStatus & { cached: boolean }> {
+    const health = await this.getHealth();
+    return {
+      ...health,
+      cached: true,
     };
   }
 }

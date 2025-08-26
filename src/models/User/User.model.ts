@@ -43,18 +43,6 @@ export class User {
     default: null,
     nullable: true,
   })
-  bio: string;
-
-  @Column({
-    default: null,
-    nullable: true,
-  })
-  avatar: string;
-
-  @Column({
-    default: null,
-    nullable: true,
-  })
   pfpUrl: string;
 
   @Column({
@@ -107,14 +95,6 @@ export class User {
     default: 0,
   })
   settledSignals: number;
-
-  @Column({
-    type: 'decimal',
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  totalStaked: number;
 
   @Column({
     type: 'int',

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SignalStatus, TokenPrediction } from '../../../models/Signal/Signal.types';
+import { SignalStatus, SignalDirection } from '../../../models/Signal/Signal.types';
 
 export class SignalResponseDto {
   @ApiProperty()
@@ -9,7 +9,16 @@ export class SignalResponseDto {
   fid: number;
 
   @ApiProperty()
-  tokens: TokenPrediction[];
+  tokenAddress: string;
+
+  @ApiProperty()
+  symbol: string;
+
+  @ApiProperty()
+  initialMarketCap: string;
+
+  @ApiProperty({ enum: ['UP', 'DOWN'] })
+  direction: SignalDirection;
 
   @ApiProperty()
   timestamp: number;
@@ -19,9 +28,6 @@ export class SignalResponseDto {
 
   @ApiProperty({ enum: ['ACTIVE', 'WON', 'LOST', 'EXPIRED'] })
   status: SignalStatus;
-
-  @ApiProperty()
-  correctPredictions: number;
 
   @ApiProperty()
   createdAt: Date;
@@ -68,8 +74,8 @@ export class SessionStatusDto {
   hasUsedRetry: boolean;
 
   @ApiProperty({ nullable: true })
-  defaultTokens: Array<{
-    ca: string;
+  suggestedTokens: Array<{
+    address: string;
     ticker: string;
   }> | null;
 }

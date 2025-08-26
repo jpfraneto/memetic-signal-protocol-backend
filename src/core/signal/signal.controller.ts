@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 
 import { SignalService } from './signal.service';
 import { CreateSignalDto } from './dto/create-signal.dto';
@@ -38,7 +38,7 @@ export class SignalController {
   async startSession(
     @Session() session: QuickAuthPayload,
     @Param('transactionHash') transactionHash: string | undefined,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       console.log('IN HERE THE TRANSACTION HASH IS', transactionHash);
@@ -63,7 +63,7 @@ export class SignalController {
   @ApiOperation({ summary: 'Start retry session with JBM payment' })
   async startRetrySession(
     @Session() session: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const result = await this.signalService.startSession(session.sub, true);
@@ -83,7 +83,7 @@ export class SignalController {
   @ApiOperation({ summary: 'Get current session status' })
   async getSessionStatus(
     @Session() session: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const result = await this.signalService.getSessionStatus(session.sub);
@@ -104,7 +104,7 @@ export class SignalController {
   async setDefaultTokens(
     @Session() session: QuickAuthPayload,
     @Body() body: { tokens: Array<{ ca: string; ticker: string }> },
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       await this.signalService.setDefaultTokens(session.sub, body.tokens);
@@ -149,7 +149,7 @@ export class SignalController {
   async createSignal(
     @Session() session: QuickAuthPayload,
     @Body() createSignalDto: CreateSignalDto,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       // Override FID from session
@@ -199,7 +199,7 @@ export class SignalController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getSignalsFeed(
     @Query() query: GetSignalsFeedDto,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const result = await this.signalService.getSignalsFeed(query);
@@ -224,7 +224,7 @@ export class SignalController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getSignalById(
     @Param('signalId') signalId: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const signal = await this.signalService.getSignalById(signalId);
@@ -255,7 +255,7 @@ export class SignalController {
   async settleSignal(
     @Param('signalId') signalId: string,
     @Body() body: { exitMarketCaps: string[]; correctPredictions: number },
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const result = await this.signalService.settleSignal(

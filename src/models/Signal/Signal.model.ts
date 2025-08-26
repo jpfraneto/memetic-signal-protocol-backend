@@ -8,21 +8,28 @@ import {
   JoinColumn,
 } from 'typeorm';
 
-import {
-  SignalDirection,
-  SignalStatus,
-  TokenPrediction,
-  SignalMetadata,
-} from './Signal.types';
+import { SignalDirection, SignalStatus } from './Signal.types';
 import { User } from '../User/User.model';
 
 @Entity({ name: 'signals' })
 export class Signal {
-  @PrimaryColumn({ type: 'varchar', length: 255 })
+  @PrimaryColumn({ type: 'varchar', length: 66 })
   signalId: string;
 
-  @Column({ type: 'json' })
-  tokens: TokenPrediction[];
+  @Column({ type: 'varchar', length: 255 })
+  tokenAddress: string;
+
+  @Column({ type: 'varchar', length: 50 })
+  symbol: string;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2 })
+  initialMarketCap: number;
+
+  @Column({
+    type: 'enum',
+    enum: ['UP', 'DOWN'],
+  })
+  direction: SignalDirection;
 
   @Column({ type: 'bigint' })
   timestamp: number;
@@ -36,12 +43,6 @@ export class Signal {
     default: 'ACTIVE',
   })
   status: SignalStatus;
-
-  @Column({ type: 'tinyint', default: 0 })
-  correctPredictions: number;
-
-  @Column({ type: 'json', nullable: true })
-  metadata: SignalMetadata;
 
   // ================================
   // FOREIGN KEYS

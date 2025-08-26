@@ -1,6 +1,6 @@
 import { Controller, Get, Param, HttpStatus, Res, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 
 import { TokenPriceService } from '../signal/services/token-price.service';
 import { SimpleTokenService } from './services/simple-token.service';
@@ -36,7 +36,7 @@ export class TokensController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getTokenPrice(
     @Param('contractAddress') contractAddress: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const price = await this.tokenPriceService.getTokenPrice(contractAddress);
@@ -50,7 +50,7 @@ export class TokensController {
         );
       }
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: {
           address: contractAddress,
@@ -93,7 +93,7 @@ export class TokensController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getTokenInfo(
     @Param('contractAddress') contractAddress: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const tokenInfo =
@@ -108,7 +108,7 @@ export class TokensController {
         );
       }
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: tokenInfo,
       });
@@ -143,7 +143,7 @@ export class TokensController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getTokenPrices(
     @Query('addresses') addresses: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       if (!addresses) {
@@ -182,7 +182,7 @@ export class TokensController {
         prices[address] = price;
       }
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: prices,
       });
@@ -212,13 +212,13 @@ export class TokensController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getTokenByContractAddress(
     @Param('ca') contractAddress: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const tokenInfo =
         await this.simpleTokenService.getTokenInfo(contractAddress);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: tokenInfo,
       });
@@ -277,11 +277,11 @@ export class TokensController {
       },
     },
   })
-  async getMarketCapAnalytics(@Res() res: Response) {
+  async getMarketCapAnalytics(@Res() res: FastifyReply) {
     try {
       const analytics = await this.marketCapitalService.getMarketCapAnalytics();
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: analytics,
       });
@@ -323,13 +323,13 @@ export class TokensController {
   })
   async getMarketCapLeaderboard(
     @Query('limit') limit: number = 100,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const leaderboard =
         await this.marketCapitalService.getMarketCapLeaderboard(limit || 100);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: leaderboard,
       });
@@ -371,7 +371,7 @@ export class TokensController {
   })
   async getMarketCapPredictions(
     @Param('contractAddress') contractAddress: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const predictions =
@@ -379,7 +379,7 @@ export class TokensController {
           contractAddress,
         );
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: predictions,
       });
@@ -418,13 +418,13 @@ export class TokensController {
   })
   async updateMarketCapData(
     @Param('contractAddress') contractAddress: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const updatedToken =
         await this.marketCapitalService.updateMarketCapData(contractAddress);
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: updatedToken,
       });

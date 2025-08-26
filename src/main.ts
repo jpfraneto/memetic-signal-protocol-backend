@@ -7,18 +7,12 @@
 
 // Dependencies
 import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { SwaggerModule } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
-import { NextFunction, Request, Response } from 'express';
-
-// Authentication
-import * as cookieParser from 'cookie-parser';
 
 // Security
-import helmet from 'helmet';
-import * as csurf from 'csurf';
-import domains, { csurfConfigOptions, getConfig } from './security/config';
-import { csrfMiddleware } from './security/middlewares';
+import domains, { getConfig } from './security/config';
 
 // Environment
 import * as dotenv from 'dotenv';
@@ -34,31 +28,30 @@ export const logger = new Logger('APIGateway');
 
 async function bootstrap() {
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create<NestFastifyApplication>(
+      AppModule,
+      new FastifyAdapter()
+    );
 
-    app.use(cookieParser(process.env.COOKIE_SECRET));
-
-    const csrf = csurf(csurfConfigOptions);
-    app.use((req: Request, res: Response, next: NextFunction) => {
-      csrfMiddleware(req, res, next, csrf);
+    await app.register(require('@fastify/cookie'), {
+      secret: process.env.COOKIE_SECRET,
     });
 
     if (!getConfig().isProduction) {
       const document = SwaggerModule.createDocument(app, swaggerOptions);
       SwaggerModule.setup('doc', app, document);
     } else {
-      app.use(helmet());
+      await app.register(require('@fastify/helmet'));
     }
 
     app.enableCors({
       origin: getConfig().isProduction
         ? domains.PRO
         : [...domains.LOCAL, ...domains.STAGING],
-
       credentials: true,
     });
 
-    await app.listen(getConfig().runtime.port);
+    await app.listen(getConfig().runtime.port, '0.0.0.0');
 
     getConfig().startup();
   } catch (e) {

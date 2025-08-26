@@ -13,7 +13,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 import { AdminService } from './services/admin.service';
 import { AuthorizationGuard, QuickAuthPayload } from '../../security/guards';
 import { Session } from '../../security/decorators';
@@ -48,7 +48,7 @@ export class AdminController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 50,
     @Query('search') search: string = '',
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(
       `getAllUsers called - user: ${user.sub}, page: ${page}, limit: ${limit}, search: "${search}"`,
@@ -103,7 +103,7 @@ export class AdminController {
   async getUserById(
     @Session() user: QuickAuthPayload,
     @Param('id') id: number,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`getUserById called - user: ${user.sub}, id: ${id}`);
 
@@ -145,7 +145,7 @@ export class AdminController {
     @Session() user: QuickAuthPayload,
     @Param('id') id: number,
     @Body() updateData: Partial<User>,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`updateUser called - user: ${user.sub}, id: ${id}`, updateData);
 
@@ -190,7 +190,7 @@ export class AdminController {
   async deleteUser(
     @Session() user: QuickAuthPayload,
     @Param('id') id: number,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`deleteUser called - user: ${user.sub}, id: ${id}`);
 
@@ -226,7 +226,7 @@ export class AdminController {
    * Get admin users
    */
   @Get('users/admin/list')
-  async getAdminUsers(@Session() user: QuickAuthPayload, @Res() res: Response) {
+  async getAdminUsers(@Session() user: QuickAuthPayload, @Res() res: FastifyReply) {
     console.log(`getAdminUsers called - user: ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
@@ -262,7 +262,7 @@ export class AdminController {
   async promoteToAdmin(
     @Session() user: QuickAuthPayload,
     @Param('id') id: number,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`promoteToAdmin called - user: ${user.sub}, id: ${id}`);
 
@@ -307,7 +307,7 @@ export class AdminController {
   async demoteToUser(
     @Session() user: QuickAuthPayload,
     @Param('id') id: number,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`demoteToUser called - user: ${user.sub}, id: ${id}`);
 
@@ -349,7 +349,7 @@ export class AdminController {
    * Get user statistics
    */
   @Get('stats/users')
-  async getUserStats(@Session() user: QuickAuthPayload, @Res() res: Response) {
+  async getUserStats(@Session() user: QuickAuthPayload, @Res() res: FastifyReply) {
     console.log(`getUserStats called - user: ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
@@ -384,7 +384,7 @@ export class AdminController {
   @Get('users/notifications/enabled')
   async getUsersWithNotifications(
     @Session() user: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`getUsersWithNotifications called - user: ${user.sub}`);
 
@@ -421,7 +421,7 @@ export class AdminController {
   async disableUserNotifications(
     @Session() user: QuickAuthPayload,
     @Param('id') id: number,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(
       `disableUserNotifications called - user: ${user.sub}, id: ${id}`,
@@ -467,7 +467,7 @@ export class AdminController {
   @Post('signals/settle-expired')
   async triggerSettleExpiredCalls(
     @Session() user: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`triggerSettleExpiredCalls called - user: ${user.sub}`);
 
@@ -506,7 +506,7 @@ export class AdminController {
   @Post('leaderboard/update-ranks')
   async triggerLeaderboardUpdate(
     @Session() user: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`triggerLeaderboardUpdate called - user: ${user.sub}`);
 
@@ -545,7 +545,7 @@ export class AdminController {
   @Post('cache/cleanup')
   async triggerCacheCleanup(
     @Session() user: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`triggerCacheCleanup called - user: ${user.sub}`);
 
@@ -584,7 +584,7 @@ export class AdminController {
   @Post('blockchain/sync')
   async triggerBlockchainSync(
     @Session() user: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`triggerBlockchainSync called - user: ${user.sub}`);
 
@@ -623,7 +623,7 @@ export class AdminController {
   @Post('blockchain/settle')
   async triggerBlockchainSettlement(
     @Session() user: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`triggerBlockchainSettlement called - user: ${user.sub}`);
 
@@ -662,7 +662,7 @@ export class AdminController {
   @Get('blockchain/stats')
   async getBlockchainStats(
     @Session() user: QuickAuthPayload,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     console.log(`getBlockchainStats called - user: ${user.sub}`);
 

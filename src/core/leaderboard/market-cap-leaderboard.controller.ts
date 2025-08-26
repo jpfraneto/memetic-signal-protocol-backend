@@ -6,7 +6,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 
 import { MarketCapitalService } from '../tokens/services/market-capital.service';
 import { hasError } from '../../utils';
@@ -62,7 +62,7 @@ export class MarketCapLeaderboardController {
   async getMarketCapLeaderboard(
     @Query('limit') limit: number = 100,
     @Query('offset') offset: number = 0,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       const limitNum = Math.min(Number(limit) || 100, 500);
@@ -90,7 +90,7 @@ export class MarketCapLeaderboardController {
         averageMarketCap: analytics.averageMarketCap,
       };
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: response,
       });
@@ -128,7 +128,7 @@ export class MarketCapLeaderboardController {
       },
     },
   })
-  async getTrendingTokens(@Res() res: Response) {
+  async getTrendingTokens(@Res() res: FastifyReply) {
     try {
       const analytics = await this.marketCapitalService.getMarketCapAnalytics();
 
@@ -163,7 +163,7 @@ export class MarketCapLeaderboardController {
         distribution: analytics.marketCapDistribution,
       };
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: response,
       });
@@ -205,7 +205,7 @@ export class MarketCapLeaderboardController {
       },
     },
   })
-  async getMarketCapAnalytics(@Res() res: Response) {
+  async getMarketCapAnalytics(@Res() res: FastifyReply) {
     try {
       const analytics = await this.marketCapitalService.getMarketCapAnalytics();
 
@@ -222,7 +222,7 @@ export class MarketCapLeaderboardController {
         }
       };
 
-      return res.status(HttpStatus.OK).json({
+      return res.status(HttpStatus.OK).send({
         success: true,
         data: response,
       });

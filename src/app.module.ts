@@ -8,6 +8,8 @@ import CoreModules from './core';
 import { getConfig } from './security/config';
 // Health
 import { HealthModule } from './health';
+// Cache
+import { RedisCacheModule } from './cache/cache.module';
 // Models
 import { User, Signal, NotificationQueue, Token } from './models';
 import { BlockchainSignal } from './models/BlockchainSignal/BlockchainSignal.model';
@@ -16,6 +18,7 @@ import { BlockchainSignal } from './models/BlockchainSignal/BlockchainSignal.mod
   imports: [
     ...CoreModules,
     HealthModule,
+    RedisCacheModule,
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: getConfig().db.host,

@@ -8,9 +8,8 @@ import {
   UseGuards,
   Body,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
 
 // Services
 import { UserService } from '../user/services';
@@ -90,8 +89,8 @@ export class AuthController {
   @UseGuards(AuthorizationGuard)
   async getMe(
     @Session() session: QuickAuthPayload,
-    @Res() res: Response,
-    @Req() req: Request,
+    @Res() res: FastifyReply,
+    @Req() req: FastifyRequest,
   ) {
     try {
       logger.log('Processing user profile request for FID:', session.sub);
@@ -125,18 +124,18 @@ export class AuthController {
       }
 
       // Handle query parameters from frontend (smart contract data)
-      const queryParams = req.query;
+      const queryParams = req.query as any;
       console.log('🔍 [GET /me] Query parameters:', queryParams);
 
       // Process contract account data from query params if provided
-      if (queryParams.fid || queryParams.isBanned !== undefined) {
+      if (queryParams?.fid || queryParams?.isBanned !== undefined) {
         console.log(
           '📄 [GET /me] Processing contract account data from query params...',
         );
 
         const contractAccount = {
-          fid: queryParams.fid ? parseInt(queryParams.fid as string) : 0,
-          isBanned: queryParams.isBanned === 'true',
+          fid: queryParams?.fid ? parseInt(queryParams?.fid as string) : 0,
+          isBanned: queryParams?.isBanned === 'true',
         };
 
         console.log('🏗️ [GET /me] Contract account details:', contractAccount);
@@ -157,8 +156,8 @@ export class AuthController {
 
         // Update user with contract account data
         const updateData: any = {
-          walletAddress: queryParams.userAddress
-            ? (queryParams.userAddress as string).toLowerCase()
+          walletAddress: queryParams?.userAddress
+            ? (queryParams?.userAddress as string).toLowerCase()
             : null,
           updatedAt: new Date(),
           isSubscriber: false, // Default to false, will be updated by blockchain events
@@ -182,14 +181,14 @@ export class AuthController {
         );
       } else {
         // Fallback: Check if user has an account on the smart contract
-        if (queryParams.userAddress) {
+        if (queryParams?.userAddress) {
           logger.log(
             'Checking smart contract account for wallet:',
-            queryParams.userAddress,
+            queryParams?.userAddress,
           );
           const blockchainAccount =
             await this.blockchainService.getAccountFromBlockchain(
-              queryParams.userAddress as string,
+              queryParams?.userAddress as string,
             );
 
           if (blockchainAccount && blockchainAccount.fid > 0) {
@@ -205,7 +204,7 @@ export class AuthController {
               const updatedData = {
                 stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
                 walletAddress: (
-                  queryParams.userAddress as string
+                  queryParams?.userAddress as string
                 ).toLowerCase(),
                 updatedAt: new Date(),
                 isSubscriber: blockchainAccount.isSubscriber,
@@ -216,18 +215,18 @@ export class AuthController {
               // Update the local user object to reflect the changes
               user.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
               user.walletAddress = (
-                queryParams.userAddress as string
+                queryParams?.userAddress as string
               ).toLowerCase();
               user.isSubscriber = blockchainAccount.isSubscriber;
 
               logger.log(
-                `Updated user FID ${session.sub} state to WITH_ACCOUNT with wallet ${queryParams.userAddress}`,
+                `Updated user FID ${session.sub} state to WITH_ACCOUNT with wallet ${queryParams?.userAddress}`,
               );
             }
           } else {
             logger.log(
               'No smart contract account found for wallet:',
-              queryParams.userAddress,
+              queryParams?.userAddress,
             );
           }
         }
@@ -235,16 +234,16 @@ export class AuthController {
 
       // Process daily status from query params if provided
       if (
-        queryParams.hasSignaledToday !== undefined ||
-        queryParams.hasUsedRetry !== undefined
+        queryParams?.hasSignaledToday !== undefined ||
+        queryParams?.hasUsedRetry !== undefined
       ) {
         console.log(
           '📅 [GET /me] Processing daily status from query params...',
         );
 
         const dailyUpdateData: any = {
-          submittedSignalToday: queryParams.hasSignaledToday === 'true',
-          usedRetryToday: queryParams.hasUsedRetry === 'true',
+          submittedSignalToday: queryParams?.hasSignaledToday === 'true',
+          usedRetryToday: queryParams?.hasUsedRetry === 'true',
           updatedAt: new Date(),
         };
 
@@ -255,12 +254,12 @@ export class AuthController {
       }
 
       // Process JBM balance from query params if provided
-      if (queryParams.jbmBalance) {
+      if (queryParams?.jbmBalance) {
         console.log('💰 [GET /me] Processing JBM balance from query params...');
-        console.log('💰 [GET /me] JBM balance value:', queryParams.jbmBalance);
+        console.log('💰 [GET /me] JBM balance value:', queryParams?.jbmBalance);
 
         const jbmUpdateData: any = {
-          jbmBalance: queryParams.jbmBalance,
+          jbmBalance: queryParams?.jbmBalance,
           updatedAt: new Date(),
         };
 
@@ -327,7 +326,7 @@ export class AuthController {
   async syncUserData(
     @Session() session: QuickAuthPayload,
     @Body() body: SyncUserDataDto,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     try {
       console.log(
@@ -762,9 +761,9 @@ export class AuthController {
    */
   @Post('/logout')
   @UseGuards(AuthorizationGuard)
-  async logOut(@Req() req: Request, @Res() res: Response) {
+  async logOut(@Req() req: FastifyRequest, @Res() res: FastifyReply) {
     try {
-      res.clearCookie('Authorization');
+      res.header('Set-Cookie', 'Authorization=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
       return hasResponse(res, 'Successfully logged out.');
     } catch (error) {
       return hasError(

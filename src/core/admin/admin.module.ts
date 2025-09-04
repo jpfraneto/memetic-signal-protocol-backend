@@ -15,7 +15,6 @@ import { User } from '../../models';
 // External modules
 import { AuthModule } from '../auth/auth.module';
 import { SignalModule } from '../signal/signal.module';
-import { BlockchainModule } from '../blockchain/blockchain.module';
 
 @Module({
   imports: [
@@ -23,7 +22,6 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
     AuthModule,
     ServicesModule,
     SignalModule,
-    BlockchainModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

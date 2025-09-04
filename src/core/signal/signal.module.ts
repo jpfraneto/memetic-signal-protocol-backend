@@ -8,9 +8,14 @@ import { SessionDataService } from './services/session-data.service';
 import { Signal } from '../../models/Signal/Signal.model';
 import { User } from '../../models/User/User.model';
 import { Token } from '../../models/Token/Token.model';
+// Import Ponder entities
+import { FidStats } from '../../models/FidStats/FidStats.model';
+import { WalletAuthorization } from '../../models/WalletAuthorization/WalletAuthorization.model';
+import { DailySignalCount } from '../../models/DailySignalCount/DailySignalCount.model';
+import { FidBan } from '../../models/FidBan/FidBan.model';
+import { WalletBan } from '../../models/WalletBan/WalletBan.model';
 import { TokenPriceService } from '../signal/services/token-price.service';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
-import { BlockchainService } from '../blockchain/blockchain.service';
 import { TokensModule } from '../tokens/tokens.module';
 import { UserModule } from '../user/user.module';
 import { AuthModule } from '../auth/auth.module';
@@ -18,7 +23,16 @@ import { ZapperService } from '../zapper/services/zapper.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Signal, User, Token]),
+    TypeOrmModule.forFeature([
+      Signal, 
+      User, 
+      Token, 
+      FidStats, 
+      WalletAuthorization, 
+      DailySignalCount, 
+      FidBan, 
+      WalletBan
+    ]),
     TokensModule,
     forwardRef(() => UserModule),
     forwardRef(() => AuthModule),
@@ -30,7 +44,6 @@ import { ZapperService } from '../zapper/services/zapper.service';
     SessionDataService,
     TokenPriceService,
     LeaderboardService,
-    BlockchainService,
     ZapperService,
   ],
   exports: [SignalService, SignalSchedulerService, SessionDataService],

@@ -4,14 +4,21 @@ export class UpdateSignalIdToBigint1733668800000 implements MigrationInterface {
   name = 'UpdateSignalIdToBigint1733668800000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE \`calls\` MODIFY COLUMN \`signalId\` BIGINT NOT NULL`,
-    );
+    // Check if calls table exists first
+    const hasTable = await queryRunner.hasTable('calls');
+    if (hasTable) {
+      await queryRunner.query(
+        `ALTER TABLE "calls" ALTER COLUMN "signalId" TYPE BIGINT`,
+      );
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE \`calls\` MODIFY COLUMN \`signalId\` INT NOT NULL`,
-    );
+    const hasTable = await queryRunner.hasTable('calls');
+    if (hasTable) {
+      await queryRunner.query(
+        `ALTER TABLE "calls" ALTER COLUMN "signalId" TYPE INTEGER`,
+      );
+    }
   }
 }

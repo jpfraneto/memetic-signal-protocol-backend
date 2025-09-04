@@ -6,15 +6,11 @@ SERVER_USER := root
 SERVER_HOST := YOUR_DROPLET_IP_HERE
 DOMAIN := api.sigil.lat
 DATABASE_NAME := sigil_db
-DATABASE_USER := root
-MYSQL_ROOT_PASSWORD := 1234
-DATABASE_PASSWORD := 1234
+DATABASE_USER := postgres
+DATABASE_PASSWORD := postgres
 JWT_SECRET := $(shell openssl rand -base64 64)
 
-# MySQL connection command
-MYSQL_CMD := docker-compose -f docker-compose.yml exec -T mysql mysql -u root -p$(MYSQL_ROOT_PASSWORD)
-
-.PHONY: simple-deploy deploy-production local-setup docker-setup db-reset db-drop db-create db-status db-recalculate-calls help check-mysql check-server-host restart status logs continue-deployment
+.PHONY: simple-deploy deploy-production local-setup docker-setup db-recalculate-calls help check-postgres check-server-host restart status logs continue-deployment
 
 # Simple one-command deployment (local execution)
 simple-deploy:
@@ -118,59 +114,28 @@ continue-deployment: check-server-host deploy-app setup-ssl setup-auto-deploy
 	@echo "🔄 Restarting services..."
 	ssh $(SERVER_USER)@$(SERVER_HOST) "cd /opt/runner-api && docker-compose restart"
 
-# Check MySQL connection method
-check-mysql:
-	@echo "Checking available MySQL connection methods..."
-	@if command -v mysql >/dev/null 2>&1; then \
-		echo "✓ mysql command available"; \
+# Check PostgreSQL connection method
+check-postgres:
+	@echo "Checking available PostgreSQL connection methods..."
+	@if command -v psql >/dev/null 2>&1; then \
+		echo "✓ psql command available"; \
 	else \
-		echo "✗ mysql command not found"; \
+		echo "✗ psql command not found"; \
 	fi
-	@if command -v docker >/dev/null 2>&1; then \
-		echo "✓ docker available"; \
-		if docker ps --format "table {{.Names}}" | grep -q mysql; then \
-			echo "✓ MySQL container found"; \
-		else \
-			echo "✗ No MySQL container running"; \
-		fi \
-	else \
-		echo "✗ docker not found"; \
-	fi
-	@if command -v docker-compose >/dev/null 2>&1; then \
-		echo "✓ docker-compose available"; \
-	else \
-		echo "✗ docker-compose not found"; \
-	fi
+	@echo "ℹ️  Connecting to Railway PostgreSQL database"
 
-# Reset database (drop and recreate)
-db-reset: db-drop db-create db-sync db-seed
-	@echo "Database '$(DATABASE_NAME)' has been reset and seeded successfully!"
-
-# Drop the database
-db-drop:
-	@echo "Dropping database '$(DATABASE_NAME)'..."
-	@$(MYSQL_CMD) -e "DROP DATABASE IF EXISTS $(DATABASE_NAME);"
-	@echo "Database dropped."
-
-# Create the database
-db-create:
-	@echo "Creating database '$(DATABASE_NAME)'..."
-	@$(MYSQL_CMD) -e "CREATE DATABASE $(DATABASE_NAME);"
-	@echo "Database created."
-
-# Check database status
-db-status:
-	@echo "Checking database status..."
-	@$(MYSQL_CMD) -e "SHOW DATABASES LIKE '$(DATABASE_NAME)';"
+# Reset database by truncating tables and re-syncing schema
+db-reset: db-sync db-seed
+	@echo "Database has been reset and seeded successfully!"
 
 # Sync database schema (create tables)
 db-sync:
 	@echo "Syncing database schema..."
 	@npx ts-node src/scripts/sync-database.ts
 
-# Seed the database with workout data
+# Seed the database with seed-database.ts script
 db-seed:
-	@echo "Seeding database with workout data..."
+	@echo "Calling the seed-database.ts script..."
 	@npx ts-node src/core/training/services/seed-database.ts
 
 db-recalculate-calls:
@@ -180,11 +145,9 @@ db-recalculate-calls:
 # Show available commands
 help:
 	@echo "Available commands:"
-	@echo "  make db-reset   - Drop, recreate and seed the database"
-	@echo "  make db-drop    - Drop the database"
-	@echo "  make db-create  - Create the database"
+	@echo "  make db-reset   - Reset database (truncate + re-sync + seed)"
+	@echo "  make db-sync    - Sync database schema with Railway PostgreSQL"
 	@echo "  make db-seed    - Seed the database with workout data"
-	@echo "  make db-status  - Check if database exists"
 	@echo "  make db-recalculate-calls - Recalculate total calls for all users"
 	@echo "  make help        - Show this help message"
 

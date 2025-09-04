@@ -4,10 +4,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 
 import { Signal } from '../../models/Signal/Signal.model';
+import { SignalStatus } from '../../models/Signal/Signal.types';
 import { User } from '../../models/User/User.model';
 import { TokenPriceService } from './services/token-price.service';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
-import { BlockchainService } from '../blockchain/blockchain.service';
 
 @Injectable()
 export class SignalSchedulerService {
@@ -20,7 +20,7 @@ export class SignalSchedulerService {
     private userRepository: Repository<User>,
     private tokenPriceService: TokenPriceService,
     private leaderboardService: LeaderboardService,
-    private blockchainService: BlockchainService,
+    // private blockchainService: BlockchainService, // Temporarily disabled
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -33,8 +33,8 @@ export class SignalSchedulerService {
       // Find all active signals that have expired
       const expiredSignals = await this.signalRepository.find({
         where: {
-          status: 'ACTIVE',
-          expiresAt: LessThan(now),
+          status: SignalStatus.ACTIVE,
+          expires_at: LessThan(now),
         },
         relations: ['user'],
         take: 50, // Process in batches to avoid overwhelming the API
@@ -51,9 +51,7 @@ export class SignalSchedulerService {
 
       // Get unique token addresses to batch fetch prices
       const uniqueTokenAddresses = [
-        ...new Set(
-          expiredSignals.map((signal) => signal.tokenAddress),
-        ),
+        ...new Set(expiredSignals.map((signal) => signal.ca)),
       ];
       const priceMap =
         await this.tokenPriceService.getTokenPrices(uniqueTokenAddresses);
@@ -67,17 +65,16 @@ export class SignalSchedulerService {
           let totalCorrect = 0;
           let totalTokens = 1;
 
-          const currentPrice = priceMap[signal.tokenAddress];
+          const currentPrice = priceMap[signal.ca];
 
           if (!currentPrice) {
             this.logger.warn(
-              `Could not fetch price for ${signal.tokenAddress}, skipping signal`,
+              `Could not fetch price for ${signal.ca}, skipping signal`,
             );
             continue;
           }
 
-          // Calculate if this token prediction was correct
-          const entryPrice = Number(signal.initialMarketCap);
+          const entryPrice = signal.mc;
           const pnlPercentage = this.tokenPriceService.calculatePnL(
             entryPrice,
             currentPrice,
@@ -85,8 +82,8 @@ export class SignalSchedulerService {
 
           // Determine if this token prediction was correct
           const isCorrect =
-            (signal.direction === 'UP' && pnlPercentage > 0) ||
-            (signal.direction === 'DOWN' && pnlPercentage < 0);
+            (signal.direction === true && pnlPercentage > 0) ||
+            (signal.direction === false && pnlPercentage < 0);
 
           if (isCorrect) {
             totalCorrect++;
@@ -94,7 +91,7 @@ export class SignalSchedulerService {
 
           // Determine overall signal result
           const isWin = totalCorrect >= 1; // Since we only have 1 token now
-          signal.status = isWin ? 'WON' : 'LOST';
+          signal.status = isWin ? SignalStatus.WON : SignalStatus.LOST;
 
           settledSignals.push(signal);
 
@@ -112,12 +109,15 @@ export class SignalSchedulerService {
           }
 
           this.logger.log(
-            `Settled signal ${signal.signalId}: ${signal.status} (${totalCorrect}/${totalTokens} correct)`,
+            `Settled signal ${signal.transaction_hash}: ${signal.status} (${totalCorrect}/${totalTokens} correct)`,
           );
         } catch (error) {
-          this.logger.error(`Error settling signal ${signal.signalId}:`, error);
-          // Mark as expired if we can't process it
-          signal.status = 'EXPIRED';
+          this.logger.error(
+            `Error settling signal ${signal.transaction_hash}:`,
+            error,
+          );
+          // Mark as lost if we can't process it
+          signal.status = SignalStatus.LOST;
           settledSignals.push(signal);
         }
       }
@@ -180,182 +180,43 @@ export class SignalSchedulerService {
       }
 
       // Update counts
-      user.activeSignals = Math.max(0, user.activeSignals - (wins + losses));
-      user.settledSignals += wins + losses;
+      user.active_signals = Math.max(0, user.active_signals - (wins + losses));
+      user.settled_signals += wins + losses;
 
       // Recalculate win rate
-      if (user.settledSignals > 0) {
+      if (user.settled_signals > 0) {
         const previousWins = Math.round(
-          (user.winRate / 100) * (user.settledSignals - wins - losses),
+          (user.win_rate / 100) * (user.settled_signals - wins - losses),
         );
         const totalWins = previousWins + wins;
-        user.winRate = (totalWins / user.settledSignals) * 100;
+        user.win_rate = (totalWins / user.settled_signals) * 100;
       }
 
       // Calculate MFS Score (Memetic Footprint Score)
-      if (user.settledSignals >= 5) {
-        const winRateWeight = user.winRate / 100;
-        const volumeWeight = Math.min(user.settledSignals / 100, 1); // Cap at 100 signals for volume weight
-        const consistencyBonus = user.settledSignals >= 20 ? 0.05 : 0; // Small bonus for high activity
-        user.mfsScore =
+      if (user.settled_signals >= 5) {
+        const winRateWeight = user.win_rate / 100;
+        const volumeWeight = Math.min(user.settled_signals / 100, 1); // Cap at 100 signals for volume weight
+        const consistencyBonus = user.settled_signals >= 20 ? 0.05 : 0; // Small bonus for high activity
+        user.mfs_score =
           winRateWeight * 0.7 + volumeWeight * 0.25 + consistencyBonus;
 
         // Ensure MFS score is between 0 and 1
-        user.mfsScore = Math.min(Math.max(user.mfsScore, 0), 1);
+        user.mfs_score = Math.min(Math.max(user.mfs_score, 0), 1);
       }
 
       await this.userRepository.save(user);
 
       this.logger.log(
-        `Updated stats for user ${userId}: ${wins} wins, ${losses} losses. New win rate: ${user.winRate.toFixed(2)}%, MFS: ${user.mfsScore.toFixed(3)}`,
+        `Updated stats for user ${userId}: ${wins} wins, ${losses} losses. New win rate: ${user.win_rate.toFixed(2)}%, MFS: ${user.mfs_score.toFixed(3)}`,
       );
     } catch (error) {
       this.logger.error(`Error updating user stats for ${userId}:`, error);
     }
   }
 
-  @Cron(CronExpression.EVERY_HOUR)
-  async syncBlockchainSignals() {
-    this.logger.log('Starting blockchain sync...');
-
-    try {
-      // Get contract stats to understand total signals
-      const stats = await this.blockchainService.getContractStats();
-
-      // Get the latest signal ID we have in our database
-      const latestSignal = await this.signalRepository.findOne({
-        order: { signalId: 'DESC' },
-      });
-
-      const lastSyncedId = latestSignal ? parseInt(latestSignal.signalId) : 0;
-      const latestBlockchainId = stats.nextSignalId - 1;
-
-      if (lastSyncedId >= latestBlockchainId) {
-        this.logger.log('Database is up to date with blockchain');
-        return;
-      }
-
-      this.logger.log(
-        `Syncing signals ${lastSyncedId + 1} to ${latestBlockchainId}`,
-      );
-
-      // Sync missing signals
-      for (
-        let signalId = lastSyncedId + 1;
-        signalId <= latestBlockchainId;
-        signalId++
-      ) {
-        await this.blockchainService.syncSignalFromBlockchain(signalId);
-
-        // Batch in groups of 10 to avoid overwhelming the system
-        if (signalId % 10 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // Brief pause
-        }
-      }
-
-      this.logger.log(
-        `Completed blockchain sync: ${latestBlockchainId - lastSyncedId} signals synced`,
-      );
-    } catch (error) {
-      this.logger.error('Error in blockchain sync:', error);
-    }
-  }
-
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async settleExpiredSignalsOnBlockchain() {
-    this.logger.log('Checking for expired signals to settle on blockchain...');
-
-    try {
-      // Get expired signals from blockchain
-      const expiredSignals =
-        await this.blockchainService.getExpiredSignalsFromBlockchain(20);
-
-      if (expiredSignals.length === 0) {
-        this.logger.log('No expired signals found on blockchain');
-        return;
-      }
-
-      this.logger.log(
-        `Found ${expiredSignals.length} expired signals on blockchain`,
-      );
-
-      // Collect unique token addresses for price fetching
-      const tokenAddressSet = new Set<string>();
-      const signalDetails: Array<{ signalId: string; tokens: string[] }> = [];
-
-      for (const signal of expiredSignals) {
-        if (signal.tokenAddress) {
-          const tokenAddress = signal.tokenAddress.toLowerCase();
-          tokenAddressSet.add(tokenAddress);
-          signalDetails.push({
-            signalId: signal.signalId,
-            tokens: [tokenAddress],
-          });
-        }
-      }
-
-      // Batch fetch current prices
-      const priceMap = await this.tokenPriceService.getTokenPrices(
-        Array.from(tokenAddressSet),
-      );
-
-      // Prepare settlement data
-      const settlements: Array<{ signalId: number; exitMarketCap: string }> =
-        [];
-
-      for (const detail of signalDetails) {
-        // Use the first token's price for settlement
-        const firstToken = detail.tokens[0];
-        const currentPrice = priceMap[firstToken];
-        if (currentPrice) {
-          settlements.push({
-            signalId:
-              typeof detail.signalId === 'string'
-                ? +detail.signalId
-                : detail.signalId,
-            exitMarketCap: (currentPrice * 1e18).toString(), // Convert to wei-like format
-          });
-        } else {
-          this.logger.warn(
-            `Could not fetch price for ${firstToken}, skipping signal ${detail.signalId}`,
-          );
-        }
-      }
-
-      if (settlements.length === 0) {
-        this.logger.log('No settlements possible due to missing prices');
-        return;
-      }
-
-      // Batch settle on blockchain
-      const success =
-        await this.blockchainService.batchSettleSignalsOnBlockchain(
-          settlements,
-        );
-
-      if (success) {
-        this.logger.log(
-          `Successfully settled ${settlements.length} signals on blockchain`,
-        );
-      } else {
-        this.logger.error('Failed to settle signals on blockchain');
-      }
-    } catch (error) {
-      this.logger.error('Error in settleExpiredSignalsOnBlockchain:', error);
-    }
-  }
-
   // Manual trigger methods for testing
   async triggerExpiredSignalsSettlement() {
     await this.settleExpiredSignals();
-  }
-
-  async triggerBlockchainSettlement() {
-    await this.settleExpiredSignalsOnBlockchain();
-  }
-
-  async triggerBlockchainSync() {
-    await this.syncBlockchainSignals();
   }
 
   async triggerLeaderboardUpdate() {

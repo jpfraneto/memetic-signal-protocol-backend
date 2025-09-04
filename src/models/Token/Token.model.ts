@@ -9,7 +9,7 @@ import {
 @Entity({ name: 'tokens' })
 export class Token {
   @PrimaryColumn({ type: 'varchar', length: 42 })
-  address: string;
+  ca: string;
 
   @Column()
   name: string;
@@ -49,8 +49,11 @@ export class Token {
   };
 
   @CreateDateColumn()
-  createdAt: Date;
+  created_at: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updated_at: Date;
+
+  @Column({ type: 'varchar', nullable: false })
+  coin_id: string;
 }

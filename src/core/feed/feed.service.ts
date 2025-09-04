@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BlockchainSignal } from '../../models/BlockchainSignal/BlockchainSignal.model';
 import { Token } from '../../models/Token/Token.model';
+import { Signal } from 'src/models/Signal/Signal.model';
+import { SignalStatus } from 'src/models/Signal/Signal.types';
 
 export interface EnrichedSignal {
   id: string;
@@ -14,9 +15,9 @@ export interface EnrichedSignal {
   isSubscriber: boolean;
   isResolved: boolean;
   won: boolean | null;
-  createdAt: Date;
+  created_at: Date;
   token: {
-    address: string;
+    ca: string;
     name: string;
     symbol: string;
     decimals: number;
@@ -36,7 +37,7 @@ export interface EnrichedSignal {
 }
 
 export interface FeedResponse {
-  signals: EnrichedSignal[];
+  signals: Signal[];
   total: number;
   page: number;
   limit: number;
@@ -49,7 +50,7 @@ export interface FeedFilters {
   fid?: string;
   direction?: number;
   isResolved?: boolean;
-  tokenAddress?: string;
+  ca?: string;
   minTimeframe?: number;
   maxTimeframe?: number;
 }
@@ -59,8 +60,8 @@ export class FeedService {
   private readonly logger = new Logger(FeedService.name);
 
   constructor(
-    @InjectRepository(BlockchainSignal)
-    private blockchainSignalRepository: Repository<BlockchainSignal>,
+    @InjectRepository(Signal)
+    private signalRepository: Repository<Signal>,
     @InjectRepository(Token)
     private tokenRepository: Repository<Token>,
   ) {}
@@ -72,7 +73,7 @@ export class FeedService {
       fid,
       direction,
       isResolved,
-      tokenAddress,
+      ca,
       minTimeframe,
       maxTimeframe,
     } = filters;
@@ -81,21 +82,21 @@ export class FeedService {
 
     // Build where conditions
     const whereConditions: any = {};
-    
+
     if (fid) {
       whereConditions.fid = fid;
     }
-    
+
     if (direction !== undefined) {
       whereConditions.direction = direction;
     }
-    
+
     if (isResolved !== undefined) {
       whereConditions.isResolved = isResolved;
     }
-    
-    if (tokenAddress) {
-      whereConditions.ca = tokenAddress.toLowerCase();
+
+    if (ca) {
+      whereConditions.ca = ca.toLowerCase();
     }
 
     // Handle timeframe range
@@ -111,20 +112,18 @@ export class FeedService {
 
     try {
       const [signals, total] = await Promise.all([
-        this.blockchainSignalRepository.find({
+        this.signalRepository.find({
           where: whereConditions,
           relations: ['token'],
-          order: { createdAt: 'DESC' },
+          order: { timestamp: 'DESC' },
           take: limit,
           skip: offset,
         }),
-        this.blockchainSignalRepository.count({ where: whereConditions }),
+        this.signalRepository.count({ where: whereConditions }),
       ]);
 
-      const enrichedSignals = signals.map(signal => this.mapToEnrichedSignal(signal));
-
       return {
-        signals: enrichedSignals,
+        signals: signals,
         total,
         page,
         limit,
@@ -136,79 +135,63 @@ export class FeedService {
     }
   }
 
-  async getSignalsByToken(tokenAddress: string, limit = 10): Promise<EnrichedSignal[]> {
+  async getSignalsByToken(ca: string, limit = 10): Promise<Signal[]> {
     try {
-      const signals = await this.blockchainSignalRepository.find({
-        where: { ca: tokenAddress.toLowerCase() },
+      const signals = await this.signalRepository.find({
+        where: { ca: ca.toLowerCase() },
         relations: ['token'],
-        order: { createdAt: 'DESC' },
+        order: { timestamp: 'DESC' },
         take: limit,
       });
 
-      return signals.map(signal => this.mapToEnrichedSignal(signal));
+      return signals;
     } catch (error) {
-      this.logger.error(`Failed to fetch signals for token ${tokenAddress}:`, error);
+      this.logger.error(`Failed to fetch signals for token ${ca}:`, error);
       return [];
     }
   }
 
-  async getSignalsByFid(fid: string, limit = 20): Promise<EnrichedSignal[]> {
+  async getSignalsByFid(fid: string, limit = 20): Promise<Signal[]> {
     try {
-      const signals = await this.blockchainSignalRepository.find({
-        where: { fid },
+      const signals = await this.signalRepository.find({
+        where: { fid: parseInt(fid) },
         relations: ['token'],
-        order: { createdAt: 'DESC' },
+        order: { timestamp: 'DESC' },
         take: limit,
       });
 
-      return signals.map(signal => this.mapToEnrichedSignal(signal));
+      return signals;
     } catch (error) {
       this.logger.error(`Failed to fetch signals for FID ${fid}:`, error);
       return [];
     }
   }
 
-  async getActiveSignals(limit = 50): Promise<EnrichedSignal[]> {
+  async getRecentSignals(limit = 20): Promise<Signal[]> {
     try {
-      const signals = await this.blockchainSignalRepository.find({
-        where: { isResolved: false },
+      const signals = await this.signalRepository.find({
         relations: ['token'],
-        order: { createdAt: 'DESC' },
+        order: { timestamp: 'DESC' },
         take: limit,
       });
 
-      return signals.map(signal => this.mapToEnrichedSignal(signal));
-    } catch (error) {
-      this.logger.error('Failed to fetch active signals:', error);
-      return [];
-    }
-  }
-
-  async getRecentSignals(limit = 20): Promise<EnrichedSignal[]> {
-    try {
-      const signals = await this.blockchainSignalRepository.find({
-        relations: ['token'],
-        order: { createdAt: 'DESC' },
-        take: limit,
-      });
-
-      return signals.map(signal => this.mapToEnrichedSignal(signal));
+      return signals;
     } catch (error) {
       this.logger.error('Failed to fetch recent signals:', error);
       return [];
     }
   }
 
-  async getSignalById(signalId: string): Promise<EnrichedSignal | null> {
+  async getSignalById(transaction_hash: string): Promise<Signal | null> {
     try {
-      const signal = await this.blockchainSignalRepository.findOne({
-        where: { signalId },
+      const signal = await this.signalRepository.findOne({
+        where: { transaction_hash: transaction_hash },
         relations: ['token'],
       });
 
-      return signal ? this.mapToEnrichedSignal(signal) : null;
+      return signal;
     } catch (error) {
-      this.logger.error(`Failed to fetch signal ${signalId}:`, error);
+      this.logger.error(`Failed to fetch signal ${transaction_hash}:`, error);
       return null;
     }
   }
@@ -228,14 +211,15 @@ export class FeedService {
         uniqueTokensResult,
         uniqueSignalersResult,
       ] = await Promise.all([
-        this.blockchainSignalRepository.count(),
-        this.blockchainSignalRepository.count({ where: { isResolved: false } }),
-        this.blockchainSignalRepository.count({ where: { isResolved: true } }),
-        this.blockchainSignalRepository
+        this.signalRepository.count(),
+        this.signalRepository.count({ where: { status: SignalStatus.ACTIVE } }),
+        this.signalRepository.count({ where: { status: SignalStatus.WON } }),
+        this.signalRepository.count({ where: { status: SignalStatus.LOST } }),
+        this.signalRepository
           .createQueryBuilder('signal')
           .select('COUNT(DISTINCT signal.ca)', 'count')
           .getRawOne(),
-        this.blockchainSignalRepository
+        this.signalRepository
           .createQueryBuilder('signal')
           .select('COUNT(DISTINCT signal.fid)', 'count')
           .getRawOne(),
@@ -245,38 +229,12 @@ export class FeedService {
         totalSignals,
         activeSignals,
         resolvedSignals,
-        uniqueTokens: parseInt(uniqueTokensResult.count),
-        uniqueSignalers: parseInt(uniqueSignalersResult.count),
+        uniqueTokens: parseInt(uniqueTokensResult.toString()),
+        uniqueSignalers: parseInt(uniqueSignalersResult.toString()),
       };
     } catch (error) {
       this.logger.error('Failed to fetch feed stats:', error);
       throw error;
     }
-  }
-
-  private mapToEnrichedSignal(signal: BlockchainSignal): EnrichedSignal {
-    return {
-      id: signal.id,
-      signalId: signal.signalId,
-      fid: signal.fid,
-      direction: signal.direction,
-      timeframe: signal.timeframe,
-      expiresAt: signal.expiresAt,
-      isSubscriber: signal.isSubscriber,
-      isResolved: signal.isResolved,
-      won: signal.won,
-      createdAt: signal.createdAt,
-      token: signal.token ? {
-        address: signal.token.address,
-        name: signal.token.name,
-        symbol: signal.token.symbol,
-        decimals: signal.token.decimals,
-        image: signal.token.image,
-        image_small: signal.token.image_small,
-        image_thumb: signal.token.image_thumb,
-        market_cap_rank: signal.token.market_cap_rank,
-        market_data: signal.token.market_data,
-      } : null,
-    };
   }
 }

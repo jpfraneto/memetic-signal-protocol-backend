@@ -66,8 +66,8 @@ export class BanGuard extends AuthorizationGuard implements CanActivate {
 
       // Check if user exists and is banned
       const user = await this.userService.getByFid(userFid, [
-        'isBanned',
-        'bannedAt',
+        'is_banned',
+        'banned_at',
         'username',
       ]);
 
@@ -77,7 +77,7 @@ export class BanGuard extends AuthorizationGuard implements CanActivate {
         return true;
       }
 
-      if (user.isBanned) {
+      if (user.is_banned) {
         throw new ForbiddenException(
           `Access denied. User ${user.username} (FID: ${userFid}) is banned from the platform.`,
         );

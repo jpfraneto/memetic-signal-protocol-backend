@@ -1,42 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-export class UserDto {
-  @ApiProperty()
-  fid: number;
-
-  @ApiProperty()
-  username: string;
-
-  @ApiProperty()
-  displayName: string;
-
-  @ApiPropertyOptional()
-  bio?: string;
-
-  @ApiPropertyOptional()
-  avatar?: string;
-
-  @ApiProperty()
-  pfpUrl: string;
-
-  @ApiProperty()
-  isVerified: boolean;
-
-  @ApiProperty()
-  followerCount: number;
-
-  @ApiProperty()
-  followingCount: number;
-
-  @ApiProperty()
-  totalCalls: number;
-
-  @ApiProperty()
-  createdAt: string;
-
-  @ApiProperty()
-  updatedAt: string;
-}
+import { User } from 'src/models';
 
 export class CallDto {
   @ApiProperty()
@@ -49,7 +12,7 @@ export class CallDto {
   fid: number;
 
   @ApiProperty()
-  tokenAddress: string;
+  ca: string;
 
   @ApiProperty()
   ticker: string;
@@ -131,7 +94,7 @@ export class UsersListResponseDto {
     },
   })
   data: {
-    users: UserDto[];
+    users: User[];
     total: number;
     hasMore: boolean;
   };
@@ -144,7 +107,7 @@ export class UserDetailResponseDto {
   @ApiProperty({
     type: 'object',
     properties: {
-      user: { $ref: '#/components/schemas/UserDto' },
+      user: { $ref: '#/components/schemas/User' },
       recentCalls: {
         type: 'array',
         items: { $ref: '#/components/schemas/CallDto' },
@@ -153,7 +116,7 @@ export class UserDetailResponseDto {
     },
   })
   data: {
-    user: UserDto;
+    user: User;
     recentCalls: CallDto[];
     stats: UserStatsDto;
   };

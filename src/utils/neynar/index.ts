@@ -26,6 +26,10 @@ export default class NeynarService {
     this.client = new NeynarAPIClient(config);
   }
 
+  async printJson(json: any) {
+    console.log(JSON.stringify(json, null, 2));
+  }
+
   /**
    * Retrieves a cast by its hash from Neynar API.
    * If the cast is not found initially, retries up to 3 times with 1 second delay between attempts.

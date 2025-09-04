@@ -8,13 +8,16 @@ import {
   UseGuards,
   Body,
 } from '@nestjs/common';
+import { createWalletClient, http, isAddress, encodeAbiParameters } from 'viem';
+import { base } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 
 // Services
 import { UserService } from '../user/services';
-import { BlockchainService } from '../blockchain/blockchain.service';
 import { ZapperService } from '../zapper/services';
+import { MeEndpointService } from './services/me-endpoint.service';
 import { UserStateOnTheSystemEnum } from '../../models/User/User.types';
 
 enum DailySignalState {
@@ -35,10 +38,16 @@ import { logger } from '../../main';
 // Utils
 import { hasResponse, hasError, HttpStatus } from '../../utils';
 import NeynarService from 'src/utils/neynar';
+import { getConfig } from '../../security/config';
 
 // DTOs
-import { CreateAccountDto } from './dto/create-account.dto';
 import { SyncUserDataDto, UserDailyStatusDto } from './dto/sync-user-data.dto';
+import { VerifyWalletDto } from './dto/verify-wallet.dto';
+import {
+  MeEndpointResponseDto,
+  ErrorResponseDto,
+} from './dto/me-endpoint-response.dto';
+import { SignalService } from '../signal/signal.service';
 
 /**
  * Authentication controller for Farcaster miniapp integration.
@@ -59,251 +68,220 @@ import { SyncUserDataDto, UserDailyStatusDto } from './dto/sync-user-data.dto';
 export class AuthController {
   constructor(
     private readonly userService: UserService,
-    private readonly blockchainService: BlockchainService,
     private readonly zapperService: ZapperService,
+    private readonly signalService: SignalService,
+    private readonly meEndpointService: MeEndpointService,
   ) {}
 
   /**
-   * Retrieves current user information with automatic user provisioning.
+   * Primary entry point for miniapp - returns complete data for all 3 screens.
    *
-   * This endpoint serves as the primary authentication mechanism for the miniapp.
-   * It leverages Farcaster's QuickAuth system where users are always authenticated
-   * within the miniapp context, eliminating the need for separate login flows.
+   * This endpoint provides all data needed by the frontend including:
+   * - User profile and statistics
+   * - Signal feed with complete token information and price data
+   * - Featured trending tokens from Zapper API
+   * - Leaderboard data (top scorers, most signals, champion)
    *
-   * For first-time users (stateOnTheSystem: 'ZERO'), this endpoint:
-   * 1. Creates a user record in the database
-   * 2. Initiates a blockchain transaction to record the user's first interaction
-   * 3. Returns user data with state 'ZERO' to trigger frontend "create account" flow
+   * Features comprehensive caching, error handling, and fallback strategies.
+   * Target response time: < 800ms with 60-second Redis TTL for user data.
    *
-   * The endpoint returns runner profile data including:
-   * - Total stats (distance, runs, time, streaks)
-   * - Weekly statistics for the last 10 weeks
-   * - Recent runs (last 10-20 runs)
-   * - User profile information
-   *
-   * @param session - Verified QuickAuth JWT payload containing user FID and address
+   * @param session - Verified QuickAuth JWT payload containing user FID
    * @param res - HTTP response object
-   * @returns Runner profile data in the format expected by the frontend
+   * @returns Complete miniapp data or structured error information
    */
   @Get('/me')
   @UseGuards(AuthorizationGuard)
-  async getMe(
-    @Session() session: QuickAuthPayload,
-    @Res() res: FastifyReply,
-    @Req() req: FastifyRequest,
-  ) {
-    try {
-      logger.log('Processing user profile request for FID:', session.sub);
+  @ApiOperation({
+    summary: 'Get complete miniapp data',
+    description:
+      'Primary endpoint that returns all data needed for the miniapp: user profile, signal feed, trending tokens, and leaderboards. Optimized for <800ms response time with Redis caching.',
+  })
+  @ApiHeader({
+    name: 'authorization',
+    description: 'Farcaster QuickAuth JWT token',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Complete miniapp data retrieved successfully',
+    type: MeEndpointResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid FID provided',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'External service unavailable (Neynar, Zapper, Redis)',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Database or internal server error',
+    type: ErrorResponseDto,
+  })
+  async getMe(@Session() session: QuickAuthPayload, @Res() res: FastifyReply) {
+    const fid = session.sub;
+    const timestamp = new Date().toISOString();
+    const startTime = Date.now();
 
-      // Ensure user exists (create if necessary)
-      let user = await this.userService.getByFid(session.sub, [
-        'fid',
-        'username',
-        'pfpUrl',
-        'createdAt',
-        'updatedAt',
-        'stateOnTheSystem',
-      ]);
-      console.log('IN HERE THE USER IS', user);
-
-      if (!user) {
-        // Create new user if doesn't exist
-        logger.log('Creating new user record for FID:', session.sub);
-        const neynar = new NeynarService();
-        const neynarUser = await neynar.getUserByFid(session.sub);
-
-        const { user: newUser } = await this.userService.create(session.sub, {
-          username: neynarUser.username,
-          pfpUrl: neynarUser.pfp_url,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          stateOnTheSystem: UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
-        });
-
-        user = newUser;
-      }
-
-      // Handle query parameters from frontend (smart contract data)
-      const queryParams = req.query as any;
-      console.log('🔍 [GET /me] Query parameters:', queryParams);
-
-      // Process contract account data from query params if provided
-      if (queryParams?.fid || queryParams?.isBanned !== undefined) {
-        console.log(
-          '📄 [GET /me] Processing contract account data from query params...',
-        );
-
-        const contractAccount = {
-          fid: queryParams?.fid ? parseInt(queryParams?.fid as string) : 0,
-          isBanned: queryParams?.isBanned === 'true',
-        };
-
-        console.log('🏗️ [GET /me] Contract account details:', contractAccount);
-
-        // Validate that contract account FID matches authenticated user
-        if (contractAccount.fid !== session.sub) {
-          console.log('❌ [GET /me] FID mismatch detected!');
-          logger.warn(
-            `Contract account FID mismatch: ${contractAccount.fid} vs ${session.sub}`,
-          );
-          return hasError(
-            res,
-            HttpStatus.BAD_REQUEST,
-            'getMe',
-            'Contract account FID does not match authenticated user.',
-          );
-        }
-
-        // Update user with contract account data
-        const updateData: any = {
-          walletAddress: queryParams?.userAddress
-            ? (queryParams?.userAddress as string).toLowerCase()
-            : null,
-          updatedAt: new Date(),
-          isSubscriber: false, // Default to false, will be updated by blockchain events
-        };
-
-        // Set appropriate state based on current user state
-        if (
-          user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
-        ) {
-          updateData.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
-          console.log(
-            '🎉 [GET /me] Setting WITH_ACCOUNT state for new account!',
-          );
-        }
-
-        await this.userService.update(session.sub, updateData);
-        Object.assign(user, updateData);
-
-        console.log(
-          '✅ [GET /me] Contract account data updated from query params',
-        );
-      } else {
-        // Fallback: Check if user has an account on the smart contract
-        if (queryParams?.userAddress) {
-          logger.log(
-            'Checking smart contract account for wallet:',
-            queryParams?.userAddress,
-          );
-          const blockchainAccount =
-            await this.blockchainService.getAccountFromBlockchain(
-              queryParams?.userAddress as string,
-            );
-
-          if (blockchainAccount && blockchainAccount.fid > 0) {
-            // User has an account on smart contract, update database state
-            logger.log(
-              'User has smart contract account, updating state to WITH_ACCOUNT',
-            );
-
-            // Update user state if it's currently WITHOUT_ACCOUNT
-            if (
-              user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
-            ) {
-              const updatedData = {
-                stateOnTheSystem: UserStateOnTheSystemEnum.WITH_ACCOUNT,
-                walletAddress: (
-                  queryParams?.userAddress as string
-                ).toLowerCase(),
-                updatedAt: new Date(),
-                isSubscriber: blockchainAccount.isSubscriber,
-              };
-
-              await this.userService.update(session.sub, updatedData);
-
-              // Update the local user object to reflect the changes
-              user.stateOnTheSystem = UserStateOnTheSystemEnum.WITH_ACCOUNT;
-              user.walletAddress = (
-                queryParams?.userAddress as string
-              ).toLowerCase();
-              user.isSubscriber = blockchainAccount.isSubscriber;
-
-              logger.log(
-                `Updated user FID ${session.sub} state to WITH_ACCOUNT with wallet ${queryParams?.userAddress}`,
-              );
-            }
-          } else {
-            logger.log(
-              'No smart contract account found for wallet:',
-              queryParams?.userAddress,
-            );
-          }
-        }
-      }
-
-      // Process daily status from query params if provided
-      if (
-        queryParams?.hasSignaledToday !== undefined ||
-        queryParams?.hasUsedRetry !== undefined
-      ) {
-        console.log(
-          '📅 [GET /me] Processing daily status from query params...',
-        );
-
-        const dailyUpdateData: any = {
-          submittedSignalToday: queryParams?.hasSignaledToday === 'true',
-          usedRetryToday: queryParams?.hasUsedRetry === 'true',
-          updatedAt: new Date(),
-        };
-
-        await this.userService.update(session.sub, dailyUpdateData);
-        Object.assign(user, dailyUpdateData);
-
-        console.log('✅ [GET /me] Daily status updated from query params');
-      }
-
-      // Process JBM balance from query params if provided
-      if (queryParams?.jbmBalance) {
-        console.log('💰 [GET /me] Processing JBM balance from query params...');
-        console.log('💰 [GET /me] JBM balance value:', queryParams?.jbmBalance);
-
-        const jbmUpdateData: any = {
-          jbmBalance: queryParams?.jbmBalance,
-          updatedAt: new Date(),
-        };
-
-        await this.userService.update(session.sub, jbmUpdateData);
-        Object.assign(user, jbmUpdateData);
-
-        console.log('✅ [GET /me] JBM balance updated from query params');
-      }
-      const userFeedOfSignals =
-        await this.blockchainService.getLastSignalsForUsersHomeFeed(
-          session.sub,
-        );
-      const favoriteTwentySignelers =
-        await this.blockchainService.getFavoriteTwentySignelersForFid(
-          session.sub,
-        );
-
-      // Fetch trending tokens from Zapper API
-      const trendingTokens = await this.zapperService.getTrendingTokens(
-        session.sub,
-        8,
-      );
-
-      // Check subscription status
-      const subscriptionStatus =
-        await this.blockchainService.checkUserSubscriptionStatus(session.sub);
-
-      return hasResponse(res, {
-        ...user,
-        userFeedOfSignals,
-        favoriteTwentySignelers,
-        trendingTokens,
-        subscriptionStatus,
-        isNewUser:
-          user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
+    // Validate FID first
+    if (!fid || fid <= 0) {
+      logger.error(`[/me] Invalid FID provided: ${fid}`);
+      return res.status(400).send({
+        success: false,
+        error: {
+          code: 'INVALID_FID',
+          message: 'Invalid user identifier provided',
+          details:
+            'FID must be a positive integer from Farcaster authentication',
+          timestamp,
+          fid: fid || null,
+          component: 'AUTH_VALIDATION',
+          retryable: false,
+        },
       });
-    } catch (error) {
-      logger.error('Failed to process user profile request:', error);
-      return hasError(
-        res,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'getMe',
-        'Unable to retrieve user profile.',
+    }
+
+    try {
+      logger.log(
+        `[/me] Processing complete miniapp data request for FID: ${fid}`,
       );
+
+      // Use the comprehensive service to get all data
+      const completeData =
+        await this.meEndpointService.getCompleteUserData(fid);
+
+      const duration = Date.now() - startTime;
+      logger.log(
+        `[/me] Successfully completed request for FID ${fid} in ${duration}ms`,
+      );
+      console.log('THE COMPLETE DATA IS', completeData);
+      console.log('THE COMPLETE DATA IS', completeData.feedData.signals);
+
+      return res.status(200).send(completeData);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage = error.message || 'Unknown error';
+
+      logger.error(`[/me] Request failed for FID ${fid} after ${duration}ms:`, {
+        error: errorMessage,
+        stack: error.stack,
+        fid,
+        duration,
+      });
+
+      // Parse structured error codes
+      if (errorMessage.includes('NEYNAR_API_UNAVAILABLE')) {
+        return res.status(503).send({
+          success: false,
+          error: {
+            code: 'NEYNAR_API_UNAVAILABLE',
+            message: 'Failed to fetch user profile from Farcaster',
+            details:
+              'Neynar API is currently unavailable. User profile data may be outdated.',
+            timestamp,
+            fid,
+            component: 'NEYNAR_INTEGRATION',
+            retryable: true,
+          },
+        });
+      }
+
+      if (errorMessage.includes('DATABASE_CONNECTION_FAILED')) {
+        return res.status(500).send({
+          success: false,
+          error: {
+            code: 'DATABASE_CONNECTION_FAILED',
+            message: 'Database connection error',
+            details:
+              'Unable to connect to the database. Please try again in a few moments.',
+            timestamp,
+            fid,
+            component: 'DATABASE',
+            retryable: true,
+          },
+        });
+      }
+
+      if (errorMessage.includes('REDIS_CACHE_UNAVAILABLE')) {
+        return res.status(503).send({
+          success: false,
+          error: {
+            code: 'REDIS_CACHE_UNAVAILABLE',
+            message: 'Cache service unavailable',
+            details:
+              'Redis cache is unavailable. Data will be served directly from database.',
+            timestamp,
+            fid,
+            component: 'CACHE',
+            retryable: true,
+          },
+        });
+      }
+
+      if (errorMessage.includes('ZAPPER_API_TIMEOUT')) {
+        return res.status(503).send({
+          success: false,
+          error: {
+            code: 'ZAPPER_API_TIMEOUT',
+            message: 'Trending tokens service unavailable',
+            details:
+              'Unable to fetch trending tokens. Other features should work normally.',
+            timestamp,
+            fid,
+            component: 'ZAPPER_API',
+            retryable: true,
+          },
+        });
+      }
+
+      if (errorMessage.includes('COINGECKO_RATE_LIMIT')) {
+        return res.status(429).send({
+          success: false,
+          error: {
+            code: 'COINGECKO_RATE_LIMIT',
+            message: 'Price data rate limit exceeded',
+            details:
+              'Token price data temporarily unavailable due to rate limits.',
+            timestamp,
+            fid,
+            component: 'PRICE_DATA',
+            retryable: true,
+          },
+        });
+      }
+
+      if (errorMessage.includes('USER_NOT_FOUND')) {
+        return res.status(404).send({
+          success: false,
+          error: {
+            code: 'USER_NOT_FOUND',
+            message: 'User not found on Farcaster',
+            details: 'The provided FID does not exist on Farcaster network.',
+            timestamp,
+            fid,
+            component: 'USER_VALIDATION',
+            retryable: false,
+          },
+        });
+      }
+
+      // Generic fallback error
+      return res.status(500).send({
+        success: false,
+        error: {
+          code: 'MINIAPP_DATA_ERROR',
+          message: 'Failed to retrieve complete miniapp data',
+          details:
+            'An unexpected error occurred. Please refresh the app and try again.',
+          timestamp,
+          fid,
+          component: 'GENERAL',
+          retryable: true,
+        },
+      });
     }
   }
 
@@ -347,9 +325,9 @@ export class AuthController {
         exists: !!user,
         fid: user?.fid,
         username: user?.username,
-        stateOnTheSystem: user?.stateOnTheSystem,
-        walletAddress: user?.walletAddress,
-        jbmBalance: user?.jbmBalance,
+        stateOnTheSystem: user?.state_on_the_system,
+        walletAddress: user?.wallet_address,
+        jbmBalance: user?.jbm_balance,
       });
 
       if (!user) {
@@ -363,17 +341,17 @@ export class AuthController {
 
         const { user: newUser } = await this.userService.create(session.sub, {
           username: neynarUser.username,
-          pfpUrl: neynarUser.pfp_url,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          stateOnTheSystem: UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
+          pfp_url: neynarUser.pfp_url,
+          created_at: new Date(),
+          updated_at: new Date(),
+          state_on_the_system: UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
         });
 
         user = newUser;
         console.log('✅ [POST /me] New user created:', {
           fid: user.fid,
           username: user.username,
-          stateOnTheSystem: user.stateOnTheSystem,
+          stateOnTheSystem: user.state_on_the_system,
         });
       }
 
@@ -384,9 +362,9 @@ export class AuthController {
         console.log('🏗️ [POST /me] Contract account details:', {
           fid: contractAccount.fid,
           username: contractAccount.username,
-          walletAddress: contractAccount.walletAddress,
-          isBanned: contractAccount.isBanned,
-          createdAt: contractAccount.createdAt,
+          wallet_address: contractAccount.walletAddress,
+          is_banned: contractAccount.is_banned,
+          created_at: contractAccount.created_at,
         });
 
         // Validate that contract account FID matches authenticated user
@@ -448,9 +426,9 @@ export class AuthController {
         );
         console.log(
           '🔄 [POST /me] Current pfpUrl:',
-          user.pfpUrl,
+          user.pfp_url,
           'Contract pfpUrl:',
-          contractAccount.pfpUrl,
+          contractAccount.pfp_url,
         );
 
         if (contractAccount.username !== user.username) {
@@ -460,21 +438,21 @@ export class AuthController {
             contractAccount.username,
           );
         }
-        if (contractAccount.pfpUrl !== user.pfpUrl) {
-          updateData.pfpUrl = contractAccount.pfpUrl;
+        if (contractAccount.pfp_url !== user.pfp_url) {
+          updateData.pfpUrl = contractAccount.pfp_url;
           console.log(
             '📝 [POST /me] PFP URL will be updated to:',
-            contractAccount.pfpUrl,
+            contractAccount.pfp_url,
           );
         }
 
         // Set appropriate state based on current user state
         console.log('🏗️ [POST /me] Checking user state transition...');
-        console.log('🏗️ [POST /me] Current state:', user.stateOnTheSystem);
+        console.log('🏗️ [POST /me] Current state:', user.state_on_the_system);
         if (
-          user.stateOnTheSystem === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
+          user.state_on_the_system === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
         ) {
-          updateData.stateOnTheSystem =
+          updateData.state_on_the_system =
             UserStateOnTheSystemEnum.ACCOUNT_CREATED_WELCOME_SCREEN;
           console.log(
             '🎉 [POST /me] Setting welcome screen state for new account!',
@@ -510,40 +488,19 @@ export class AuthController {
         // Handle both object and array formats
         if (Array.isArray(body.userDailyStatus)) {
           console.log('📅 [POST /me] Processing array format daily status...');
-          // Array format: [submittedSignalToday, usedRetryToday, isNewDay, hasRetryAvailable]
-          const [
-            submittedSignalToday,
-            usedRetryToday,
-            isNewDay,
-            hasRetryAvailable,
-          ] = body.userDailyStatus;
+          // Array format: [ usedToday, isNewDay, ]
+          const [usedToday, isNewDay] = body.userDailyStatus;
 
           console.log('📅 [POST /me] Array values:', {
-            submittedSignalToday,
-            usedRetryToday,
+            usedToday,
             isNewDay,
-            hasRetryAvailable,
           });
-
-          dailyUpdateData.submittedSignalToday = submittedSignalToday;
-          dailyUpdateData.usedRetryToday = usedRetryToday;
-
-          // If it's a new day, update the last signal date
-          if (isNewDay) {
-            dailyUpdateData.lastSignalDate = new Date();
-            console.log(
-              '📅 [POST /me] New day detected, updating lastSignalDate',
-            );
-          }
         } else {
           console.log('📅 [POST /me] Processing object format daily status...');
           // Object format
           const dailyStatus = body.userDailyStatus as UserDailyStatusDto;
           console.log('📅 [POST /me] Object daily status:', dailyStatus);
 
-          dailyUpdateData.submittedSignalToday =
-            dailyStatus.submittedSignalToday;
-          dailyUpdateData.usedRetryToday = dailyStatus.usedRetryToday;
           dailyUpdateData.lastSignalDate = dailyStatus.lastSignalDate
             ? new Date(dailyStatus.lastSignalDate)
             : null;
@@ -621,31 +578,25 @@ export class AuthController {
       console.log('👤 [POST /me] Updated user data:', {
         fid: updatedUser.fid,
         username: updatedUser.username,
-        stateOnTheSystem: updatedUser.stateOnTheSystem,
-        walletAddress: updatedUser.walletAddress,
-        jbmBalance: updatedUser.jbmBalance,
-        submittedSignalToday: updatedUser.submittedSignalToday,
-        usedRetryToday: updatedUser.usedRetryToday,
+        stateOnTheSystem: updatedUser.state_on_the_system,
+        walletAddress: updatedUser.wallet_address,
       });
 
       // Get user feed data
       console.log('📰 [POST /me] Fetching user feed data...');
-      const userFeedOfSignals =
-        await this.blockchainService.getLastSignalsForUsersHomeFeed(
-          session.sub,
-        );
+      const userFeedOfSignals = await this.signalService.getSignalsFeedForUser(
+        session.sub,
+      );
       console.log(
         '📰 [POST /me] User feed signals count:',
         userFeedOfSignals.length,
       );
 
-      const favoriteTwentySignelers =
-        await this.blockchainService.getFavoriteTwentySignelersForFid(
-          session.sub,
-        );
+      const favoriteTwentySignalers =
+        await this.signalService.getFavoriteTwentySignalersForFid(session.sub);
       console.log(
         '⭐ [POST /me] Favorite signalers count:',
-        favoriteTwentySignelers.length,
+        favoriteTwentySignalers.length,
       );
 
       // Fetch trending tokens from Zapper API
@@ -654,18 +605,13 @@ export class AuthController {
         8,
       );
 
-      // Check subscription status
-      const subscriptionStatus =
-        await this.blockchainService.checkUserSubscriptionStatus(session.sub);
-
       const responseData = {
         ...updatedUser,
         userFeedOfSignals,
-        favoriteTwentySignelers,
+        favoriteTwentySignalers,
         trendingTokens,
-        subscriptionStatus,
         isNewUser:
-          updatedUser.stateOnTheSystem ===
+          updatedUser.state_on_the_system ===
           UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
         syncStatus: {
           contractAccountSynced: !!body.contractAccount,
@@ -734,18 +680,258 @@ export class AuthController {
       return DailySignalState.FRESH_TODAY;
     }
 
-    // Same day logic
-    if (user.submittedSignalToday) {
-      return DailySignalState.SIGNALED_TODAY;
-    }
-
-    // Failed states
-    if (user.usedRetryToday) {
-      return DailySignalState.FAILED_TODAY;
-    }
-
     // Has account, hasn't signaled, has retry available
     return DailySignalState.WITH_ACCOUNT;
+  }
+
+  /**
+   * Verifies wallet ownership for a Farcaster user and generates authorization signature.
+   *
+   * This endpoint validates that a wallet address is authorized for a specific Farcaster ID
+   * by checking against Farcaster's verified addresses and auth addresses. If valid,
+   * it generates an EIP-712 signature that can be used for on-chain authorization.
+   *
+   * @param body - Request body containing FID and wallet address
+   * @param res - HTTP response object
+   * @returns Authorization data with signature and deadline
+   */
+  @Post('/get-signature')
+  @UseGuards(AuthorizationGuard)
+  async verifyWalletOwnership(
+    @Body() body: VerifyWalletDto,
+    @Res() res: FastifyReply,
+  ) {
+    try {
+      const { fid, walletAddress } = body;
+
+      console.log(
+        `🔍 [verifyWalletOwnership] Starting verification for FID: ${fid}, Wallet: ${walletAddress}`,
+      );
+
+      // Validate wallet address format
+      if (!isAddress(walletAddress)) {
+        console.log(
+          `❌ [verifyWalletOwnership] Invalid wallet address format: ${walletAddress}`,
+        );
+        return hasError(
+          res,
+          HttpStatus.BAD_REQUEST,
+          'verifyWalletOwnership',
+          'Invalid wallet address format.',
+        );
+      }
+
+      console.log(`✅ [verifyWalletOwnership] Wallet address format validated`);
+
+      // Fetch user from Farcaster API (Neynar) directly without cache
+      let user;
+      try {
+        console.log(
+          `📡 [verifyWalletOwnership] Fetching user data from Neynar API for FID: ${fid}`,
+        );
+        const neynarService = new NeynarService();
+        user = await neynarService.getUserByFid(fid);
+        console.log(
+          `✅ [verifyWalletOwnership] Successfully fetched user data from Neynar`,
+        );
+      } catch (error) {
+        console.log(
+          `❌ [verifyWalletOwnership] Failed to fetch Farcaster user for FID ${fid}:`,
+          error,
+        );
+        logger.error(`Failed to fetch Farcaster user for FID ${fid}:`, error);
+        return hasError(
+          res,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'verifyWalletOwnership',
+          'Failed to fetch Farcaster user data.',
+        );
+      }
+
+      // Check if wallet is in verified or auth addresses
+      const userData = user as any; // Type assertion for Neynar user data
+      const verifiedAddresses =
+        userData.verified_addresses?.eth_addresses.map((address) =>
+          address.toLowerCase(),
+        ) || [];
+      const authAddresses =
+        userData.auth_addresses?.map((auth) => auth.address.toLowerCase()) ||
+        [];
+
+      console.log(`🔍 [verifyWalletOwnership] Checking wallet authorization:`);
+      console.log(
+        `   - Verified addresses: ${JSON.stringify(verifiedAddresses)}`,
+      );
+      console.log(`   - Auth addresses: ${JSON.stringify(authAddresses)}`);
+      console.log(`   - Target wallet: ${walletAddress}`);
+
+      const isValid =
+        verifiedAddresses.includes(walletAddress.toLowerCase()) ||
+        authAddresses.includes(walletAddress.toLowerCase());
+
+      console.log(
+        `✅ [verifyWalletOwnership] Wallet authorization result: ${isValid}`,
+      );
+
+      if (!isValid) {
+        console.log(
+          `❌ [verifyWalletOwnership] Wallet not authorized for FID ${fid}`,
+        );
+        return hasError(
+          res,
+          HttpStatus.UNAUTHORIZED,
+          'verifyWalletOwnership',
+          'Wallet not authorized for FID.',
+        );
+      }
+
+      // Generate EIP-712 signature
+      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+      console.log(
+        `🔐 [verifyWalletOwnership] Generating EIP-712 signature with deadline: ${deadline}`,
+      );
+
+      const authData = await this.generateAuthSignature(
+        fid,
+        walletAddress,
+        deadline,
+      );
+
+      console.log(
+        `✅ [verifyWalletOwnership] Successfully generated auth signature`,
+      );
+      console.log(
+        `📤 [verifyWalletOwnership] Returning auth data and deadline: ${deadline}`,
+      );
+
+      return hasResponse(res, {
+        success: true,
+        data: {
+          signature: authData,
+          deadline: deadline.toString(),
+          fid: fid,
+          walletAddress: walletAddress,
+        },
+        message: 'Wallet ownership verified successfully',
+      });
+    } catch (error) {
+      console.log(`❌ [verifyWalletOwnership] Unexpected error:`, error);
+      logger.error('Failed to verify wallet ownership:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'verifyWalletOwnership',
+        'An unexpected error occurred during wallet verification.',
+      );
+    }
+  }
+
+  /**
+   * Generates EIP-712 signature for wallet authorization
+   */
+  private async generateAuthSignature(
+    fid: number,
+    walletAddress: string,
+    deadline: number,
+  ): Promise<string> {
+    console.log(
+      `🔐 [generateAuthSignature] Starting signature generation for FID: ${fid}, Wallet: ${walletAddress}, Deadline: ${deadline}`,
+    );
+
+    const config = getConfig();
+
+    if (!config.blockchain.backendPrivateKey) {
+      console.log(
+        `❌ [generateAuthSignature] BACKEND_PRIVATE_KEY environment variable is not set`,
+      );
+      throw new Error('BACKEND_PRIVATE_KEY environment variable is not set');
+    }
+
+    console.log(`✅ [generateAuthSignature] Backend private key found`);
+
+    // Setup wallet client - ensure private key has 0x prefix
+    const privateKey = config.blockchain.backendPrivateKey.startsWith('0x')
+      ? (config.blockchain.backendPrivateKey as `0x${string}`)
+      : (`0x${config.blockchain.backendPrivateKey}` as `0x${string}`);
+
+    const account = privateKeyToAccount(privateKey);
+    console.log(
+      `🔐 [generateAuthSignature] Created account from private key: ${account.address}`,
+    );
+
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http(),
+    });
+    console.log(
+      `🔐 [generateAuthSignature] Wallet client created for Base chain`,
+    );
+
+    const domain = {
+      name: 'ProjectLighthouseV16',
+      version: '1',
+      chainId: 8453,
+      verifyingContract: config.blockchain.contractAddress as `0x${string}`,
+    } as const;
+
+    console.log(`🔐 [generateAuthSignature] EIP-712 domain configured:`);
+    console.log(`   - Name: ${domain.name}`);
+    console.log(`   - Version: ${domain.version}`);
+    console.log(`   - Chain ID: ${domain.chainId}`);
+    console.log(`   - Contract: ${domain.verifyingContract}`);
+
+    const types = {
+      Authorization: [
+        { name: 'fid', type: 'uint256' },
+        { name: 'wallet', type: 'address' },
+        { name: 'deadline', type: 'uint256' },
+      ],
+    } as const;
+
+    console.log(
+      `🔐 [generateAuthSignature] EIP-712 types configured for Authorization`,
+    );
+    console.log(`🔐 [generateAuthSignature] Signing message with:`);
+    console.log(`   - FID: ${fid} (as number for uint256)`);
+    console.log(`   - Wallet: ${walletAddress}`);
+    console.log(`   - Deadline: ${deadline} (as BigInt: ${BigInt(deadline)})`);
+
+    // Sign the message
+    const signature = await walletClient.signTypedData({
+      account,
+      domain,
+      types,
+      primaryType: 'Authorization',
+      message: {
+        fid: BigInt(fid),
+        wallet: walletAddress as `0x${string}`,
+        deadline: BigInt(deadline),
+      },
+    });
+
+    console.log(
+      `✅ [generateAuthSignature] EIP-712 signature generated: ${signature}`,
+    );
+
+    // Encode for contract consumption
+    const authData = encodeAbiParameters(
+      [
+        { name: 'fid', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' },
+        { name: 'signature', type: 'bytes' },
+      ],
+      [BigInt(fid), BigInt(deadline), signature], // Convert fid to BigInt for uint256
+    );
+
+    console.log(
+      `✅ [generateAuthSignature] Auth data encoded for contract: ${authData}`,
+    );
+    console.log(
+      `✅ [generateAuthSignature] Auth data length: ${authData.length} characters`,
+    );
+
+    return authData;
   }
 
   /**
@@ -763,7 +949,10 @@ export class AuthController {
   @UseGuards(AuthorizationGuard)
   async logOut(@Req() req: FastifyRequest, @Res() res: FastifyReply) {
     try {
-      res.header('Set-Cookie', 'Authorization=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+      res.header(
+        'Set-Cookie',
+        'Authorization=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+      );
       return hasResponse(res, 'Successfully logged out.');
     } catch (error) {
       return hasError(

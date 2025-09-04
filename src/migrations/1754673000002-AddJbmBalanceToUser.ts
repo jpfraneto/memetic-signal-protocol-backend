@@ -5,11 +5,11 @@ export class AddJbmBalanceToUser1754673000002 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE \`users\` ADD \`jbmBalance\` decimal(65,0) NOT NULL DEFAULT '0'`,
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "jbmBalance" DECIMAL(65,0) NOT NULL DEFAULT '0'`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE \`users\` DROP COLUMN \`jbmBalance\``);
+    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "jbmBalance"`);
   }
 }

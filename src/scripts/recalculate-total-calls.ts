@@ -1,5 +1,7 @@
 import { AppDataSource } from '../data-source';
 import { UserService } from '../core/user/services/user.service';
+import { User } from '../models';
+import { Signal } from '../models';
 
 async function recalculateTotalCalls() {
   try {
@@ -8,8 +10,8 @@ async function recalculateTotalCalls() {
     console.log('✅ Database connected successfully');
 
     const userService = new UserService(
-      AppDataSource.getRepository('User'),
-      AppDataSource.getRepository('Signal'),
+      AppDataSource.getRepository(User),
+      AppDataSource.getRepository(Signal),
     );
 
     console.log('🔄 Recalculating total calls for all users...');

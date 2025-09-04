@@ -1,45 +1,55 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SignalStatus, SignalDirection } from '../../../models/Signal/Signal.types';
 
 export class SignalResponseDto {
-  @ApiProperty()
-  signalId: string;
+  @ApiProperty({ description: 'Transaction hash' })
+  transaction_hash: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'User Farcaster ID' })
   fid: number;
 
-  @ApiProperty()
-  tokenAddress: string;
+  @ApiProperty({ description: 'Token contract address' })
+  ca: string;
 
-  @ApiProperty()
-  symbol: string;
+  @ApiProperty({
+    description: 'Signal direction - true for UP, false for DOWN',
+  })
+  direction: boolean;
 
-  @ApiProperty()
-  initialMarketCap: string;
+  @ApiProperty({ description: 'Market cap when signal was created' })
+  mc: number;
 
-  @ApiProperty({ enum: ['UP', 'DOWN'] })
-  direction: SignalDirection;
+  @ApiProperty({ description: 'Signal duration in days' })
+  duration: number;
 
-  @ApiProperty()
-  timestamp: number;
+  @ApiProperty({ description: 'Block timestamp' })
+  timestamp: string;
 
-  @ApiProperty()
-  expiresAt: Date;
+  @ApiProperty({ description: 'Block number' })
+  block_number: number;
 
-  @ApiProperty({ enum: ['ACTIVE', 'WON', 'LOST', 'EXPIRED'] })
-  status: SignalStatus;
+  @ApiProperty({ description: 'Signal status (0=ACTIVE, 1=WON, 2=LOST)' })
+  status: number;
 
-  @ApiProperty()
-  createdAt: Date;
+  @ApiProperty({ description: 'Signal expiration date' })
+  expires_at: Date;
 
-  @ApiProperty()
-  user: {
+  @ApiProperty({ description: 'User information', required: false })
+  user?: {
     fid: number;
     username: string;
-    pfpUrl?: string;
-    totalSignals: number;
-    winRate: number;
-    mfsScore: number;
+    display_name?: string;
+    pfp_url?: string;
+    total_signals: number;
+    win_rate: number;
+    mfs_score: number;
+  };
+
+  @ApiProperty({ description: 'Token information', required: false })
+  token?: {
+    ca: string;
+    name: string;
+    symbol: string;
+    image?: string;
   };
 }
 
@@ -58,7 +68,9 @@ export class SessionStatusDto {
   @ApiProperty()
   isActive: boolean;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Time remaining in milliseconds. -1 indicates no time limit.',
+  })
   timeRemaining: number;
 
   @ApiProperty()
@@ -72,10 +84,4 @@ export class SessionStatusDto {
 
   @ApiProperty()
   hasUsedRetry: boolean;
-
-  @ApiProperty({ nullable: true })
-  suggestedTokens: Array<{
-    address: string;
-    ticker: string;
-  }> | null;
 }

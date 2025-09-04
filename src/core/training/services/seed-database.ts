@@ -1,74 +1,59 @@
-// Simple seed file for memetic layer protocol
+// src/core/training/services/seed-database.ts
+// Database reset script - completely drops all schemas and data
+import 'reflect-metadata';
 import * as dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
-import { User } from '../../../models/User/User.model';
-import { Signal } from '../../../models/Signal/Signal.model';
-import { Token } from '../../../models/Token/Token.model';
-import { NotificationQueue } from '../../../models/NotificationQueue/NotificationQueue.model';
+import { getConfig } from '../../../security/config';
 
-// Load environment variables
-dotenv.config();
+// Load environment: prefer .env.development locally, fallback .env
+dotenv.config({
+  path: process.env.NODE_ENV === 'production' ? '.env' : '.env.development',
+});
 
-async function seedDatabase() {
-  console.log('🌱 Starting database seeding...');
+async function resetDatabase() {
+  console.log('🗑️  Starting complete database reset...');
 
-  // Database configuration from environment variables
-  const dbConfig = {
-    host: process.env.DATABASE_HOST || 'localhost',
-    port: parseInt(process.env.DATABASE_PORT || '3306', 10),
-    username: process.env.DATABASE_USER || 'root',
-    password: process.env.DATABASE_PASSWORD || '',
-    database: process.env.DATABASE_NAME || 'sigil_db',
-  };
+  const config = getConfig();
 
-  console.log('📊 Database config:', {
-    host: dbConfig.host,
-    port: dbConfig.port,
-    username: dbConfig.username,
-    password: dbConfig.password ? '***' : 'undefined',
-    database: dbConfig.database,
-  });
-
-  // Create data source
   const dataSource = new DataSource({
-    type: 'mysql',
-    host: dbConfig.host,
-    port: dbConfig.port,
-    username: dbConfig.username,
-    password: dbConfig.password,
-    database: dbConfig.database,
-    entities: [User, Signal, Token, NotificationQueue],
+    type: 'postgres',
+    ...(config.db.url
+      ? { url: config.db.url }
+      : {
+          host: config.db.host,
+          port: config.db.port,
+          username: config.db.username,
+          password: config.db.password,
+          database: config.db.name,
+        }),
+    ssl: config.db.requireSSL ? { rejectUnauthorized: false } : false,
+    entities: [],
     synchronize: false,
-    ssl: false,
   });
 
   try {
-    // Initialize the connection
     await dataSource.initialize();
-    console.log('📡 Connected to database successfully');
+    console.log('📡 Connected to PostgreSQL');
 
-    // Clear existing data - handle foreign key constraints
-    await dataSource.query('DELETE FROM notification_queue');
-    await dataSource.query('DELETE FROM signals');
-    await dataSource.query('DELETE FROM tokens');
-    await dataSource.query('DELETE FROM users');
-    console.log('🧹 Cleared existing data');
+    // Drop all tables in the public schema
+    console.log('🧹 Dropping all tables...');
+    await dataSource.query(`
+      DROP SCHEMA public CASCADE;
+      CREATE SCHEMA public;
+      GRANT ALL ON SCHEMA public TO postgres;
+      GRANT ALL ON SCHEMA public TO public;
+    `);
 
-    console.log('🎉 Database seeding completed successfully!');
+    console.log('✨ Database completely reset - all schemas and data erased');
+    console.log('📝 Ponder migrations will recreate the necessary tables');
 
-    // Close the connection
     await dataSource.destroy();
     process.exit(0);
   } catch (error) {
-    console.error('❌ Database seeding failed:', error);
-
-    // Close the connection on error
-    if (dataSource.isInitialized) {
-      await dataSource.destroy();
-    }
+    console.error('❌ Database reset failed:', error);
+    if (dataSource.isInitialized) await dataSource.destroy();
     process.exit(1);
   }
 }
 
-// Run the seed function
-seedDatabase();
+resetDatabase();

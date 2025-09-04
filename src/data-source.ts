@@ -6,25 +6,31 @@ import { User } from './models/User/User.model';
 import { NotificationQueue } from './models/NotificationQueue/NotificationQueue.model';
 import { Signal } from './models/Signal/Signal.model';
 import { Token } from './models/Token/Token.model';
+// Import Ponder entities
+import { FidStats } from './models/FidStats/FidStats.model';
+import { WalletAuthorization } from './models/WalletAuthorization/WalletAuthorization.model';
+import { DailySignalCount } from './models/DailySignalCount/DailySignalCount.model';
+import { FidBan } from './models/FidBan/FidBan.model';
+import { WalletBan } from './models/WalletBan/WalletBan.model';
 
 // Create data source for TypeORM CLI commands
 export const AppDataSource = new DataSource({
-  type: 'mysql',
-  host: getConfig().db.host,
-  port: getConfig().db.port,
-  username: getConfig().db.username,
-  password: getConfig().db.password,
-  database: getConfig().db.name,
-  entities: [User, NotificationQueue, Signal, Token],
+  type: 'postgres',
+  ...(getConfig().db.url
+    ? { url: getConfig().db.url }
+    : {
+        host: getConfig().db.host,
+        port: getConfig().db.port,
+        username: getConfig().db.username,
+        password: getConfig().db.password,
+        database: getConfig().db.name,
+      }),
+  entities: [User, NotificationQueue, Signal, Token, FidStats, WalletAuthorization, DailySignalCount, FidBan, WalletBan],
   migrations: ['src/migrations/*.ts'],
   subscribers: ['src/database/subscribers/*.ts'],
   synchronize: false, // Always false for CLI commands
   logging: getConfig().isProduction ? false : 'all',
-  ssl: getConfig().db.requireSSL
-    ? {
-        rejectUnauthorized: false,
-      }
-    : false,
+  ssl: getConfig().db.requireSSL ? { rejectUnauthorized: false } : false,
   extra: {
     connectionLimit: 10,
   },

@@ -18,16 +18,18 @@ export class LeaderboardService {
     try {
       const queryBuilder = this.userRepository
         .createQueryBuilder('user')
-        .where('user.settledCalls >= :minCalls', {
-          minCalls: query.minSettledCalls,
+        .where('user.settled_signals >= :minCalls', {
+          minCalls: query.minSettledCalls || 5,
         })
-        .orderBy('user.mfsScore', 'DESC')
-        .addOrderBy('user.winRate', 'DESC')
-        .addOrderBy('user.settledCalls', 'DESC');
+        .orderBy('user.mfs_score', 'DESC')
+        .addOrderBy('user.win_rate', 'DESC')
+        .addOrderBy('user.settled_signals', 'DESC');
 
       // Pagination
-      const skip = (query.page - 1) * query.limit;
-      queryBuilder.skip(skip).take(query.limit);
+      const page = Number(query.page || 1);
+      const limit = Number(query.limit || 20);
+      const skip = (page - 1) * limit;
+      queryBuilder.skip(skip).take(limit);
 
       const [users, total] = await queryBuilder.getManyAndCount();
 
@@ -35,24 +37,23 @@ export class LeaderboardService {
       const usersWithRanks = users.map((user, index) => ({
         fid: user.fid,
         username: user.username,
-        displayName: user.displayName,
-        pfpUrl: user.pfpUrl,
-        isVerified: user.isVerified,
-        totalSignals: user.totalSignals,
-        activeSignals: user.activeSignals,
-        settledSignals: user.settledSignals,
-        winRate: parseFloat(user.winRate.toString()),
-        mfsScore: parseFloat(user.mfsScore.toString()),
+        pfp_url: user.pfp_url,
+        isVerified: user.is_verified,
+        totalSignals: user.total_signals,
+        activeSignals: user.active_signals,
+        settledSignals: user.settled_signals,
+        winRate: parseFloat(user.win_rate.toString()),
+        mfsScore: parseFloat(user.mfs_score.toString()),
         rank: skip + index + 1,
       }));
 
       return {
         users: usersWithRanks,
         pagination: {
-          page: query.page,
-          limit: query.limit,
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / query.limit),
+          pages: Math.ceil(total / limit),
         },
       };
     } catch (error) {
@@ -66,10 +67,10 @@ export class LeaderboardService {
       // Get total users
       const totalUsers = await this.userRepository.count();
 
-      // Get qualified users (minimum settled calls) 
+      // Get qualified users (minimum settled calls)
       const qualifiedUsers = await this.userRepository
         .createQueryBuilder('user')
-        .where('user.settledCalls >= 5')
+        .where('user.settled_signals >= 5')
         .getCount();
 
       // Get aggregate stats
@@ -77,16 +78,16 @@ export class LeaderboardService {
         .createQueryBuilder('user')
         .select([
           'COUNT(user.fid) as totalUsers',
-          'SUM(user.totalCalls) as totalCalls',
-          'AVG(CASE WHEN user.settledCalls >= 5 THEN user.winRate ELSE NULL END) as avgWinRate',
-          'MAX(user.mfsScore) as topMfsScore',
+          'SUM(user.total_signals) as totalSignals',
+          'AVG(CASE WHEN user.settled_signals >= 5 THEN user.win_rate ELSE NULL END) as avgWinRate',
+          'MAX(user.mfs_score) as topMfsScore',
         ])
         .getRawOne();
 
       return {
         totalUsers,
         qualifiedUsers,
-        totalCalls: parseInt(result.totalCalls) || 0,
+        totalSignals: parseInt(result.totalSignals) || 0,
         avgWinRate: parseFloat(result.avgWinRate) || 0,
         topMfsScore: parseFloat(result.topMfsScore) || 0,
       };
@@ -101,10 +102,10 @@ export class LeaderboardService {
       // Get all qualified users ordered by MFS score
       const users = await this.userRepository
         .createQueryBuilder('user')
-        .where('user.settledCalls >= 5')
-        .orderBy('user.mfsScore', 'DESC')
-        .addOrderBy('user.winRate', 'DESC')
-        .addOrderBy('user.settledCalls', 'DESC')
+        .where('user.settled_signals >= 5')
+        .orderBy('user.mfs_score', 'DESC')
+        .addOrderBy('user.win_rate', 'DESC')
+        .addOrderBy('user.settledSignals', 'DESC')
         .getMany();
 
       // Update ranks
@@ -123,7 +124,7 @@ export class LeaderboardService {
         .createQueryBuilder()
         .update(User)
         .set({ rank: null })
-        .where('settledCalls < 5')
+        .where('settled_signals < 5')
         .execute();
 
       this.logger.log(`Updated ranks for ${users.length} qualified users`);

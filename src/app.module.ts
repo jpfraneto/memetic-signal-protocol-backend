@@ -1,7 +1,7 @@
-// src/app.module.ts - Updated for Production with SSL Support
-// Dependencies
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 // Core
 import CoreModules from './core';
 // Security
@@ -11,35 +11,42 @@ import { HealthModule } from './health';
 // Cache
 import { RedisCacheModule } from './cache/cache.module';
 // Models
-import { User, Signal, NotificationQueue, Token } from './models';
-import { BlockchainSignal } from './models/BlockchainSignal/BlockchainSignal.model';
+import { User, Signal, NotificationQueue, Token, PriceSnapshot } from './models';
+// Ponder entities
+import { FidStats } from './models/FidStats/FidStats.model';
+import { WalletAuthorization } from './models/WalletAuthorization/WalletAuthorization.model';
+import { DailySignalCount } from './models/DailySignalCount/DailySignalCount.model';
+import { FidBan } from './models/FidBan/FidBan.model';
+import { WalletBan } from './models/WalletBan/WalletBan.model';
 
 @Module({
   imports: [
     ...CoreModules,
     HealthModule,
     RedisCacheModule,
-    TypeOrmModule.forRoot({
-      type: 'mysql',
-      host: getConfig().db.host,
-      port: getConfig().db.port,
-      username: getConfig().db.username,
-      password: getConfig().db.password,
-      database: getConfig().db.name,
-      entities: [User, Signal, NotificationQueue, Token, BlockchainSignal],
-      // Important: Set synchronize to false in production for safety
-      synchronize: true,
-      //synchronize: !getConfig().isProduction,
-      logging: getConfig().isProduction ? false : 'all',
-      // SSL configuration for DigitalOcean managed database
-      ssl: getConfig().db.requireSSL
-        ? {
-            rejectUnauthorized: false, // Required for DigitalOcean managed databases
-          }
-        : false,
-      extra: {
-        // Connection pool settings for production
-        connectionLimit: 10,
+
+    // ✅ Postgres via single DATABASE_URL (works in dev + Railway)
+    TypeOrmModule.forRootAsync({
+      useFactory: () => {
+        const url = process.env.DATABASE_URL;
+        if (!url) throw new Error('DATABASE_URL is not set');
+
+        // Local (Railway proxy) uses ?sslmode=require; on Railway internal URL, it won’t.
+        const ssl = url.includes('sslmode=require')
+          ? { rejectUnauthorized: false }
+          : false;
+
+        return {
+          type: 'postgres' as const,
+          url,
+          ssl,
+          synchronize: false,
+          logging: getConfig().isProduction ? false : 'all',
+          entities: [User, Signal, NotificationQueue, Token, PriceSnapshot, FidStats, WalletAuthorization, DailySignalCount, FidBan, WalletBan],
+          // Pool (pg uses max instead of connectionLimit)
+          extra: { max: 10 },
+          autoLoadEntities: false, // using explicit entities array above
+        };
       },
     }),
   ],

@@ -57,7 +57,7 @@ export class SimpleTokenService {
 
     // Check database first
     let token = await this.tokenRepository.findOne({
-      where: { address: normalizedAddress },
+      where: { ca: normalizedAddress },
     });
 
     // If token doesn't exist or metadata is outdated, fetch from blockchain
@@ -70,50 +70,90 @@ export class SimpleTokenService {
       await this.updateTokenPrice(token);
     }
 
+    console.log('THE TOKEN HERE IS', JSON.stringify(token, null, 2));
+
     return token;
   }
 
   private isMetadataOutdated(token: Token): boolean {
-    if (!token.updatedAt) return true;
-    return Date.now() - token.updatedAt.getTime() > this.METADATA_CACHE_TTL;
+    if (!token.updated_at) return true;
+    // Handle string, Date, and BigInt formats
+    let updatedAt: number;
+    if (typeof token.updated_at === 'string') {
+      updatedAt = new Date(token.updated_at).getTime();
+    } else if (typeof token.updated_at === 'bigint') {
+      updatedAt = Number(token.updated_at);
+    } else {
+      updatedAt = new Date(token.updated_at).getTime();
+    }
+    return Date.now() - updatedAt > this.METADATA_CACHE_TTL;
   }
 
   private isPriceOutdated(token: Token): boolean {
-    if (!token.updatedAt) return true;
-    return Date.now() - token.updatedAt.getTime() > this.PRICE_CACHE_TTL;
+    if (!token.updated_at) return true;
+    // Handle string, Date, and BigInt formats
+    let updatedAt: number;
+    if (typeof token.updated_at === 'string') {
+      updatedAt = new Date(token.updated_at).getTime();
+    } else if (typeof token.updated_at === 'bigint') {
+      updatedAt = Number(token.updated_at);
+    } else {
+      updatedAt = new Date(token.updated_at).getTime();
+    }
+    return Date.now() - updatedAt > this.PRICE_CACHE_TTL;
   }
 
   private async fetchAndSaveTokenMetadata(
-    address: string,
+    ca: string,
     existingToken?: Token,
   ): Promise<Token> {
     try {
-      this.logger.log(`Fetching metadata for token ${address}`);
+      this.logger.log(`Fetching metadata for token ${ca}`);
       let coinData: any;
+
+      // Try CoinGecko first
       try {
         await this.rateLimit();
-        const coinDataUrl = `${this.COINGECKO_API_URL}/coins/base/contract/${address}`;
+        const coinDataUrl = `${this.COINGECKO_API_URL}/coins/base/contract/${ca}`;
+        console.log('THE COIN DATA URL IS', coinDataUrl);
         const coinDataResponse = await fetch(coinDataUrl, {
           headers: {
             accept: 'application/json',
             'x-cg-pro-api-key': process.env.COINGECKO_API_KEY || '',
           },
         });
-
+        console.log('THE COIN DATA RESPONSE IS', coinDataResponse);
         if (coinDataResponse.ok) {
           coinData = await coinDataResponse.json();
         }
       } catch (error) {
-        this.logger.warn(`Failed to fetch image from CoinGecko for ${address}`);
+        this.logger.warn(`Failed to fetch from CoinGecko for ${ca}:`, error);
+      }
+
+      // If CoinGecko fails, try DexScreener as fallback
+      if (!coinData) {
+        this.logger.log(`CoinGecko failed, trying DexScreener for ${ca}`);
+        try {
+          coinData = await this.fetchFromDexScreener(ca);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to fetch from DexScreener for ${ca}:`,
+            error,
+          );
+        }
       }
 
       console.log('THE COIN DATA IS', coinData);
 
-      const tokenData: Token = {
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        address,
+      if (!coinData) {
+        throw new Error('Token not found or invalid contract address');
+      }
+      const now = new Date();
+      const tokenData: Partial<Token> = {
+        ca,
         name: coinData?.name,
+        created_at: now,
+        updated_at: now,
         symbol: coinData?.symbol,
         decimals: parseInt(
           coinData?.detail_platforms?.base?.decimal_place.toString(),
@@ -144,12 +184,100 @@ export class SimpleTokenService {
         return await this.tokenRepository.save(newToken);
       }
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch token metadata for ${address}:`,
-        error,
-      );
+      this.logger.error(`Failed to fetch token metadata for ${ca}:`, error);
       console.log('THE ERROR IS:', error);
       throw new Error('Token not found or invalid contract address');
+    }
+  }
+
+  private async fetchFromDexScreener(ca: string): Promise<any> {
+    try {
+      const dexScreenerUrl = `https://api.dexscreener.com/tokens/v1/base/${ca}`;
+      console.log('THE DEXSCREENER URL IS', dexScreenerUrl);
+
+      const response = await fetch(dexScreenerUrl);
+      console.log('THE DEXSCREENER RESPONSE IS', response);
+
+      if (!response.ok) {
+        throw new Error(`DexScreener API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('THE DEXSCREENER DATA IS', data);
+
+      // DexScreener returns an array, we want the first (most relevant) result
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        throw new Error('No token data found in DexScreener response');
+      }
+
+      const tokenData = data[0];
+
+      // Transform DexScreener data to match CoinGecko format
+      return {
+        name: tokenData.baseToken?.name,
+        symbol: tokenData.baseToken?.symbol,
+        image: {
+          large: tokenData.info?.imageUrl,
+          small: tokenData.info?.imageUrl,
+          thumb: tokenData.info?.imageUrl,
+        },
+        market_data: {
+          current_price: {
+            usd: parseFloat(tokenData.priceUsd) || 0,
+          },
+          market_cap: {
+            usd: tokenData.marketCap || 0,
+          },
+          price_change_24h: tokenData.priceChange?.h24 || 0,
+        },
+        detail_platforms: {
+          base: {
+            decimal_place: 18, // Default to 18 decimals for most ERC20 tokens
+          },
+        },
+        categories: [],
+        description: {
+          en: `Token on Base network with symbol ${tokenData.baseToken?.symbol}`,
+        },
+        market_cap_rank: null,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to fetch from DexScreener for ${ca}:`, error);
+      throw error;
+    }
+  }
+
+  private async fetchPriceFromDexScreener(ca: string): Promise<any> {
+    try {
+      const dexScreenerUrl = `https://api.dexscreener.com/tokens/v1/base/${ca}`;
+
+      const response = await fetch(dexScreenerUrl);
+
+      if (!response.ok) {
+        throw new Error(`DexScreener API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // DexScreener returns an array, we want the first (most relevant) result
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        throw new Error('No token data found in DexScreener response');
+      }
+
+      const tokenData = data[0];
+
+      // Return only price-related data
+      return {
+        price: parseFloat(tokenData.priceUsd) || 0,
+        price_change_24h: tokenData.priceChange?.h24 || 0,
+        market_cap: tokenData.marketCap || 0,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch price from DexScreener for ${ca}:`,
+        error,
+      );
+      throw error;
     }
   }
 
@@ -157,7 +285,7 @@ export class SimpleTokenService {
     try {
       await this.rateLimit();
 
-      const url = `${this.COINGECKO_API_URL}/simple/token_price/${this.BASE_NETWORK_PLATFORM_ID}?contract_addresses=${token.address}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`;
+      const url = `${this.COINGECKO_API_URL}/simple/token_price/${this.BASE_NETWORK_PLATFORM_ID}?contract_addresses=${token.ca}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`;
 
       const response = await fetch(url, {
         headers: {
@@ -165,30 +293,57 @@ export class SimpleTokenService {
         },
       });
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          this.logger.warn('CoinGecko rate limit hit');
-          return;
+      let priceUpdated = false;
+
+      if (response.ok) {
+        const data = await response.json();
+        const tokenData = data[token.ca];
+
+        if (tokenData) {
+          token.market_data.current_price = tokenData.usd || 0;
+          token.market_data.price_change_24h = tokenData.usd_24h_change;
+          token.market_data.market_cap = tokenData.usd_market_cap;
+          // Let TypeORM handle the updated_at timestamp automatically
+          priceUpdated = true;
         }
-        return;
+      } else if (response.status === 429) {
+        this.logger.warn('CoinGecko rate limit hit');
+      } else {
+        this.logger.warn(
+          `CoinGecko price update failed for ${token.ca}, trying DexScreener`,
+        );
       }
 
-      const data = await response.json();
-      const tokenData = data[token.address];
+      // If CoinGecko failed, try DexScreener as fallback
+      if (!priceUpdated) {
+        try {
+          const dexScreenerPriceData = await this.fetchPriceFromDexScreener(
+            token.ca,
+          );
+          if (dexScreenerPriceData) {
+            token.market_data.current_price = dexScreenerPriceData.price || 0;
+            token.market_data.price_change_24h =
+              dexScreenerPriceData.price_change_24h || 0;
+            token.market_data.market_cap = dexScreenerPriceData.market_cap || 0;
+            // Let TypeORM handle the updated_at timestamp automatically
+            priceUpdated = true;
+            this.logger.log(
+              `Updated price for ${token.ca} using DexScreener fallback`,
+            );
+          }
+        } catch (error) {
+          this.logger.warn(
+            `DexScreener fallback also failed for ${token.ca}:`,
+            error,
+          );
+        }
+      }
 
-      if (tokenData) {
-        token.market_data.current_price = tokenData.usd || 0;
-        token.market_data.price_change_24h = tokenData.usd_24h_change;
-        token.market_data.market_cap = tokenData.usd_market_cap;
-        token.updatedAt = new Date();
-
+      if (priceUpdated) {
         await this.tokenRepository.save(token);
       }
     } catch (error) {
-      this.logger.error(
-        `Failed to update price for token ${token.address}:`,
-        error,
-      );
+      this.logger.error(`Failed to update price for token ${token.ca}:`, error);
     }
   }
 }

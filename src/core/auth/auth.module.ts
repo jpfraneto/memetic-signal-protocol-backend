@@ -7,25 +7,26 @@ import { AuthController } from './auth.controller';
 
 // Services
 import { AuthService } from './services';
+import { MeEndpointService } from './services/me-endpoint.service';
 
 // Models
-import { User } from '../../models';
+import { User, Signal, Token, PriceSnapshot } from '../../models';
 import { AdminGuard } from 'src/security/guards';
 
 // Modules
 import { UserModule } from '../user/user.module';
-import { BlockchainModule } from '../blockchain/blockchain.module';
 import { ZapperModule } from '../zapper/zapper.module';
+import { SignalModule } from '../signal/signal.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Signal, Token, PriceSnapshot]),
     forwardRef(() => UserModule),
-    BlockchainModule,
     ZapperModule,
+    SignalModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, AdminGuard],
-  exports: [AuthService, AdminGuard],
+  providers: [AuthService, MeEndpointService, AdminGuard],
+  exports: [AuthService, MeEndpointService, AdminGuard],
 })
 export class AuthModule {}

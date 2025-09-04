@@ -7,7 +7,10 @@
 
 // Dependencies
 import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
 import { SwaggerModule } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
 
@@ -16,7 +19,9 @@ import domains, { getConfig } from './security/config';
 
 // Environment
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env' });
+dotenv.config({
+  path: process.env.NODE_ENV === 'production' ? '.env' : '.env.development',
+});
 
 // Modules
 import { AppModule } from './app.module';
@@ -30,7 +35,7 @@ async function bootstrap() {
   try {
     const app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
-      new FastifyAdapter()
+      new FastifyAdapter(),
     );
 
     await app.register(require('@fastify/cookie'), {
@@ -51,7 +56,9 @@ async function bootstrap() {
       credentials: true,
     });
 
-    await app.listen(getConfig().runtime.port, '0.0.0.0');
+    const port = Number(process.env.PORT || getConfig().runtime.port || 3000);
+
+    await app.listen(port, '0.0.0.0');
 
     getConfig().startup();
   } catch (e) {

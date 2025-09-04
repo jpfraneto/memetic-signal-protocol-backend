@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 // Models
-import { User, UserRoleEnum, Signal } from '../../../models';
+import { User, UserRoleEnum, Signal } from 'src/models';
 
 // Utils
 import NeynarService from '../../../utils/neynar';
@@ -12,7 +12,9 @@ import NeynarService from '../../../utils/neynar';
 // DTOs
 import { GetUsersQueryDto } from '../dto/get-users-query.dto';
 import { UserCallsQueryDto } from '../dto/user-calls-query.dto';
-import { UserDto, CallDto } from '../dto/user-response.dto';
+import { CallDto } from '../dto/user-response.dto';
+import { SignalService } from 'src/core/signal/signal.service';
+import { SignalResponseDto } from 'src/core/signal/dto/signal-response.dto';
 
 @Injectable()
 export class UserService {
@@ -195,7 +197,7 @@ export class UserService {
   }
 
   async getUsers(query: GetUsersQueryDto): Promise<{
-    users: UserDto[];
+    users: User[];
     total: number;
     hasMore: boolean;
   }> {
@@ -207,13 +209,13 @@ export class UserService {
 
     if (search) {
       queryBuilder.andWhere(
-        '(user.username ILIKE :search OR user.displayName ILIKE :search)',
+        '(user.username ILIKE :search OR user.display_name ILIKE :search)',
         { search: `%${search}%` },
       );
     }
 
     if (verified !== undefined) {
-      queryBuilder.andWhere('user.isVerified = :verified', { verified });
+      queryBuilder.andWhere('user.is_verified = :verified', { verified });
     }
 
     queryBuilder
@@ -223,21 +225,8 @@ export class UserService {
 
     const [users, total] = await queryBuilder.getManyAndCount();
 
-    const userDtos: UserDto[] = users.map((user, index) => ({
-      fid: user.fid,
-      username: user.username,
-      displayName: user.displayName || user.username,
-      pfpUrl: user.pfpUrl,
-      isVerified: user.isVerified,
-      followerCount: user.followerCount,
-      followingCount: user.followingCount,
-      totalCalls: user.totalSignals,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-    }));
-
     const result = {
-      users: userDtos,
+      users: users,
       total,
       hasMore: offset + limit < total,
     };
@@ -246,8 +235,8 @@ export class UserService {
   }
 
   async getUserWithDetails(fid: number): Promise<{
-    user: UserDto;
-    recentSignals: CallDto[];
+    user: User;
+    recentSignals: Signal[];
   }> {
     const user = await this.userRepository.findOne({
       where: { fid },
@@ -259,33 +248,16 @@ export class UserService {
     }
 
     const recentSignals = await this.signalRepository
-      .createQueryBuilder('call')
-      .leftJoin('call.user', 'user')
+      .createQueryBuilder('signal')
+      .leftJoin('signal.user', 'user')
       .where('user.fid = :fid', { fid })
-      .orderBy('call.timestamp', 'DESC')
+      .orderBy('signal.timestamp', 'DESC')
       .limit(10)
       .getMany();
 
-    const signalDtos: CallDto[] = recentSignals.map((signal) =>
-      this.mapSignalToDto(signal),
-    );
-
-    const userDto: UserDto = {
-      fid: user.fid,
-      username: user.username,
-      displayName: user.displayName || user.username,
-      pfpUrl: user.pfpUrl,
-      isVerified: user.isVerified,
-      followerCount: user.followerCount,
-      followingCount: user.followingCount,
-      totalCalls: user.totalSignals,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-    };
-
     const result = {
-      user: userDto,
-      recentSignals: signalDtos,
+      user,
+      recentSignals,
     };
 
     return result;
@@ -295,7 +267,7 @@ export class UserService {
     fid: number,
     query: UserCallsQueryDto,
   ): Promise<{
-    signals: CallDto[];
+    signals: Signal[];
     total: number;
     hasMore: boolean;
   }> {
@@ -317,56 +289,15 @@ export class UserService {
 
     const [signals, total] = await queryBuilder.getManyAndCount();
 
-    const signalDtos: CallDto[] = signals.map((signal) =>
-      this.mapSignalToDto(signal),
-    );
-
     return {
-      signals: signalDtos,
+      signals,
       total,
       hasMore: offset + limit < total,
     };
   }
 
-  private mapSignalToDto(signal: Signal): CallDto {
-    return {
-      id: signal.signalId,
-      signalId: signal.signalId,
-      fid: signal.user?.fid || signal.fid,
-      tokenAddress: signal.tokenAddress,
-      ticker: signal.symbol,
-      direction: signal.direction,
-      timestamp: signal.timestamp,
-      callPrice: Number(signal.initialMarketCap),
-      transactionHash: '', // Not available in current metadata structure
-    };
-  }
-
   /**
-   * Recalculates and updates the total signals count for all users
-   * This is useful for fixing data inconsistencies
-   */
-  async recalculateTotalSignals(): Promise<void> {
-    const users = await this.userRepository.find();
-
-    for (const user of users) {
-      const signalCount = await this.signalRepository.count({
-        where: { fid: user.fid },
-      });
-
-      if (signalCount !== user.totalSignals) {
-        await this.userRepository.update(user.fid, {
-          totalSignals: signalCount,
-        });
-        console.log(
-          `Updated user ${user.username} (FID: ${user.fid}) total signals from ${user.totalSignals} to ${signalCount}`,
-        );
-      }
-    }
-  }
-
-  /**
-   * Recalculates and updates the total signals count for a specific user
+   * Recalculates total signals for a specific user
    */
   async recalculateUserTotalSignals(fid: number): Promise<void> {
     const user = await this.userRepository.findOne({ where: { fid } });
@@ -374,15 +305,33 @@ export class UserService {
       throw new Error(`User with FID ${fid} not found`);
     }
 
-    const signalCount = await this.signalRepository.count({
-      where: { fid: user.fid },
+    // Count total signals for this user
+    const totalSignals = await this.signalRepository.count({
+      where: { fid },
     });
 
-    if (signalCount !== user.totalSignals) {
-      await this.userRepository.update(user.fid, { totalSignals: signalCount });
-      console.log(
-        `Updated user ${user.username} (FID: ${user.fid}) total signals from ${user.totalSignals} to ${signalCount}`,
-      );
+    // Update user's total_signals field
+    user.total_signals = totalSignals;
+    await this.userRepository.save(user);
+
+    console.log(`✅ Updated total signals for user ${fid}: ${totalSignals}`);
+  }
+
+  /**
+   * Recalculates total signals for all users
+   */
+  async recalculateTotalSignals(): Promise<void> {
+    const users = await this.userRepository.find();
+
+    for (const user of users) {
+      const totalSignals = await this.signalRepository.count({
+        where: { fid: user.fid },
+      });
+
+      user.total_signals = totalSignals;
+      await this.userRepository.save(user);
     }
+
+    console.log(`✅ Recalculated total signals for ${users.length} users`);
   }
 }

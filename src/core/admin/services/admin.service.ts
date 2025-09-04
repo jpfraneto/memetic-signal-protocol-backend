@@ -29,7 +29,7 @@ export class AdminService {
 
     return this.userRepository.findAndCount({
       where: search ? { username: Like(`%${search}%`) } : {},
-      order: { createdAt: 'DESC' },
+      order: { created_at: 'DESC' },
       skip,
       take: limit,
     });
@@ -90,7 +90,7 @@ export class AdminService {
   async getUsersByRole(role: UserRoleEnum): Promise<User[]> {
     return this.userRepository.find({
       where: { role },
-      order: { createdAt: 'DESC' },
+      order: { created_at: 'DESC' },
     });
   }
 
@@ -141,8 +141,8 @@ export class AdminService {
    */
   async getUsersWithNotifications(): Promise<User[]> {
     return this.userRepository.find({
-      where: { notificationsEnabled: true },
-      select: ['fid', 'username', 'notificationToken', 'notificationUrl'],
+      where: { notifications_enabled: true },
+      select: ['fid', 'username', 'notification_token', 'notification_url'],
     });
   }
 
@@ -151,9 +151,9 @@ export class AdminService {
    */
   async disableUserNotifications(fid: number): Promise<User> {
     return this.updateUser(fid, {
-      notificationsEnabled: false,
-      notificationToken: null,
-      notificationUrl: null,
+      notifications_enabled: false,
+      notification_token: null,
+      notification_url: null,
     });
   }
 }

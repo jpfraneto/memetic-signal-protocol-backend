@@ -33,126 +33,202 @@ export class User {
   username: string;
 
   @Column({
-    default: null,
-    nullable: true,
-  })
-  displayName: string;
-
-  @Column({
+    name: 'display_name',
     type: 'text',
-    default: null,
     nullable: true,
   })
-  pfpUrl: string;
+  display_name: string;
 
   @Column({
+    name: 'pfp_url',
+    type: 'text',
+    nullable: true,
+  })
+  pfp_url: string;
+
+  @Column({
+    name: 'is_verified',
     default: false,
   })
-  isVerified: boolean;
+  is_verified: boolean;
 
   @Column({
+    name: 'follower_count',
     type: 'int',
     default: 0,
   })
-  followerCount: number;
+  follower_count: number;
 
   @Column({
+    name: 'following_count',
     type: 'int',
     default: 0,
   })
-  followingCount: number;
+  following_count: number;
 
   @Column({
-    type: 'decimal',
-    precision: 5,
-    scale: 3,
+    name: 'mfs_score',
+    type: 'real',
     default: 0,
   })
-  mfsScore: number;
+  mfs_score: number;
 
   @Column({
-    type: 'decimal',
-    precision: 5,
-    scale: 2,
+    name: 'win_rate',
+    type: 'real',
     default: 0,
   })
-  winRate: number;
+  win_rate: number;
 
   @Column({
+    name: 'total_signals',
     type: 'int',
     default: 0,
   })
-  totalSignals: number;
+  total_signals: number;
 
   @Column({
+    name: 'active_signals',
     type: 'int',
     default: 0,
   })
-  activeSignals: number;
+  active_signals: number;
 
   @Column({
+    name: 'settled_signals',
     type: 'int',
     default: 0,
   })
-  settledSignals: number;
+  settled_signals: number;
 
   @Column({
+    name: 'total_score',
+    type: 'real',
+    default: 0,
+  })
+  total_score: number; // Accumulated score from all resolved signals
+
+  @Column({
+    name: 'rank',
     type: 'int',
-    default: null,
     nullable: true,
   })
   rank: number;
+
+  @Column({
+    name: 'last_score_update',
+    type: 'int',
+    nullable: true,
+  })
+  last_score_update: number;
 
   // ================================
   // USER ROLE & PERMISSIONS
   // ================================
 
   @Column({
-    type: 'enum',
-    enum: UserRoleEnum,
-    default: UserRoleEnum.USER,
+    type: 'text',
+    default: 'USER',
   })
-  role: UserRoleEnum;
+  role: string;
+
+  @Column({
+    name: 'is_banned',
+    default: false,
+  })
+  is_banned: boolean; // Whether user is currently banned
+
+  @Column({
+    name: 'banned_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  banned_at: Date; // When the ban started
 
   // ================================
   // NOTIFICATION SETTINGS
   // ================================
 
   @Column({
-    default: false,
+    name: 'notifications_enabled',
+    default: true,
   })
-  notificationsEnabled: boolean;
+  notifications_enabled: boolean;
 
   @Column({
-    default: null,
+    name: 'notification_token',
+    type: 'text',
     nullable: true,
   })
-  notificationToken: string;
+  notification_token: string;
 
   @Column({
-    default: null,
+    name: 'notification_url',
+    type: 'text',
     nullable: true,
   })
-  notificationUrl: string;
+  notification_url: string;
 
-  @Column({ default: false })
-  isBanned: boolean; // Whether user is currently banned
+  @Column({
+    name: 'last_signal_date',
+    type: 'text',
+    nullable: true,
+  })
+  last_signal_date: string;
 
-  @Column({ type: 'timestamp', nullable: true })
-  bannedAt: Date; // When the ban started
+  @Column({
+    name: 'state_on_the_system',
+    type: 'text',
+    default: 'ACTIVE',
+  })
+  state_on_the_system: string;
+
+  @Column({
+    name: 'wallet_address',
+    type: 'varchar',
+    length: 42,
+    nullable: true,
+    unique: true,
+  })
+  wallet_address: string;
+
+  // ================================
+  // JBM TOKEN BALANCE
+  // ================================
+
+  @Column({
+    name: 'jbm_balance',
+    type: 'text',
+    default: '0',
+  })
+  jbm_balance: string;
+
+  // ================================
+  // SUBSCRIPTION STATUS
+  // ================================
 
   // ================================
   // TIMESTAMPS
   // ================================
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @Column({
+    name: 'created_at',
+    type: 'timestamp',
+  })
+  created_at: Date;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @Column({
+    name: 'updated_at',
+    type: 'timestamp',
+  })
+  updated_at: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
-  lastActiveAt: Date;
+  @Column({
+    name: 'last_active_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  last_active_at: Date;
 
   // ================================
   // RELATIONSHIPS
@@ -160,68 +236,4 @@ export class User {
 
   @OneToMany(() => Signal, (signal) => signal.user)
   signals: Signal[];
-
-  // ================================
-  // DAILY SIGNAL TRACKING
-  // ================================
-
-  @Column({ type: 'date', nullable: true })
-  lastSignalDate: Date;
-
-  @Column({ default: false })
-  usedRetryToday: boolean;
-
-  @Column({ default: false })
-  submittedSignalToday: boolean;
-
-  // ================================
-  // DEFAULT TOKENS
-  // ================================
-
-  @Column({ type: 'json', nullable: true })
-  defaultTokens: Array<{
-    ca: string;
-    ticker: string;
-  }>;
-
-  @Column({
-    type: 'enum',
-    enum: UserStateOnTheSystemEnum,
-    default: UserStateOnTheSystemEnum.WITHOUT_ACCOUNT,
-  })
-  stateOnTheSystem: UserStateOnTheSystemEnum;
-
-  @Column({
-    type: 'varchar',
-    length: 42,
-    nullable: true,
-    unique: true,
-  })
-  walletAddress: string;
-
-  // ================================
-  // JBM TOKEN BALANCE
-  // ================================
-
-  @Column({
-    type: 'decimal',
-    precision: 65,
-    scale: 0,
-    default: '0',
-    nullable: true,
-  })
-  jbmBalance: string;
-
-  // ================================
-  // SUBSCRIPTION STATUS
-  // ================================
-
-  @Column({ default: false })
-  isSubscriber: boolean; // Whether user has active subscription
-
-  @Column({ type: 'timestamp', nullable: true })
-  subscriptionExpiresAt: Date; // When subscription expires
-
-  @Column({ type: 'timestamp', nullable: true })
-  subscribedAt: Date; // When subscription was purchased
 }

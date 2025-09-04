@@ -6,14 +6,20 @@ export class UpdateSignalIdToVarchar1754673000000
   name = 'UpdateSignalIdToVarchar1754673000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE \`calls\` MODIFY COLUMN \`signalId\` VARCHAR(255) NOT NULL`,
-    );
+    const hasTable = await queryRunner.hasTable('calls');
+    if (hasTable) {
+      await queryRunner.query(
+        `ALTER TABLE "calls" ALTER COLUMN "signalId" TYPE VARCHAR(255)`,
+      );
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE \`calls\` MODIFY COLUMN \`signalId\` BIGINT NOT NULL`,
-    );
+    const hasTable = await queryRunner.hasTable('calls');
+    if (hasTable) {
+      await queryRunner.query(
+        `ALTER TABLE "calls" ALTER COLUMN "signalId" TYPE BIGINT`,
+      );
+    }
   }
 }

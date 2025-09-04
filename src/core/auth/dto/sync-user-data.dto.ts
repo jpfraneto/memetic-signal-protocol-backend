@@ -24,26 +24,18 @@ export class ContractAccountDto {
 
   @ApiProperty()
   @IsString()
-  pfpUrl: string;
+  pfp_url: string;
 
   @ApiProperty()
   @IsBoolean()
-  isBanned: boolean;
+  is_banned: boolean;
 
   @ApiProperty()
   @IsNumber()
-  createdAt: number;
+  created_at: number;
 }
 
 export class UserDailyStatusDto {
-  @ApiProperty()
-  @IsBoolean()
-  submittedSignalToday: boolean;
-
-  @ApiProperty()
-  @IsBoolean()
-  usedRetryToday: boolean;
-
   @ApiProperty()
   @IsNumber()
   currentDay: number;

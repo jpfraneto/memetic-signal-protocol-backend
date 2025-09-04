@@ -1,16 +1,16 @@
 import { Logger } from '@nestjs/common';
 
-const logger = new Logger('APISystem');
+const logger = new Logger('MSPSystem');
 
 /**
- * Configuration object for the SIGIL application environment.
+ * Configuration object for the Memetic Signal Protocol (MSP) application environment.
  * @property {boolean} isProduction - Determines if the environment is production based on the NODE_ENV variable.
  * @property {Object} runtime - Contains runtime configuration.
  * @property {number|string} runtime.port - The port the application runs on, defaults to 8080 if not specified.
  * @property {Object} db - Contains database connection configuration.
  * @property {string} db.name - The name of the database from the DATABASE_NAME environment variable.
  * @property {string} db.host - The database host, defaults to an empty string if not specified.
- * @property {number} db.port - The database port, parsed from the DATABASE_PORT environment variable, defaults to 3306 for MySQL.
+ * @property {number} db.port - The database port, parsed from the DATABASE_PORT environment variable, defaults to 5432 for PostgreSQL.
  * @property {string} db.username - The database username from the DATABASE_USER environment variable.
  * @property {string} db.password - The database password from the DATABASE_PASSWORD environment variable.
  */
@@ -19,8 +19,8 @@ export const getConfig = () => {
   // Debug logging to see what environment variables are being read
 
   const config = {
-    identifier: process.env.IDENTIFIER || 'SIGIL API',
-    version: process.env.VERSION || '1.0',
+    identifier: process.env.IDENTIFIER || 'MSP API',
+    version: process.env.VERSION || '2.0',
     isProduction: process.env.NODE_ENV === 'production',
     runtime: {
       host: process.env.HOST || '',
@@ -29,28 +29,50 @@ export const getConfig = () => {
         (process.env.NODE_ENV === 'production' ? 3000 : 8080),
     },
     session: {
-      key: process.env.SESSION_KEY || 'sigil_session_key',
+      key: process.env.SESSION_KEY || 'msp_session_key',
       domain: process.env.SESSION_DOMAIN || '127.0.0.1',
     },
     db: {
-      name: process.env.DATABASE_NAME || 'sigil_db',
-      host: process.env.DATABASE_HOST || 'localhost', // Fixed: better fallback
+      name:
+        process.env.DATABASE_NAME ||
+        process.env.DATABASE_URL?.split('/').pop() ||
+        'railway',
+      host:
+        process.env.DATABASE_HOST ||
+        process.env.DATABASE_URL?.split('@')[1]?.split(':')[0] ||
+        'localhost',
       port: process.env.DATABASE_PORT
         ? parseInt(process.env.DATABASE_PORT, 10)
-        : 3306, // Fixed: proper parsing
-      username: process.env.DATABASE_USER || 'root',
-      password: process.env.DATABASE_PASSWORD || '1234',
-      requireSSL:
-        process.env.DATABASE_SSL === 'true' ||
-        process.env.NODE_ENV === 'production',
+        : process.env.DATABASE_URL
+          ? parseInt(
+              process.env.DATABASE_URL.split(':')[2]?.split('/')[0] || '5432',
+              10,
+            )
+          : 5432,
+      username:
+        process.env.DATABASE_USER ||
+        process.env.DATABASE_URL?.split('://')[1]?.split(':')[0] ||
+        'postgres',
+      password:
+        process.env.DATABASE_PASSWORD ||
+        process.env.DATABASE_URL?.split(':')[2]?.split('@')[0] ||
+        '',
+      requireSSL: process.env.DATABASE_SSL === 'true',
+      url: process.env.DATABASE_URL,
     },
     neynar: {
       apiKey: process.env.NEYNAR_API_KEY || '',
     },
+    blockchain: {
+      backendPrivateKey: process.env.PRIVATE_KEY,
+      contractAddress:
+        process.env.CONTRACT_ADDRESS ||
+        '0xd02De59d7Cc4dbbB609BB84fAb85936739ae0068',
+    },
     notifications: {
       enabled: process.env.NOTIFICATIONS_ENABLED !== 'false',
-      baseUrl: process.env.NOTIFICATION_BASE_URL || 'https://sigil.app',
-      miniappUrl: process.env.MINIAPP_URL || 'https://sigil.app',
+      baseUrl: process.env.NOTIFICATION_BASE_URL || 'https://msp.app',
+      miniappUrl: process.env.MINIAPP_URL || 'https://msp.app',
       dailyReminderHour: parseInt(process.env.DAILY_REMINDER_HOUR || '7', 10),
       eveningReminderHour: parseInt(
         process.env.EVENING_REMINDER_HOUR || '18',
@@ -62,8 +84,8 @@ export const getConfig = () => {
         10,
       ),
     },
-    sigil: {
-      // SIGIL-specific configurations
+    msp: {
+      // MSP-specific configurations
       defaultEngagementThreshold: parseInt(
         process.env.DEFAULT_ENGAGEMENT_THRESHOLD || '10',
         10,
@@ -74,45 +96,54 @@ export const getConfig = () => {
       ),
       tokenRewardAmount: parseInt(process.env.TOKEN_REWARD_AMOUNT || '100', 10),
       aiAgentEnabled: process.env.AI_AGENT_ENABLED !== 'false',
+      // MSP exponential decay configuration
+      decayConstant: parseFloat(process.env.MSP_DECAY_CONSTANT || '0.088'),
+      maxSignalDuration: parseInt(process.env.MAX_SIGNAL_DURATION || '333', 10),
+      dailySignalLimit: parseInt(process.env.DAILY_SIGNAL_LIMIT || '3', 10),
     },
     tools: {},
     startup: () => {
       logger.log(`
         ╔══════════════════════════════════════════════════════════════════════════════╗
         ║                                                                              ║
-        ║    ███████╗██╗ ██████╗ ██╗██╗                                              ║
-        ║    ██╔════╝██║██╔════╝ ██║██║                                              ║
-        ║    ███████╗██║██║  ███╗██║██║                                              ║
-        ║    ╚════██║██║██║   ██║██║██║                                              ║
-        ║    ███████║██║╚██████╔╝██║███████╗                                         ║
-        ║    ╚══════╝╚═╝ ╚═════╝ ╚═╝╚══════╝                                         ║
-       ║                     MEMETIC LAYER PROTOCOL                                  ║
+        ║    ███╗   ███╗███████╗██████╗                                                      ║
+        ║    ████╗ ████║██╔════╝██╔══██╗                                                     ║
+        ║    ██╔████╔██║███████╗██████╔╝                                                     ║
+        ║    ██║╚██╔╝██║╚════██║██╔═══╝                                                      ║
+        ║    ██║ ╚═╝ ██║███████║██║                                                          ║
+        ║    ╚═╝     ╚═╝╚══════╝╚═╝                                                          ║
         ║                                                                              ║
-        ║                      🔮 SIGIL MEMETIC LAYER PROTOCOL API 🔮                 ║
+        ║                MEMETIC SIGNAL PROTOCOL (MSP)                                ║
+        ║                                                                              ║
+        ║              🔮 Cryptographic Reputation for Crypto Predictions 🔮         ║
         ║                               Version ${config.version}                 ║
         ║                                                                              ║
         ╠══════════════════════════════════════════════════════════════════════════════╣
 
-        ║    🔮 SIGIL MEMETIC LAYER PROTOCOL:                                           ║
-        ║       • Building the future of memetic coordination                        ║
-        ║                                   ║
+        ║    🔮 MEMETIC SIGNAL PROTOCOL:                                               ║
+        ║       • Exponential decay scoring for precise market timing                 ║
+        ║       • Cryptographic reputation on Base Chain                              ║
+        ║       • Farcaster decentralized social infrastructure                      ║
+        ║       • Trustless foundation for memetic reputation                         ║
         ║                                                                              ║
         ╠══════════════════════════════════════════════════════════════════════════════╣
         ║                                                                              ║
-        ║  🚀 SIGIL SYSTEM STATUS:                                                     ║
+        ║  🚀 MSP SYSTEM STATUS:                                                       ║
         ║                                                                              ║
-        ║    ✅ Memetic Analysis                                                       ║
-        ║    ✅ Signal Processing                                                       ║
-        ║    ✅ Token Rewards                                                           ║
-        ║    ✅ Farcaster Integration                                                    ║
-        ║    ✅ Community Features                                                      ║
+        ║    ✅ Smart Contract Layer (ProjectLighthouseV16)                            ║
+        ║    ✅ Blockchain Indexing (Ponder)                                           ║
+        ║    ✅ NestJS Backend & Redis Caching                                         ║
+        ║    ✅ Farcaster Miniapp Interface                                            ║
+        ║    ✅ Exponential Decay Scoring (λ = ${config.msp.decayConstant})                              ║
+        ║    ✅ EIP-712 Signature Verification                                         ║
         ║    ${process.env.NODE_ENV === 'production' ? '🌐 PRODUCTION MODE' : '🔧 DEVELOPMENT MODE'}              ║
         ║                                                                              ║
         ║  🌐 Server listening on: http://localhost:${config.runtime.port}                             ║
-        ║  📡 Database: Connected & Synchronized                                       ║
-        ║  🔐 Auth: Farcaster QuickAuth Enabled                                       ║
+        ║  📡 Database: PostgreSQL with Ponder Indexer                                ║
+        ║  🔐 Auth: Farcaster + Neynar API                                           ║
         ║  🗄️  SSL: ${config.db.requireSSL ? 'Enabled' : 'Disabled'}                                      ║
-        ║  🤖 AI Agent: ${config.sigil.aiAgentEnabled ? 'Active' : 'Disabled'}                           ║
+        ║  🤖 AI Agent: ${config.msp.aiAgentEnabled ? 'Active' : 'Disabled'}                           ║
+        ║  ⚡ Decay Constant: ${config.msp.decayConstant} (${config.msp.maxSignalDuration} day max)              ║
         ║                                                                              ║
         ╠══════════════════════════════════════════════════════════════════════════════╣
         ║                                                                              ║
@@ -120,19 +151,20 @@ export const getConfig = () => {
         ║                                                                              ║
         ║     We believe in learning together, and sharing how to do things.            ║
         ║     Building open protocols for memetic coordination                        ║
-        ║     Learn more about the Memetic Layer Protocol                            ║
+        ║     Learn more about the Memetic Signal Protocol                            ║
         ║                                                                              ║
-        ║     © ${new Date().getFullYear()} SIGIL - Memetic Layer Protocol - Open Source              ║
+        ║     © ${new Date().getFullYear()} MSP - Memetic Signal Protocol - MIT License              ║
         ║                                                                              ║
         ╠══════════════════════════════════════════════════════════════════════════════╣
         ║                                                                              ║
-        ║  🎯 READY TO POWER MEMETIC COORDINATION ON FARCASTER                          ║
-        ║     Building intelligent agent networks through social signals              ║
+        ║  🎯 READY TO POWER MEMETIC REPUTATION ON FARCASTER                           ║
+        ║     Building cryptographic reputation through social signals                ║
         ║                                                                              ║
         ╚══════════════════════════════════════════════════════════════════════════════╝
         
         🔗 API Documentation: ${process.env.NODE_ENV === 'production' ? 'Disabled in production' : 'Available in development mode'}
         📊 Health Check: All systems operational and ready for signalers
+        🏗️  Built on: Farcaster Protocol + Base Chain + Railway Infrastructure
         
       `);
     },
@@ -151,7 +183,7 @@ export const getConfig = () => {
  */
 export const csurfConfigOptions = {
   cookie: {
-    key: '_csrf_sigil',
+    key: '_csrf_msp',
     sameSite: true,
     httpOnly: true,
     secure: true,
@@ -171,26 +203,26 @@ const domains: Domains = {
   LOCAL: [
     'http://127.0.0.1:5173',
     'http://localhost:5173',
-    'https://sigil.app',
-    'https://sigil.lat',
-    'https://www.sigil.lat',
+    'https://msp.app',
+    'https://msp.lat',
+    'https://www.msp.lat',
     'https://localhost:3000',
     'https://miniapp.anky.app',
   ],
   STAGING: [
-    'https://staging-sigil.app',
-    'https://dev-sigil.app',
-    'https://sigil.lat',
+    'https://staging-msp.app',
+    'https://dev-msp.app',
+    'https://msp.lat',
   ],
   PRO: [
     'http://127.0.0.1:5173',
     'http://localhost:5173',
-    'https://sigil.app',
-    'https://sigil.lat',
-    'https://www.sigil.lat',
-    'https://www.sigil.app',
-    'https://frame.sigil.app',
-    'https://api.sigil.app',
+    'https://msp.app',
+    'https://msp.lat',
+    'https://www.msp.lat',
+    'https://www.msp.app',
+    'https://frame.msp.app',
+    'https://api.msp.app',
     '*',
   ],
 };

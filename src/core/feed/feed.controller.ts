@@ -14,17 +14,14 @@ import {
   EnrichedSignal,
   FeedFilters,
 } from './feed.service';
-import { SignalSyncService } from '../indexer/signal-sync.service';
+import { Signal } from 'src/models/Signal/Signal.model';
 
 @ApiTags('feed')
 @Controller('feed')
 export class FeedController {
   private readonly logger = new Logger(FeedController.name);
 
-  constructor(
-    private feedService: FeedService,
-    private signalSyncService: SignalSyncService,
-  ) {}
+  constructor(private feedService: FeedService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get enriched signals feed' })
@@ -86,7 +83,7 @@ export class FeedController {
     @Query('fid') fid?: string,
     @Query('direction', new DefaultValuePipe(undefined)) direction?: number,
     @Query('isResolved') isResolved?: boolean,
-    @Query('tokenAddress') tokenAddress?: string,
+    @Query('ca') ca?: string,
     @Query('minTimeframe') minTimeframe?: number,
     @Query('maxTimeframe') maxTimeframe?: number,
   ): Promise<FeedResponse> {
@@ -96,7 +93,7 @@ export class FeedController {
       fid,
       direction,
       isResolved,
-      tokenAddress,
+      ca,
       minTimeframe,
       maxTimeframe,
     };
@@ -115,41 +112,22 @@ export class FeedController {
   })
   async getRecentSignals(
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-  ): Promise<EnrichedSignal[]> {
+  ): Promise<Signal[]> {
     return this.feedService.getRecentSignals(Math.min(limit, 100));
-  }
-
-  @Get('active')
-  @ApiOperation({ summary: 'Get active (unresolved) signals' })
-  @ApiResponse({ status: 200, description: 'Returns active signals' })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Number of signals (default: 50)',
-  })
-  async getActiveSignals(
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
-  ): Promise<EnrichedSignal[]> {
-    return this.feedService.getActiveSignals(Math.min(limit, 100));
   }
 
   @Get('stats')
   @ApiOperation({ summary: 'Get feed statistics' })
   @ApiResponse({ status: 200, description: 'Returns feed statistics' })
   async getFeedStats() {
-    const [feedStats, syncStats] = await Promise.all([
-      this.feedService.getFeedStats(),
-      this.signalSyncService.getSignalStats(),
-    ]);
+    const [feedStats] = await Promise.all([this.feedService.getFeedStats()]);
 
     return {
       ...feedStats,
-      sync: syncStats,
     };
   }
 
-  @Get('token/:address')
+  @Get('token/:ca')
   @ApiOperation({ summary: 'Get signals for a specific token' })
   @ApiResponse({ status: 200, description: 'Returns signals for the token' })
   @ApiQuery({
@@ -159,10 +137,10 @@ export class FeedController {
     description: 'Number of signals (default: 10)',
   })
   async getSignalsByToken(
-    @Param('address') address: string,
+    @Param('ca') ca: string,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-  ): Promise<EnrichedSignal[]> {
-    return this.feedService.getSignalsByToken(address, Math.min(limit, 100));
+  ): Promise<Signal[]> {
+    return this.feedService.getSignalsByToken(ca, Math.min(limit, 100));
   }
 
   @Get('fid/:fid')
@@ -177,7 +155,7 @@ export class FeedController {
   async getSignalsByFid(
     @Param('fid') fid: string,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-  ): Promise<EnrichedSignal[]> {
+  ): Promise<Signal[]> {
     return this.feedService.getSignalsByFid(fid, Math.min(limit, 100));
   }
 
@@ -186,20 +164,7 @@ export class FeedController {
   @ApiResponse({ status: 200, description: 'Returns the signal' })
   async getSignalById(
     @Param('signalId') signalId: string,
-  ): Promise<EnrichedSignal | null> {
+  ): Promise<Signal | null> {
     return this.feedService.getSignalById(signalId);
-  }
-
-  @Get('sync/force')
-  @ApiOperation({ summary: 'Force sync with indexer (admin only)' })
-  @ApiResponse({ status: 200, description: 'Sync completed' })
-  async forceSync(): Promise<{ message: string; timestamp: string }> {
-    this.logger.log('Manual sync triggered');
-    await this.signalSyncService.forceSync();
-
-    return {
-      message: 'Sync completed successfully',
-      timestamp: new Date().toISOString(),
-    };
   }
 }

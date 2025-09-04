@@ -7,25 +7,25 @@ export class AddSubscriptionFieldsToUser1754673000003
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE \`users\` ADD \`isSubscriber\` tinyint NOT NULL DEFAULT 0`,
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isSubscriber" BOOLEAN NOT NULL DEFAULT FALSE`,
     );
     await queryRunner.query(
-      `ALTER TABLE \`users\` ADD \`subscriptionExpiresAt\` timestamp NULL`,
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "subscriptionExpiresAt" TIMESTAMP`,
     );
     await queryRunner.query(
-      `ALTER TABLE \`users\` ADD \`subscribedAt\` timestamp NULL`,
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "subscribedAt" TIMESTAMP`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE \`users\` DROP COLUMN \`subscribedAt\``,
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "subscribedAt"`,
     );
     await queryRunner.query(
-      `ALTER TABLE \`users\` DROP COLUMN \`subscriptionExpiresAt\``,
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "subscriptionExpiresAt"`,
     );
     await queryRunner.query(
-      `ALTER TABLE \`users\` DROP COLUMN \`isSubscriber\``,
+      `ALTER TABLE "users" DROP COLUMN IF EXISTS "isSubscriber"`,
     );
   }
 }

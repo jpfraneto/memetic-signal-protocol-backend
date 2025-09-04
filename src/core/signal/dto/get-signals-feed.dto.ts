@@ -47,7 +47,7 @@ export class GetSignalsFeedDto {
   @ApiPropertyOptional({ description: 'Filter by token address' })
   @IsOptional()
   @IsString()
-  tokenAddress?: string;
+  ca?: string;
 
   @ApiPropertyOptional({
     description: 'Sort field',

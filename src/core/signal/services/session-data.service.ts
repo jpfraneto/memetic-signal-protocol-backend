@@ -5,7 +5,6 @@ import { Repository } from 'typeorm';
 import { Signal } from '../../../models/Signal/Signal.model';
 import { User } from '../../../models/User/User.model';
 import { Token } from '../../../models/Token/Token.model';
-import { BlockchainService } from '../../blockchain/blockchain.service';
 import { ZapperService } from 'src/core/zapper/services/zapper.service';
 
 export interface SessionStartData {
@@ -23,7 +22,6 @@ export interface SessionStartData {
 @Injectable()
 export class SessionDataService {
   private readonly logger = new Logger(SessionDataService.name);
-  private readonly SESSION_DURATION = 88 * 1000; // 88 seconds
 
   constructor(
     @InjectRepository(Signal)
@@ -32,50 +30,9 @@ export class SessionDataService {
     private userRepository: Repository<User>,
     @InjectRepository(Token)
     private tokenRepository: Repository<Token>,
-    private blockchainService: BlockchainService,
+    // private blockchainService: BlockchainService, // Temporarily disabled
     private zapperService: ZapperService,
   ) {}
-
-  async prepareSessionStartData(
-    fid: number,
-    transactionHash?: string,
-  ): Promise<SessionStartData> {
-    this.logger.log(
-      `Preparing session start data for FID ${fid}, TX: ${transactionHash}`,
-    );
-
-    const sessionId = `session-${Date.now()}-${fid}`;
-    const startTime = Date.now();
-    const expiresAt = startTime + this.SESSION_DURATION;
-    const timeRemaining = this.SESSION_DURATION;
-
-    // Fetch all required data in parallel
-    const [
-      lastTwentySignals,
-      userLastEightTokens,
-      lastTwentySignalers,
-      trendingTokens,
-      user,
-    ] = await Promise.all([
-      this.getLastTwentySignalsFromFeed(),
-      this.getUserLastEightTokens(fid),
-      this.getLastTwentySignalers(),
-      this.zapperService.getTrendingTokens(fid),
-      this.userRepository.findOne({ where: { fid } }),
-    ]);
-
-    return {
-      sessionId,
-      startTime,
-      expiresAt,
-      timeRemaining,
-      lastTwentySignals,
-      userLastEightTokens,
-      lastTwentySignalers,
-      trendingTokens,
-      defaultTokens: user?.defaultTokens || null,
-    };
-  }
 
   private async getLastTwentySignalsFromFeed(): Promise<any[]> {
     try {
@@ -88,18 +45,15 @@ export class SessionDataService {
         .getMany();
 
       return signals.map((signal) => ({
-        signalId: signal.signalId,
+        signalId: signal.transaction_hash, // Updated to use new primary key
         fid: signal.fid,
         username: signal.user?.username || 'Unknown',
-        displayName:
-          signal.user?.displayName || signal.user?.username || 'Unknown',
-        pfpUrl: signal.user?.pfpUrl || '',
-        isVerified: signal.user?.isVerified || false,
-        tokenAddress: signal.tokenAddress,
-        symbol: signal.symbol,
+        pfp_url: signal.user?.pfp_url || '',
+        isVerified: signal.user?.is_verified || false,
+        ca: signal.ca,
         timestamp: signal.timestamp,
         status: signal.status,
-        expiresAt: signal.expiresAt,
+        expires_at: signal.expires_at, // Already a Date object
       }));
     } catch (error) {
       this.logger.error('Error fetching last 20 signals from feed:', error);
@@ -119,15 +73,19 @@ export class SessionDataService {
       const uniqueTokens = new Map();
 
       for (const signal of userSignals) {
-        if (signal.tokenAddress && !uniqueTokens.has(signal.tokenAddress) && uniqueTokens.size < 8) {
+        if (
+          signal.ca &&
+          !uniqueTokens.has(signal.ca) &&
+          uniqueTokens.size < 8
+        ) {
           // Try to get current price and market cap from Token table
           const tokenData = await this.tokenRepository.findOne({
-            where: { address: signal.tokenAddress },
+            where: { ca: signal.ca },
           });
 
-          uniqueTokens.set(signal.tokenAddress, {
-            ca: signal.tokenAddress,
-            ticker: signal.symbol,
+          uniqueTokens.set(signal.ca, {
+            ca: signal.ca,
+            ticker: '', // Symbol no longer in schema
             imageUrl: tokenData?.image || '',
             priceInUSDC: Number(tokenData?.market_data?.current_price) || 0,
             mcInUSDC: Number(tokenData?.market_data?.market_cap) || 0,
@@ -157,23 +115,12 @@ export class SessionDataService {
         .getMany();
 
       // Sort by most recent activity
-      recentSignalers.sort((a, b) => b.timestamp - a.timestamp);
+      recentSignalers.sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      );
 
-      return recentSignalers.map((signal) => ({
-        fid: signal.user?.fid || signal.fid,
-        username: signal.user?.username || 'Unknown',
-        displayName:
-          signal.user?.displayName || signal.user?.username || 'Unknown',
-        pfpUrl: signal.user?.pfpUrl || '',
-        isVerified: signal.user?.isVerified || false,
-        mfsScore: Number(signal.user?.mfsScore || 0),
-        winRate: Number(signal.user?.winRate || 0),
-        settledSignals: signal.user?.settledSignals || 0,
-        totalSignals: signal.user?.totalSignals || 0,
-        followerCount: signal.user?.followerCount || 0,
-        followingCount: signal.user?.followingCount || 0,
-        lastSignalTimestamp: signal.timestamp,
-      }));
+      return recentSignalers;
     } catch (error) {
       this.logger.error('Error fetching last 20 signalers:', error);
       return [];
@@ -187,23 +134,11 @@ export class SessionDataService {
     this.logger.log(`Verifying transaction event: ${transactionHash}`);
 
     try {
-      // Use the blockchain service to verify the transaction contains a SignalCreated event
-      const isValidSessionStart =
-        await this.blockchainService.verifySessionStartTransaction(
-          transactionHash,
-        );
-
-      if (isValidSessionStart) {
-        this.logger.log(
-          `Session start transaction verified: ${transactionHash}`,
-        );
-        return true;
-      } else {
-        this.logger.warn(
-          `Invalid session start transaction: ${transactionHash}`,
-        );
-        return false;
-      }
+      // Blockchain service temporarily disabled - return true for now
+      this.logger.log(
+        `Transaction verification temporarily disabled: ${transactionHash}`,
+      );
+      return true;
     } catch (error) {
       this.logger.error(
         `Error verifying transaction event ${transactionHash}:`,

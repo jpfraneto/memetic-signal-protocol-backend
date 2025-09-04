@@ -1,67 +1,46 @@
-import {
-  Entity,
-  Column,
-  PrimaryColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn } from 'typeorm';
 
-import { SignalDirection, SignalStatus } from './Signal.types';
 import { User } from '../User/User.model';
+import { Token } from '../Token/Token.model';
 
 @Entity({ name: 'signals' })
 export class Signal {
   @PrimaryColumn({ type: 'varchar', length: 66 })
-  signalId: string;
+  transaction_hash: string;
 
-  @Column({ type: 'varchar', length: 255 })
-  tokenAddress: string;
-
-  @Column({ type: 'varchar', length: 50 })
-  symbol: string;
-
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  initialMarketCap: number;
-
-  @Column({
-    type: 'enum',
-    enum: ['UP', 'DOWN'],
-  })
-  direction: SignalDirection;
-
-  @Column({ type: 'bigint' })
-  timestamp: number;
-
-  @Column({ type: 'timestamp' })
-  expiresAt: Date;
-
-  @Column({
-    type: 'enum',
-    enum: ['ACTIVE', 'WON', 'LOST', 'EXPIRED'],
-    default: 'ACTIVE',
-  })
-  status: SignalStatus;
-
-  // ================================
-  // FOREIGN KEYS
-  // ================================
-
-  @Column()
+  @Column({ type: 'int' })
   fid: number;
 
-  // ================================
-  // RELATIONSHIPS
-  // ================================
+  @Column({ type: 'varchar', length: 42 })
+  ca: string; // Contract address - hex format
 
+  @Column({ type: 'boolean' })
+  direction: boolean; // false = DOWN, true = UP
+
+  @Column({ type: 'int' })
+  duration: number; // Duration in days
+
+  @Column({ type: 'int' })
+  mc: number; // Market cap when signal was created
+
+  @Column({ type: 'varchar' })
+  timestamp: string; // Block timestamp
+
+  @Column({ type: 'bigint', name: 'block_number' })
+  block_number: number;
+
+  @Column({ type: 'int', default: 0 })
+  status: number; // 0 = active, 1 = won, 2 = lost
+
+  @Column({ type: 'date', name: 'expires_at' })
+  expires_at: Date;
+
+  // Optional relations for backend convenience (not part of Ponder schema)
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'fid', referencedColumnName: 'fid' })
-  user: User;
+  user?: User;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @ManyToOne(() => Token, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'ca', referencedColumnName: 'ca' })
+  token?: Token;
 }

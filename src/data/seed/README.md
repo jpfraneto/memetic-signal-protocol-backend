@@ -44,8 +44,7 @@ Array of user objects with the following structure:
     "updatedAt": "2024-01-01T00:00:00.000Z",
     "lastActiveAt": "2024-01-01T00:00:00.000Z",
     "lastSignalDate": "2024-01-01T00:00:00.000Z",
-    "usedRetryToday": false,
-    "submittedSignalToday": false,
+
     "stateOnTheSystem": "WITH_ACCOUNT",
     "walletAddress": "0x1234567890abcdef1234567890abcdef12345678",
     "jbmBalance": "1000000",
@@ -57,6 +56,7 @@ Array of user objects with the following structure:
 ```
 
 #### Required Fields:
+
 - `fid` (number): Farcaster ID
 - `username` (string): Unique username
 - `isVerified` (boolean)
@@ -79,6 +79,7 @@ Array of user objects with the following structure:
 - `isSubscriber` (boolean)
 
 #### Optional Fields:
+
 - `displayName`, `bio`, `avatar`, `pfpUrl`, `rank`, `lastActiveAt`, `lastSignalDate`, `walletAddress`, `jbmBalance`, `subscriptionExpiresAt`, `subscribedAt`
 
 ### tokens.json
@@ -105,6 +106,7 @@ Array of token objects with the following structure:
 ```
 
 #### Required Fields:
+
 - `address` (string): Token contract address
 - `name` (string): Token name
 - `symbol` (string): Token symbol/ticker
@@ -114,6 +116,7 @@ Array of token objects with the following structure:
 - `updatedAt` (string): ISO date string
 
 #### Optional Fields:
+
 - `description`, `image`, `image_small`, `image_thumb`, `market_cap_rank`
 
 ### signals.json
@@ -139,6 +142,7 @@ Array of signal objects with the following structure:
 ```
 
 #### Required Fields:
+
 - `signalId` (string): Unique signal identifier (transaction hash format)
 - `tokenAddress` (string): Token contract address
 - `tokenTicker` (string): Token symbol
@@ -172,6 +176,7 @@ Array of signal objects with the following structure:
 ## Example Generation Script Output
 
 Your generation script should output files compatible with these formats. The script you provided generates data in the correct format for:
+
 - ✅ Users with all required fields
 - ✅ Tokens with categories and metadata
 - ✅ Signals with simplified single-token structure

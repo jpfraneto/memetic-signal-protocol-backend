@@ -4,8 +4,8 @@ import { FastifyReply } from 'fastify';
 
 import { TokenPriceService } from '../signal/services/token-price.service';
 import { SimpleTokenService } from './services/simple-token.service';
-import { MarketCapitalService } from './services/market-capital.service';
-import { hasError } from '../../utils';
+import { ZapperService } from '../zapper/services/zapper.service';
+import { hasError, hasResponse } from '../../utils';
 
 @ApiTags('token-service')
 @Controller('token-service')
@@ -13,7 +13,7 @@ export class TokensController {
   constructor(
     private readonly tokenPriceService: TokenPriceService,
     private readonly simpleTokenService: SimpleTokenService,
-    private readonly marketCapitalService: MarketCapitalService,
+    private readonly zapperService: ZapperService,
   ) {}
 
   @Get('price/:contractAddress')
@@ -220,7 +220,7 @@ export class TokensController {
 
       return res.status(HttpStatus.OK).send({
         success: true,
-        data: tokenInfo,
+        data: { token: tokenInfo },
       });
     } catch (error) {
       console.error('❌ [TokensController] Error fetching token info:', error);
@@ -252,193 +252,145 @@ export class TokensController {
     }
   }
 
-  @Get('market-cap/analytics')
-  @ApiOperation({ summary: 'Get market capital analytics' })
-  @ApiResponse({
-    status: 200,
+  /**
+   * Token search endpoint for miniapp
+   *
+   * Logic:
+   * - If query is 42-character hex string (0x + 40 chars) → search by contract address
+   * - Otherwise → search by name/symbol via existing token services
+   * - Debounced calls (frontend waits 3s after user stops typing)
+   *
+   * @param query - Search query (contract address or token name/symbol)
+   * @param res - HTTP response object
+   * @returns Array of matching tokens with complete information
+   */
+  @Get('search')
+  @ApiOperation({
+    summary: 'Search tokens by address or name/symbol',
     description:
-      'Market capital analytics including top gainers, losers, and distribution',
-    schema: {
-      example: {
-        success: true,
-        data: {
-          totalMarketCap: 1000000000,
-          averageMarketCap: 5000000,
-          topGainers24h: [],
-          topLosers24h: [],
-          marketCapDistribution: {
-            micro: 150,
-            small: 50,
-            mid: 10,
-            large: 5,
-          },
-          trending: [],
-        },
-      },
-    },
+      'Smart search that detects contract addresses (42 chars) vs name/symbol queries',
   })
-  async getMarketCapAnalytics(@Res() res: FastifyReply) {
-    try {
-      const analytics = await this.marketCapitalService.getMarketCapAnalytics();
-
-      return res.status(HttpStatus.OK).send({
-        success: true,
-        data: analytics,
-      });
-    } catch (error) {
-      console.error(
-        '❌ [TokensController] Error fetching market cap analytics:',
-        error,
-      );
-
-      return hasError(
-        res,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'getMarketCapAnalytics',
-        'Failed to fetch market cap analytics',
-      );
-    }
-  }
-
-  @Get('market-cap/leaderboard')
-  @ApiOperation({ summary: 'Get market capital leaderboard' })
   @ApiResponse({
     status: 200,
-    description: 'Tokens ranked by market capitalization',
+    description: 'Array of matching tokens',
     schema: {
       example: {
         success: true,
         data: [
           {
             address: '0x123...',
-            symbol: 'TOKEN1',
-            name: 'Token One',
-            marketCap: 1000000000,
-            marketCapRank: 1,
-            marketCapChange24h: 5.2,
+            symbol: 'ETH',
+            name: 'Ethereum',
+            image: 'https://...',
+            marketCap: 450000000000,
+            price: 3500.45,
+            volume24h: 15000000,
           },
         ],
       },
     },
   })
-  async getMarketCapLeaderboard(
-    @Query('limit') limit: number = 100,
-    @Res() res: FastifyReply,
-  ) {
+  @ApiResponse({ status: 400, description: 'Query parameter required' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async searchTokens(@Query('q') query: string, @Res() res: FastifyReply) {
     try {
-      const leaderboard =
-        await this.marketCapitalService.getMarketCapLeaderboard(limit || 100);
-
-      return res.status(HttpStatus.OK).send({
-        success: true,
-        data: leaderboard,
-      });
-    } catch (error) {
-      console.error(
-        '❌ [TokensController] Error fetching market cap leaderboard:',
-        error,
-      );
-
-      return hasError(
-        res,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'getMarketCapLeaderboard',
-        'Failed to fetch market cap leaderboard',
-      );
-    }
-  }
-
-  @Get('market-cap/predictions/:contractAddress')
-  @ApiOperation({ summary: 'Get market capital predictions for a token' })
-  @ApiResponse({
-    status: 200,
-    description: 'Market capital predictions for different timeframes',
-    schema: {
-      example: {
-        success: true,
-        data: [
-          {
-            tokenAddress: '0x123...',
-            currentMarketCap: 1000000,
-            predictedMarketCap: 1200000,
-            confidence: 0.75,
-            timeframe: '24h',
-            factors: ['Strong 24h momentum', 'Positive weekly trend'],
-          },
-        ],
-      },
-    },
-  })
-  async getMarketCapPredictions(
-    @Param('contractAddress') contractAddress: string,
-    @Res() res: FastifyReply,
-  ) {
-    try {
-      const predictions =
-        await this.marketCapitalService.getMarketCapPredictions(
-          contractAddress,
+      if (!query || query.trim().length === 0) {
+        return hasError(
+          res,
+          HttpStatus.BAD_REQUEST,
+          'MISSING_QUERY',
+          'Search query parameter "q" is required',
         );
+      }
 
-      return res.status(HttpStatus.OK).send({
-        success: true,
-        data: predictions,
-      });
+      const trimmedQuery = query.trim();
+
+      // Check if query is a 42-character hex string (0x + 40 chars)
+      const isContractAddress = /^0x[a-fA-F0-9]{40}$/.test(trimmedQuery);
+
+      if (isContractAddress) {
+        // Search by contract address
+        try {
+          const tokenInfo =
+            await this.simpleTokenService.getTokenInfo(trimmedQuery);
+
+          if (tokenInfo) {
+            return hasResponse(res, {
+              success: true,
+              data: [tokenInfo], // Return as array for consistent format
+            });
+          } else {
+            return hasResponse(res, {
+              success: true,
+              data: [], // No results found
+            });
+          }
+        } catch (addressError) {
+          console.error(
+            '❌ [TokenSearch] Error searching by address:',
+            addressError,
+          );
+          // Return empty results rather than error for better UX
+          return hasResponse(res, {
+            success: true,
+            data: [],
+          });
+        }
+      } else {
+        // Search by name/symbol using Zapper service
+        try {
+          // Get trending tokens and filter by query
+          const trendingTokens = await this.zapperService.getTrendingTokens(
+            1,
+            50,
+          );
+
+          const filteredTokens = trendingTokens.filter((token) => {
+            const tokenData = token.token;
+            const name = tokenData.name?.toLowerCase() || '';
+            const symbol = tokenData.symbol?.toLowerCase() || '';
+            const searchQuery = trimmedQuery.toLowerCase();
+
+            return name.includes(searchQuery) || symbol.includes(searchQuery);
+          });
+
+          // Transform to expected format
+          const searchResults = filteredTokens.slice(0, 10).map((item) => ({
+            address: item.tokenAddress,
+            symbol: item.token.symbol,
+            name: item.token.name,
+            image: item.token.imageUrlV2,
+            marketCap: item.token.priceData?.marketCap || 0,
+            price: item.token.priceData?.price || 0,
+            volume24h: item.token.priceData?.volume24h || 0,
+          }));
+
+          return hasResponse(res, {
+            success: true,
+            data: searchResults,
+          });
+        } catch (nameError) {
+          console.error(
+            '❌ [TokenSearch] Error searching by name/symbol:',
+            nameError,
+          );
+
+          // Fallback: try to search using token service if it has search capabilities
+          return hasResponse(res, {
+            success: true,
+            data: [],
+            warning: 'Search temporarily unavailable, please try again',
+          });
+        }
+      }
     } catch (error) {
-      console.error(
-        '❌ [TokensController] Error fetching market cap predictions:',
-        error,
-      );
+      console.error('❌ [TokenSearch] Unexpected error:', error);
 
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'getMarketCapPredictions',
-        'Failed to fetch market cap predictions',
-      );
-    }
-  }
-
-  @Get('market-cap/update/:contractAddress')
-  @ApiOperation({ summary: 'Update market capital data for a token' })
-  @ApiResponse({
-    status: 200,
-    description: 'Market capital data updated successfully',
-    schema: {
-      example: {
-        success: true,
-        data: {
-          address: '0x123...',
-          marketCap: 1000000,
-          marketCapChange24h: 5.2,
-          marketCapRank: 42,
-          lastMarketCapUpdate: '2024-01-01T00:00:00.000Z',
-        },
-      },
-    },
-  })
-  async updateMarketCapData(
-    @Param('contractAddress') contractAddress: string,
-    @Res() res: FastifyReply,
-  ) {
-    try {
-      const updatedToken =
-        await this.marketCapitalService.updateMarketCapData(contractAddress);
-
-      return res.status(HttpStatus.OK).send({
-        success: true,
-        data: updatedToken,
-      });
-    } catch (error) {
-      console.error(
-        '❌ [TokensController] Error updating market cap data:',
-        error,
-      );
-
-      return hasError(
-        res,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'updateMarketCapData',
-        'Failed to update market cap data',
+        'TOKEN_SEARCH_ERROR',
+        'Failed to search tokens. Please try again.',
       );
     }
   }

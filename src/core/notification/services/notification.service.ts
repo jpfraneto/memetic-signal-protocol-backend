@@ -53,9 +53,9 @@ export class NotificationService {
 
       // Enable notifications if details provided
       if (notificationDetails) {
-        user.notificationsEnabled = true;
-        user.notificationToken = notificationDetails.token;
-        user.notificationUrl = notificationDetails.url;
+        user.notifications_enabled = true;
+        user.notification_token = notificationDetails.token;
+        user.notification_url = notificationDetails.url;
         await this.userRepository.save(user);
         this.logger.log(`Notifications enabled for user ${user.fid}`);
       }
@@ -85,9 +85,9 @@ export class NotificationService {
       }
 
       // Disable notifications
-      user.notificationsEnabled = false;
-      user.notificationToken = null;
-      user.notificationUrl = null;
+      user.notifications_enabled = false;
+      user.notification_token = null;
+      user.notification_url = null;
       await this.userRepository.save(user);
 
       this.logger.log(`Notifications disabled for user ${user.fid}`);
@@ -116,9 +116,9 @@ export class NotificationService {
         return;
       }
 
-      user.notificationsEnabled = true;
-      user.notificationToken = notificationDetails.token;
-      user.notificationUrl = notificationDetails.url;
+      user.notifications_enabled = true;
+      user.notification_token = notificationDetails.token;
+      user.notification_url = notificationDetails.url;
       await this.userRepository.save(user);
 
       this.logger.log(`Notification settings updated for user ${user.fid}`);
@@ -144,9 +144,9 @@ export class NotificationService {
         return;
       }
 
-      user.notificationsEnabled = false;
-      user.notificationToken = null;
-      user.notificationUrl = null;
+      user.notifications_enabled = false;
+      user.notification_token = null;
+      user.notification_url = null;
       await this.userRepository.save(user);
 
       this.logger.log(`Notification settings updated for user ${user.fid}`);
@@ -259,7 +259,7 @@ export class NotificationService {
 
       // Handle notifications with null users before processing URL groups
       const nullUserNotifications = pendingNotifications.filter(
-        (n) => !n.user || !n.user.notificationUrl,
+        (n) => !n.user || !n.user.notification_url,
       );
       if (nullUserNotifications.length > 0) {
         await this.handleNotificationFailures(
@@ -452,7 +452,7 @@ export class NotificationService {
         title: notification.title,
         body: notification.body,
         targetUrl: notification.targetUrl,
-        token: notification.user.notificationToken,
+        token: notification.user.notification_token,
       })),
     };
 
@@ -592,14 +592,14 @@ export class NotificationService {
 
     for (const notification of notifications) {
       // Skip notifications where user is null or doesn't have notification URL
-      if (!notification.user || !notification.user.notificationUrl) {
+      if (!notification.user || !notification.user.notification_url) {
         this.logger.warn(
-          `Skipping notification ${notification.notificationId}: user is null or missing notificationUrl`,
+          `Skipping notification ${notification.notificationId}: user is null or missing notification_url`,
         );
         continue;
       }
 
-      const url = notification.user.notificationUrl;
+      const url = notification.user.notification_url;
       if (!groups.has(url)) {
         groups.set(url, []);
       }

@@ -1,19 +1,9 @@
-export type SignalDirection = 'UP' | 'DOWN';
-export type SignalStatus = 'ACTIVE' | 'WON' | 'LOST' | 'EXPIRED';
-
-export interface TokenPrediction {
-  ca: string;
-  ticker: string;
-  mc: string;
-  direction: SignalDirection;
+// Status enum mapped to numbers to match Ponder indexer schema
+export enum SignalStatus {
+  ACTIVE = 0,
+  WON = 1,
+  LOST = 2,
 }
 
-export interface CreateSignalData {
-  signalId: string;
-  fid: number;
-  tokenAddress: string;
-  tokenTicker: string;
-  initialMarketCap: string;
-  direction: SignalDirection;
-  expiresAt: Date;
-}
+// Direction type to match Ponder boolean schema
+export type SignalDirection = boolean; // false = DOWN, true = UP

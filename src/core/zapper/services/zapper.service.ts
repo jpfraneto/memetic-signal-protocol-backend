@@ -121,7 +121,7 @@ export class ZapperService {
 
       const variables = {
         fid,
-        first: Math.max(count, 8), // Always fetch at least 8 to have a good selection
+        first: Math.max(count, 16), // Always fetch at least 16 to have a good selection
       };
 
       const response = await fetch(this.ZAPPER_API_URL, {
@@ -151,6 +151,7 @@ export class ZapperService {
       }
 
       const tokens = data.data.tokenTrends.edges.map((edge) => edge.node);
+      this.logger.log('FETCHED TOKENS', tokens);
 
       // Cache the results
       this.tokenTrendsCache = {

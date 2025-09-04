@@ -10,9 +10,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindManyOptions } from 'typeorm';
 
 import { Signal } from '../../models/Signal/Signal.model';
+import {
+  SignalDirection,
+  SignalStatus,
+} from '../../models/Signal/Signal.types';
 import { User } from '../../models/User/User.model';
 import { UserService } from '../user/services/user.service';
-import { CreateSignalDto } from './dto/create-signal.dto';
 import {
   SignalResponseDto,
   SignalsFeedResponseDto,
@@ -28,14 +31,12 @@ import {
 interface ActiveSession {
   fid: number;
   startTime: number;
-  expiresAt: number;
   isRetry: boolean;
 }
 
 @Injectable()
 export class SignalService {
   private readonly logger = new Logger(SignalService.name);
-  private readonly SESSION_DURATION = 88 * 1000; // 88 seconds in milliseconds
   private activeSessions = new Map<number, ActiveSession>();
 
   constructor(
@@ -46,281 +47,35 @@ export class SignalService {
     private userService: UserService,
     private sessionDataService: SessionDataService,
   ) {
-    // Clean up expired sessions every minute
-    setInterval(() => this.cleanupExpiredSessions(), 60000);
-  }
-
-  private cleanupExpiredSessions(): void {
-    const now = Date.now();
-    for (const [fid, session] of this.activeSessions) {
-      if (now > session.expiresAt) {
-        this.activeSessions.delete(fid);
-        this.logger.log(`Session expired for FID ${fid}`);
-      }
-    }
+    // Sessions are now persistent until signal submission
   }
 
   private isNewDay(user: User): boolean {
-    if (!user.lastSignalDate) return true;
+    if (!user.last_signal_date) return true;
 
     const today = new Date();
-    const lastSignal = new Date(user.lastSignalDate);
+    const lastSignal = new Date(user.last_signal_date);
 
     return today.toDateString() !== lastSignal.toDateString();
   }
 
-  private async resetDailyStatus(user: User): Promise<User> {
-    if (this.isNewDay(user)) {
-      user.lastSignalDate = new Date();
-      user.submittedSignalToday = false;
-      user.usedRetryToday = false;
-      await this.userRepository.save(user);
-    }
-    return user;
-  }
-
-  async startSession(
-    fid: number,
-    isRetry: boolean = false,
-    transactionHash?: string,
-  ): Promise<SessionStartData> {
-    try {
-      console.log(
-        `[startSession] Starting session for FID: ${fid}, isRetry: ${isRetry}, transactionHash: ${transactionHash}`,
-      );
-
-      // Get or create user
-      const user = await this.userService.getByFid(fid);
-      console.log('IN HERE THE USER IS', user);
-
-      if (user.isBanned) {
-        console.log(
-          `[startSession] User ${fid} is banned, throwing FORBIDDEN error`,
-        );
-        throw new HttpException('User is banned', HttpStatus.FORBIDDEN);
-      }
-
-      // Reset daily status if new day
-      console.log(`[startSession] Resetting daily status for user ${fid}`);
-      await this.resetDailyStatus(user);
-
-      // Check if already signaled today
-      if (user.submittedSignalToday) {
-        console.log(
-          `[startSession] User ${fid} already signaled today, throwing CONFLICT error`,
-        );
-        throw new ConflictException('Already signaled today');
-      }
-
-      // Check retry conditions
-      if (isRetry && user.usedRetryToday) {
-        console.log(
-          `[startSession] User ${fid} already used retry today, throwing CONFLICT error`,
-        );
-        throw new ConflictException('Retry already used today');
-      }
-
-      // Check for existing active session
-      const existingSession = this.activeSessions.get(fid);
-      console.log('IN HERE THE EXISTING SESSION IS', existingSession);
-      if (existingSession && Date.now() < existingSession.expiresAt) {
-        console.log(
-          `[startSession] User ${fid} has existing active session, returning existing session data`,
-        );
-        // Return existing session data instead of throwing error
-        const sessionData =
-          await this.sessionDataService.prepareSessionStartData(
-            fid,
-            transactionHash,
-          );
-        console.log(
-          `[startSession] Returning existing session data for FID: ${fid}`,
-        );
-        return sessionData;
-      }
-      console.log('IN HERE THE EXISTING SESSION IS', existingSession);
-
-      // If transaction hash is provided, wait for the blockchain event (or just verify it exists)
-      if (transactionHash) {
-        console.log(
-          `[startSession] Waiting for transaction event: ${transactionHash}`,
-        );
-        await this.sessionDataService.waitForTransactionEvent(transactionHash);
-      }
-
-      // Create new session
-      const now = Date.now();
-      const expiresAt = now + this.SESSION_DURATION;
-
-      console.log('IN HERE THE TRANSACTION HASH IS', transactionHash);
-      const session: ActiveSession = {
-        fid,
-        startTime: now,
-        expiresAt,
-        isRetry,
-      };
-
-      this.activeSessions.set(fid, session);
-
-      this.logger.log(
-        `Session started for FID ${fid} - ${isRetry ? 'Retry' : 'Regular'} session, expires at ${new Date(expiresAt).toISOString()}${transactionHash ? `, TX: ${transactionHash}` : ''}`,
-      );
-
-      // Prepare and return comprehensive session data
-      console.log(
-        `[startSession] Preparing session start data for FID: ${fid}`,
-      );
-      const sessionData = await this.sessionDataService.prepareSessionStartData(
-        fid,
-        transactionHash,
-      );
-
-      console.log(
-        `[startSession] Successfully started session for FID: ${fid}`,
-      );
-      return sessionData;
-    } catch (error) {
-      console.error(
-        `[startSession] Error starting session for FID ${fid}:`,
-        error,
-      );
-      console.error(`[startSession] Error details:`, {
-        message: error.message,
-        stack: error.stack,
-        isRetry,
-        transactionHash,
-        errorType: error.constructor.name,
-      });
-
-      // Re-throw the error to maintain the original behavior
-      throw error;
-    }
-  }
-
-  async getSessionStatus(fid: number): Promise<SessionStatusDto> {
-    const user = await this.userRepository.findOne({ where: { fid } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    await this.resetDailyStatus(user);
-
-    const session = this.activeSessions.get(fid);
-    const now = Date.now();
-
-    let isActive = false;
-    let timeRemaining = 0;
-
-    if (session && now < session.expiresAt) {
-      isActive = true;
-      timeRemaining = session.expiresAt - now;
-    }
-
-    return {
-      isActive,
-      timeRemaining,
-      canSignal: !user.submittedSignalToday,
-      canRetry: !user.usedRetryToday && !user.submittedSignalToday,
-      hasSignaledToday: user.submittedSignalToday,
-      hasUsedRetry: user.usedRetryToday,
-      suggestedTokens: user.defaultTokens?.map(token => ({
-        address: token.ca,
-        ticker: token.ticker,
-      })) || null,
-    };
-  }
-
-  async setDefaultTokens(
-    fid: number,
-    tokens: Array<{ ca: string; ticker: string }>,
-  ): Promise<void> {
-    if (tokens.length !== 8) {
-      throw new HttpException(
-        'Must provide exactly 8 default tokens',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const user = await this.userRepository.findOne({ where: { fid } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    user.defaultTokens = tokens;
-    await this.userRepository.save(user);
-
-    this.logger.log(`Updated default tokens for FID ${fid}`);
-  }
-
-  async createSignal(
-    createSignalDto: CreateSignalDto,
-  ): Promise<SignalResponseDto> {
-    const { fid, tokenAddress, symbol, initialMarketCap, direction } = createSignalDto;
-
-    // Validate session
-    const session = this.activeSessions.get(fid);
-    if (!session || Date.now() > session.expiresAt) {
-      throw new HttpException(
-        'No active session or session expired',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // Get user
-    const user = await this.userRepository.findOne({ where: { fid } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    await this.resetDailyStatus(user);
-
-    // Check if already signaled today
-    if (user.submittedSignalToday) {
-      throw new ConflictException('Already signaled today');
-    }
-
-    // Validate token data
-    if (!tokenAddress || !symbol || !initialMarketCap) {
-      throw new HttpException(
-        'Token address, symbol, and initial market cap are required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // Generate signal ID
-    const signalId = `signal-${Date.now()}-${fid}`;
-
-    // Calculate expiration (24 hours from now)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    // Create signal
-    const signal = this.signalRepository.create({
-      signalId,
-      tokenAddress,
-      symbol,
-      initialMarketCap: Number(initialMarketCap),
-      direction,
-      timestamp: Date.now(),
-      expiresAt,
-      status: 'ACTIVE',
-      fid,
-      user,
+  async getSignalsFeedForUser(fid: number): Promise<SignalResponseDto[]> {
+    const signals = await this.signalRepository.find({
+      where: { fid },
+      relations: ['user', 'token'],
     });
+    return signals.map((signal) => this.mapToResponseDto(signal));
+  }
 
-    const savedSignal = await this.signalRepository.save(signal);
-
-    // Update user status
-    user.submittedSignalToday = true;
-    user.totalSignals += 1;
-    user.activeSignals += 1;
-    await this.userRepository.save(user);
-
-    // End session
-    this.activeSessions.delete(fid);
-
-    this.logger.log(`Signal created: ${signalId} by FID ${fid}`);
-
-    return this.mapToResponseDto(savedSignal);
+  async getFavoriteTwentySignalersForFid(
+    fid: number,
+  ): Promise<SignalResponseDto[]> {
+    const signals = await this.signalRepository.find({
+      order: { timestamp: 'DESC' },
+      take: 20,
+      relations: ['user', 'token'],
+    });
+    return signals.map((signal) => this.mapToResponseDto(signal));
   }
 
   async getSignalsFeed(
@@ -342,7 +97,7 @@ export class SignalService {
       order: { timestamp: 'DESC' },
       take: limit,
       skip: offset,
-      relations: ['user'],
+      relations: ['user', 'token'],
     };
 
     const [signals, total] = await Promise.all([
@@ -361,54 +116,57 @@ export class SignalService {
     };
   }
 
-  async getSignalById(signalId: string): Promise<SignalResponseDto> {
+  async getSignalById(transaction_hash: string): Promise<SignalResponseDto> {
     const signal = await this.signalRepository.findOne({
-      where: { signalId },
-      relations: ['user'],
+      where: { transaction_hash: transaction_hash },
+      relations: ['user', 'token'],
     });
 
     if (!signal) {
-      throw new NotFoundException(`Signal with ID ${signalId} not found`);
+      throw new NotFoundException(
+        `Signal with transaction_hash ${transaction_hash} not found`,
+      );
     }
 
     return this.mapToResponseDto(signal);
   }
 
   async settleSignal(
-    signalId: string,
-    exitMarketCaps: string[],
-    correctPredictions: number,
+    transaction_hash: string,
+    exitMarketCap: string,
+    isCorrect: boolean,
   ): Promise<SignalResponseDto> {
     const signal = await this.signalRepository.findOne({
-      where: { signalId },
-      relations: ['user'],
+      where: { transaction_hash: transaction_hash },
+      relations: ['user', 'token'],
     });
 
     if (!signal) {
-      throw new NotFoundException(`Signal with ID ${signalId} not found`);
+      throw new NotFoundException(
+        `Signal with transaction_hash ${transaction_hash} not found`,
+      );
     }
 
-    if (signal.status !== 'ACTIVE') {
+    if (signal.status !== SignalStatus.ACTIVE) {
       throw new ConflictException('Signal is not active');
     }
 
-    // Validate exit market caps
-    if (exitMarketCaps.length !== 8) {
+    // Validate exit market cap
+    if (!exitMarketCap) {
       throw new HttpException(
-        'Must provide exactly 8 exit market caps',
+        'Exit market cap is required',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    // Determine status based on correct predictions (>4 = win)
-    const isWin = correctPredictions > 4;
-    const isExpired = Date.now() >= signal.expiresAt.getTime();
+    // Determine status based on prediction correctness
+    const isExpired = new Date() >= signal.expires_at;
 
-    let newStatus: 'WON' | 'LOST' | 'EXPIRED';
+    let newStatus: SignalStatus;
     if (isExpired) {
-      newStatus = 'EXPIRED';
+      newStatus = SignalStatus.LOST; // Expired signals are considered lost
     } else {
-      newStatus = isWin ? 'WON' : 'LOST';
+      newStatus = isCorrect ? SignalStatus.WON : SignalStatus.LOST;
     }
 
     // Update signal
@@ -420,7 +178,7 @@ export class SignalService {
     await this.updateUserStats(signal.user);
 
     this.logger.log(
-      `Signal settled: ${signalId} - Status: ${newStatus}, Correct: ${correctPredictions}/8`,
+      `Signal settled: ${transaction_hash} - Status: ${newStatus}, Correct: ${isCorrect}`,
     );
 
     return this.mapToResponseDto(savedSignal);
@@ -437,13 +195,13 @@ export class SignalService {
 
     const totalSignals = userWithSignals.signals.length;
     const activeSignals = userWithSignals.signals.filter(
-      (s) => s.status === 'ACTIVE',
+      (s) => s.status === SignalStatus.ACTIVE,
     ).length;
     const settledSignals = userWithSignals.signals.filter((s) =>
-      ['WON', 'LOST', 'EXPIRED'].includes(s.status),
+      [SignalStatus.WON, SignalStatus.LOST].includes(s.status),
     ).length;
     const wonSignals = userWithSignals.signals.filter(
-      (s) => s.status === 'WON',
+      (s) => s.status === SignalStatus.WON,
     ).length;
 
     const winRate =
@@ -458,35 +216,60 @@ export class SignalService {
     }
 
     // Update user
-    userWithSignals.totalSignals = totalSignals;
-    userWithSignals.activeSignals = activeSignals;
-    userWithSignals.settledSignals = settledSignals;
-    userWithSignals.winRate = winRate;
-    userWithSignals.mfsScore = mfsScore;
+    userWithSignals.total_signals = totalSignals;
+    userWithSignals.active_signals = activeSignals;
+    userWithSignals.settled_signals = settledSignals;
+    userWithSignals.win_rate = winRate;
+    userWithSignals.mfs_score = mfsScore;
 
     await this.userRepository.save(userWithSignals);
   }
 
   private mapToResponseDto(signal: Signal): SignalResponseDto {
+    // Convert boolean direction to uppercase string for API response
+    const directionString = signal.direction ? 'UP' : 'DOWN';
+
+    // Convert numeric status to string
+    const statusString =
+      signal.status === SignalStatus.ACTIVE
+        ? 'ACTIVE'
+        : signal.status === SignalStatus.WON
+          ? 'WON'
+          : 'LOST';
+
     return {
-      signalId: signal.signalId,
+      transaction_hash: signal.transaction_hash,
       fid: signal.fid,
-      tokenAddress: signal.tokenAddress,
-      symbol: signal.symbol,
-      initialMarketCap: signal.initialMarketCap.toString(),
-      direction: signal.direction,
+      ca: signal.ca,
+      mc: signal.mc,
+      direction: directionString === 'UP',
       timestamp: signal.timestamp,
-      expiresAt: signal.expiresAt,
-      status: signal.status,
-      createdAt: signal.createdAt,
+      block_number: signal.block_number,
+      expires_at: signal.expires_at,
+      status:
+        statusString === 'ACTIVE'
+          ? SignalStatus.ACTIVE
+          : statusString === 'WON'
+            ? SignalStatus.WON
+            : SignalStatus.LOST,
+      duration: signal.duration,
       user: {
         fid: signal.user.fid,
         username: signal.user.username,
-        pfpUrl: signal.user.pfpUrl,
-        totalSignals: signal.user.totalSignals,
-        winRate: signal.user.winRate,
-        mfsScore: signal.user.mfsScore,
+        pfp_url: signal.user.pfp_url,
+        total_signals: signal.user.total_signals,
+        win_rate: signal.user.win_rate,
+        mfs_score: signal.user.mfs_score,
+        display_name: signal.user.display_name,
       },
+      token: signal.token
+        ? {
+            ca: signal.token.ca,
+            name: signal.token.name,
+            symbol: signal.token.symbol,
+            image: signal.token.image,
+          }
+        : undefined,
     };
   }
 }

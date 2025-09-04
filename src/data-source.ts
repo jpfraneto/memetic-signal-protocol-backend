@@ -26,7 +26,7 @@ export const AppDataSource = new DataSource({
         database: getConfig().db.name,
       }),
   entities: [User, NotificationQueue, Signal, Token, FidStats, WalletAuthorization, DailySignalCount, FidBan, WalletBan],
-  migrations: ['src/migrations/*.ts'],
+  migrations: [],
   subscribers: ['src/database/subscribers/*.ts'],
   synchronize: false, // Always false for CLI commands
   logging: getConfig().isProduction ? false : 'all',

@@ -436,8 +436,7 @@ export class MeEndpointService {
    */
   async getFeaturedTokensWithFallback(fid: number): Promise<any[]> {
     const cacheKey = `tokens:trending:${fid}`;
-    const cachedTokens =
-      await this.cacheManager.get<FeaturedTokenDto[]>(cacheKey);
+    const cachedTokens = await this.cacheManager.get<any[]>(cacheKey);
 
     if (cachedTokens) {
       this.logger.log('[/me] Using cached trending tokens');
@@ -445,10 +444,29 @@ export class MeEndpointService {
     }
 
     try {
-      const trendingTokens = await this.zapperService.getTrendingTokens(fid, 8);
+      const zapperTokens = await this.zapperService.getTrendingTokens(fid, 8);
+      
+      // Format Zapper tokens to match frontend Token interface expectations
+      const formattedTokens = zapperTokens.map(zapperToken => ({
+        ca: zapperToken.tokenAddress.toLowerCase(),
+        name: zapperToken.token.name,
+        symbol: zapperToken.token.symbol,
+        image: zapperToken.token.imageUrlV2 || '',
+        created_at: new Date(),
+        updated_at: new Date(),
+        market_data: {
+          current_price: zapperToken.token.priceData.price || 0,
+          ath: 0, // Zapper doesn't provide ATH data, set default
+          ath_change_percentage: 0, // Zapper doesn't provide ATH change, set default
+          ath_date: new Date(), // Default date
+          market_cap: zapperToken.token.priceData.marketCap || 0,
+          price_change_24h: zapperToken.token.priceData.priceChange24h || 0,
+        }
+      }));
+
       // Cache for 5 minutes
-      await this.cacheManager.set(cacheKey, trendingTokens, 5 * 60 * 1000);
-      return trendingTokens;
+      await this.cacheManager.set(cacheKey, formattedTokens, 5 * 60 * 1000);
+      return formattedTokens;
     } catch (error) {
       this.logger.error(
         '[/me] Zapper API failed, trying cached fallback:',
@@ -457,8 +475,7 @@ export class MeEndpointService {
 
       // Try global cache as fallback
       const globalCacheKey = 'tokens:trending:global';
-      const globalCached =
-        await this.cacheManager.get<FeaturedTokenDto[]>(globalCacheKey);
+      const globalCached = await this.cacheManager.get<any[]>(globalCacheKey);
 
       if (globalCached) {
         return globalCached;

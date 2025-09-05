@@ -206,13 +206,16 @@ const domains: Domains = {
     'https://localhost:3000',
     'https://miniapp.anky.app',
     'https://sigil.lat',
+    'https://www.sigil.lat',
   ],
   STAGING: [
     'https://staging-msp.app',
     'https://dev-msp.app',
     'https://msp.lat',
+    'https://sigil.lat',
+    'https://www.sigil.lat',
   ],
-  PRO: ['https://sigil.lat', '*'],
+  PRO: ['https://sigil.lat', 'https://www.sigil.lat'],
 };
 
 export default domains;

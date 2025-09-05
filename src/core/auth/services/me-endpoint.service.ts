@@ -17,7 +17,6 @@ import {
   MeEndpointResponseDto,
   UserProfileDto,
   FeaturedTokenDto,
-  LeaderboardDto,
   LeaderboardUserDto,
   ErrorResponseDto,
   ErrorDetailsDto,
@@ -76,7 +75,7 @@ export class MeEndpointService {
         leaderboard:
           leaderboard.status === 'fulfilled'
             ? leaderboard.value
-            : { topByScore: [] },
+            : [],
       };
 
       const duration = Date.now() - startTime;
@@ -489,10 +488,10 @@ export class MeEndpointService {
   /**
    * Get leaderboards with caching and fallback
    */
-  async getLeaderboardsWithFallback(): Promise<LeaderboardDto> {
+  async getLeaderboardsWithFallback(): Promise<LeaderboardUserDto[]> {
     const cacheKey = 'leaderboards:all';
     const cachedLeaderboards =
-      await this.cacheManager.get<LeaderboardDto>(cacheKey);
+      await this.cacheManager.get<LeaderboardUserDto[]>(cacheKey);
 
     if (cachedLeaderboards) {
       this.logger.log('[/me] Using cached leaderboard data');
@@ -506,14 +505,14 @@ export class MeEndpointService {
       return leaderboards;
     } catch (error) {
       this.logger.error('[/me] Leaderboard query failed:', error);
-      return { topByScore: [] };
+      return [];
     }
   }
 
   /**
    * Get leaderboard data with optimized queries
    */
-  async getLeaderboards(): Promise<LeaderboardDto> {
+  async getLeaderboards(): Promise<LeaderboardUserDto[]> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
 
@@ -540,7 +539,7 @@ export class MeEndpointService {
         }),
       );
 
-      return { topByScore };
+      return topByScore;
     } finally {
       await queryRunner.release();
     }

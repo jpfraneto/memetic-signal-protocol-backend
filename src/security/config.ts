@@ -203,28 +203,16 @@ const domains: Domains = {
   LOCAL: [
     'http://127.0.0.1:5173',
     'http://localhost:5173',
-    'https://msp.app',
-    'https://msp.lat',
-    'https://www.msp.lat',
     'https://localhost:3000',
     'https://miniapp.anky.app',
+    'https://sigil.lat',
   ],
   STAGING: [
     'https://staging-msp.app',
     'https://dev-msp.app',
     'https://msp.lat',
   ],
-  PRO: [
-    'http://127.0.0.1:5173',
-    'http://localhost:5173',
-    'https://msp.app',
-    'https://msp.lat',
-    'https://www.msp.lat',
-    'https://www.msp.app',
-    'https://frame.msp.app',
-    'https://api.msp.app',
-    '*',
-  ],
+  PRO: ['https://sigil.lat', '*'],
 };
 
 export default domains;

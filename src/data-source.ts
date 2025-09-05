@@ -25,7 +25,17 @@ export const AppDataSource = new DataSource({
         password: getConfig().db.password,
         database: getConfig().db.name,
       }),
-  entities: [User, NotificationQueue, Signal, Token, FidStats, WalletAuthorization, DailySignalCount, FidBan, WalletBan],
+  entities: [
+    User,
+    NotificationQueue,
+    Signal,
+    Token,
+    FidStats,
+    WalletAuthorization,
+    DailySignalCount,
+    FidBan,
+    WalletBan,
+  ],
   migrations: [],
   subscribers: ['src/database/subscribers/*.ts'],
   synchronize: false, // Always false for CLI commands

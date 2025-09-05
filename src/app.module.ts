@@ -11,7 +11,13 @@ import { HealthModule } from './health';
 // Cache
 import { RedisCacheModule } from './cache/cache.module';
 // Models
-import { User, Signal, NotificationQueue, Token, PriceSnapshot } from './models';
+import {
+  User,
+  Signal,
+  NotificationQueue,
+  Token,
+  PriceSnapshot,
+} from './models';
 // Ponder entities
 import { FidStats } from './models/FidStats/FidStats.model';
 import { WalletAuthorization } from './models/WalletAuthorization/WalletAuthorization.model';
@@ -42,7 +48,18 @@ import { WalletBan } from './models/WalletBan/WalletBan.model';
           ssl,
           synchronize: false,
           logging: false,
-          entities: [User, Signal, NotificationQueue, Token, PriceSnapshot, FidStats, WalletAuthorization, DailySignalCount, FidBan, WalletBan],
+          entities: [
+            User,
+            Signal,
+            NotificationQueue,
+            Token,
+            PriceSnapshot,
+            FidStats,
+            WalletAuthorization,
+            DailySignalCount,
+            FidBan,
+            WalletBan,
+          ],
           // Pool (pg uses max instead of connectionLimit)
           extra: { max: 10 },
           autoLoadEntities: false, // using explicit entities array above

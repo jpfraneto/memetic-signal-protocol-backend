@@ -11,7 +11,7 @@
     "start": "bunx nest start",
     "start:dev": "bunx nest start --watch",
     "start:debug": "bunx nest start --debug --watch",
-    "start:prod": "bun run dist/src/main.js",
+    "start:prod": "bun run dist/main.js",
     "typeorm:run": "bunx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/data-source.ts",
     "typeorm:gen": "bunx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate src/migrations/auto -d src/data-source.ts",
     "typeorm:revert": "bunx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/data-source.ts",

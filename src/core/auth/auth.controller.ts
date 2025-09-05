@@ -157,8 +157,6 @@ export class AuthController {
       logger.log(
         `[/me] Successfully completed request for FID ${fid} in ${duration}ms`,
       );
-      console.log('THE COMPLETE DATA IS', completeData);
-      console.log('THE COMPLETE DATA IS', completeData.feedData.signals);
 
       return res.status(200).send(completeData);
     } catch (error) {

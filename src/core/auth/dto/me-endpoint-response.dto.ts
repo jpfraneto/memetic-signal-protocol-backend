@@ -94,25 +94,12 @@ export class LeaderboardUserDto {
   winRate?: number;
 }
 
-export class LeaderboardsDto {
+export class LeaderboardDto {
   @ApiProperty({
     description: 'Top 3 users by score',
     type: [LeaderboardUserDto],
   })
   topByScore: LeaderboardUserDto[];
-
-  @ApiProperty({
-    description: 'Top 3 users by signal count',
-    type: [LeaderboardUserDto],
-  })
-  mostSignals: LeaderboardUserDto[];
-
-  @ApiProperty({
-    description: 'Current champion (highest score)',
-    type: LeaderboardUserDto,
-    nullable: true,
-  })
-  champion: LeaderboardUserDto | null;
 }
 
 export class MeEndpointResponseDto {
@@ -133,8 +120,8 @@ export class MeEndpointResponseDto {
   })
   featuredTokens: FeaturedTokenDto[];
 
-  @ApiProperty({ description: 'Leaderboard data', type: LeaderboardsDto })
-  leaderboards: LeaderboardsDto;
+  @ApiProperty({ description: 'Leaderboard data', type: LeaderboardDto })
+  leaderboard: LeaderboardDto;
 }
 
 export class ErrorDetailsDto {

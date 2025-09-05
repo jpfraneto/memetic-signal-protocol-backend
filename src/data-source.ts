@@ -29,7 +29,7 @@ export const AppDataSource = new DataSource({
   migrations: [],
   subscribers: ['src/database/subscribers/*.ts'],
   synchronize: false, // Always false for CLI commands
-  logging: getConfig().isProduction ? false : 'all',
+  logging: false,
   ssl: getConfig().db.requireSSL ? { rejectUnauthorized: false } : false,
   extra: {
     connectionLimit: 10,

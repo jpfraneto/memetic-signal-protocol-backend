@@ -17,7 +17,7 @@ import {
   MeEndpointResponseDto,
   UserProfileDto,
   FeaturedTokenDto,
-  LeaderboardsDto,
+  LeaderboardDto,
   LeaderboardUserDto,
   ErrorResponseDto,
   ErrorDetailsDto,
@@ -58,13 +58,11 @@ export class MeEndpointService {
       this.logger.log(`[/me] User validated: ${user.username} (${user.fid})`);
 
       // 2. Get all data in parallel with fallbacks
-      const [feedData, featuredTokens, leaderboards] = await Promise.allSettled(
-        [
-          this.getFeedDataWithFallback(),
-          this.getFeaturedTokensWithFallback(fid),
-          this.getLeaderboardsWithFallback(),
-        ],
-      );
+      const [feedData, featuredTokens, leaderboard] = await Promise.allSettled([
+        this.getFeedDataWithFallback(),
+        this.getFeaturedTokensWithFallback(fid),
+        this.getLeaderboardsWithFallback(),
+      ]);
 
       const response: MeEndpointResponseDto = {
         success: true,
@@ -75,10 +73,10 @@ export class MeEndpointService {
             : { signals: [], totalCount: 0 },
         featuredTokens:
           featuredTokens.status === 'fulfilled' ? featuredTokens.value : [],
-        leaderboards:
-          leaderboards.status === 'fulfilled'
-            ? leaderboards.value
-            : { topByScore: [], mostSignals: [], champion: null },
+        leaderboard:
+          leaderboard.status === 'fulfilled'
+            ? leaderboard.value
+            : { topByScore: [] },
       };
 
       const duration = Date.now() - startTime;
@@ -91,7 +89,7 @@ export class MeEndpointService {
         userSuccess: true,
         feedSuccess: feedData.status === 'fulfilled',
         tokensSuccess: featuredTokens.status === 'fulfilled',
-        leaderboardSuccess: leaderboards.status === 'fulfilled',
+        leaderboardSuccess: leaderboard.status === 'fulfilled',
       });
 
       return response;
@@ -201,6 +199,7 @@ export class MeEndpointService {
     }>(cacheKey);
 
     if (cachedFeed) {
+      console.log('THE CACHED FEED IS', cachedFeed);
       this.logger.log('[/me] Using cached feed data');
       return cachedFeed;
     }
@@ -229,7 +228,7 @@ export class MeEndpointService {
     try {
       const query = `
         SELECT 
-          s.transaction_hash,  -- Changed from s.id
+          s.transaction_hash,
           s.fid,
           s.ca,
           s.mc,
@@ -242,9 +241,43 @@ export class MeEndpointService {
           u.username,
           u.display_name,
           u.pfp_url,
+          u.is_verified,
+          u.follower_count,
+          u.following_count,
+          u.mfs_score,
+          u.win_rate,
+          u.total_signals,
+          u.active_signals,
+          u.settled_signals,
+          u.total_score,
+          u.rank,
+          u.last_score_update,
+          u.role,
+          u.is_banned,
+          u.banned_at,
+          u.notifications_enabled,
+          u.notification_token,
+          u.notification_url,
+          u.last_signal_date,
+          u.state_on_the_system,
+          u.wallet_address,
+          u.jbm_balance,
+          u.created_at as user_created_at,
+          u.updated_at as user_updated_at,
+          u.last_active_at,
           t.name as token_name,
           t.symbol as token_symbol,
+          t.decimals,
+          t.categories,
+          t.description,
           t.image as token_image,
+          t.image_small,
+          t.image_thumb,
+          t.market_cap_rank,
+          t.market_data,
+          t.created_at as token_created_at,
+          t.updated_at as token_updated_at,
+          t.coin_id,
           ps_initial.market_cap as initial_market_cap,
           ps_current.market_cap as current_market_cap
         FROM signals s
@@ -252,12 +285,12 @@ export class MeEndpointService {
         LEFT JOIN tokens t ON LOWER(s.ca) = LOWER(t.ca)
         LEFT JOIN price_snapshots ps_initial ON (
           LOWER(ps_initial.token_address) = LOWER(s.ca) 
-          AND ps_initial.snapshot_at <= s.timestamp  -- Direct bigint comparison
+          AND ps_initial.snapshot_at <= s.timestamp
           AND ps_initial.snapshot_at = (
             SELECT MAX(snapshot_at) 
             FROM price_snapshots 
             WHERE LOWER(token_address) = LOWER(s.ca) 
-              AND snapshot_at <= s.timestamp  -- Direct bigint comparison
+              AND snapshot_at <= s.timestamp
           )
         )
         LEFT JOIN price_snapshots ps_current ON (
@@ -277,30 +310,77 @@ export class MeEndpointService {
         'SELECT COUNT(*) as count FROM signals',
       );
       const totalCount = parseInt(totalCountQuery[0].count);
-      console.log('THE RESULTS ARE', results);
 
-      const signals: Signal[] = results.map((row: any) => ({
-        transaction_hash: row.transaction_hash,
-        fid: row.fid,
-        username: row.username || 'Unknown',
-        display_name: row.display_name,
-        pfp_url: row.pfp_url,
-        ca: row.ca,
-        name: row.token_name || 'Unknown Token',
-        symbol: row.token_symbol || 'UNKNOWN',
-        image: row.token_image || '',
-        direction: row.direction,
-        duration: row.duration,
-        timestamp: row.timestamp.toString(),
-        status: row.status,
-        expires_at: row.expires_at.toString(),
-        mc: row.mc,
-        current_market_cap: row.current_market_cap,
-        price_change: this.calculatePriceChange(row.mc, row.current_market_cap),
-        block_number: row.block_number.toString(),
-        token: row.token as Token,
-        user: row.user as User,
-      }));
+      const signals: Signal[] = results.map((row: any) => {
+        // Create User object
+        const user: User = {
+          fid: row.fid,
+          username: row.username || 'Unknown',
+          display_name: row.display_name,
+          pfp_url: row.pfp_url,
+          is_verified: row.is_verified || false,
+          follower_count: row.follower_count || 0,
+          following_count: row.following_count || 0,
+          mfs_score: row.mfs_score || 0,
+          win_rate: row.win_rate || 0,
+          total_signals: row.total_signals || 0,
+          active_signals: row.active_signals || 0,
+          settled_signals: row.settled_signals || 0,
+          total_score: row.total_score || 0,
+          rank: row.rank,
+          last_score_update: row.last_score_update,
+          role: row.role || 'USER',
+          is_banned: row.is_banned || false,
+          banned_at: row.banned_at,
+          notifications_enabled: row.notifications_enabled !== false,
+          notification_token: row.notification_token,
+          notification_url: row.notification_url,
+          last_signal_date: row.last_signal_date,
+          state_on_the_system: row.state_on_the_system || 'ACTIVE',
+          wallet_address: row.wallet_address,
+          jbm_balance: row.jbm_balance || '0',
+          created_at: row.user_created_at,
+          updated_at: row.user_updated_at,
+          last_active_at: row.last_active_at,
+          signals: [], // Will be populated if needed
+        };
+
+        // Create Token object
+        const token: Token = {
+          ca: row.ca,
+          name: row.token_name || 'Unknown Token',
+          symbol: row.token_symbol || 'UNKNOWN',
+          decimals: row.decimals || 18,
+          categories: row.categories || [],
+          description: row.description,
+          image: row.token_image || '',
+          image_small: row.image_small,
+          image_thumb: row.image_thumb,
+          market_cap_rank: row.market_cap_rank,
+          market_data: row.market_data,
+          created_at: row.token_created_at,
+          updated_at: row.token_updated_at,
+          coin_id: row.coin_id,
+        };
+
+        // Create Signal object with proper structure
+        const signal: Signal = {
+          transaction_hash: row.transaction_hash,
+          fid: row.fid,
+          ca: row.ca,
+          direction: row.direction,
+          duration: row.duration,
+          mc: row.mc,
+          timestamp: row.timestamp.toString(),
+          block_number: row.block_number,
+          status: row.status,
+          expires_at: row.expires_at,
+          user: user,
+          token: token,
+        };
+
+        return signal;
+      });
 
       return { signals, totalCount };
     } finally {
@@ -392,10 +472,10 @@ export class MeEndpointService {
   /**
    * Get leaderboards with caching and fallback
    */
-  async getLeaderboardsWithFallback(): Promise<LeaderboardsDto> {
+  async getLeaderboardsWithFallback(): Promise<LeaderboardDto> {
     const cacheKey = 'leaderboards:all';
     const cachedLeaderboards =
-      await this.cacheManager.get<LeaderboardsDto>(cacheKey);
+      await this.cacheManager.get<LeaderboardDto>(cacheKey);
 
     if (cachedLeaderboards) {
       this.logger.log('[/me] Using cached leaderboard data');
@@ -409,46 +489,29 @@ export class MeEndpointService {
       return leaderboards;
     } catch (error) {
       this.logger.error('[/me] Leaderboard query failed:', error);
-      return { topByScore: [], mostSignals: [], champion: null };
+      return { topByScore: [] };
     }
   }
 
   /**
    * Get leaderboard data with optimized queries
    */
-  async getLeaderboards(): Promise<LeaderboardsDto> {
+  async getLeaderboards(): Promise<LeaderboardDto> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
 
     try {
       // Execute all leaderboard queries in parallel
-      const [topByScoreResults, mostSignalsResults, championResults] =
-        await Promise.all([
-          // Top 3 by score
-          queryRunner.query(`
+      const [topByScoreResults] = await Promise.all([
+        // Top 20 by score
+        queryRunner.query(`
           SELECT fid, username, display_name, pfp_url, total_score 
           FROM users 
           WHERE total_score > 0 
           ORDER BY total_score DESC 
-          LIMIT 3
+          LIMIT 20
         `),
-          // Top 3 by signal count
-          queryRunner.query(`
-          SELECT fid, username, display_name, pfp_url, total_signals 
-          FROM users 
-          WHERE total_signals > 0 
-          ORDER BY total_signals DESC 
-          LIMIT 3
-        `),
-          // Champion (highest score)
-          queryRunner.query(`
-          SELECT fid, username, display_name, pfp_url, total_score, total_signals, win_rate 
-          FROM users 
-          WHERE total_score > 0 
-          ORDER BY total_score DESC 
-          LIMIT 1
-        `),
-        ]);
+      ]);
 
       const topByScore: LeaderboardUserDto[] = topByScoreResults.map(
         (row: any) => ({
@@ -460,30 +523,7 @@ export class MeEndpointService {
         }),
       );
 
-      const mostSignals: LeaderboardUserDto[] = mostSignalsResults.map(
-        (row: any) => ({
-          fid: row.fid,
-          username: row.username,
-          displayName: row.display_name,
-          pfpUrl: row.pfp_url,
-          totalSignals: row.total_signals,
-        }),
-      );
-
-      const champion: LeaderboardUserDto | null =
-        championResults.length > 0
-          ? {
-              fid: championResults[0].fid,
-              username: championResults[0].username,
-              displayName: championResults[0].display_name,
-              pfpUrl: championResults[0].pfp_url,
-              totalScore: championResults[0].total_score,
-              totalSignals: championResults[0].total_signals,
-              winRate: championResults[0].win_rate,
-            }
-          : null;
-
-      return { topByScore, mostSignals, champion };
+      return { topByScore };
     } finally {
       await queryRunner.release();
     }

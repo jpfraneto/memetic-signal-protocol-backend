@@ -70,7 +70,22 @@ export class SimpleTokenService {
       await this.updateTokenPrice(token);
     }
 
-    console.log('THE TOKEN HERE IS', JSON.stringify(token, null, 2));
+    // Ensure market_data is properly parsed
+    if (token && token.market_data && typeof token.market_data === 'string') {
+      try {
+        token.market_data = JSON.parse(token.market_data);
+      } catch (error) {
+        this.logger.warn(`Failed to parse market_data for token ${token.ca}:`, error);
+        token.market_data = {
+          current_price: 0,
+          ath: 0,
+          ath_change_percentage: 0,
+          ath_date: '',
+          market_cap: 0,
+          price_change_24h: 0,
+        };
+      }
+    }
 
     return token;
   }
@@ -295,15 +310,27 @@ export class SimpleTokenService {
 
       let priceUpdated = false;
 
+      // Ensure market_data is an object, not a string
+      let marketData: any;
+      if (typeof token.market_data === 'string') {
+        try {
+          marketData = JSON.parse(token.market_data);
+        } catch {
+          marketData = {};
+        }
+      } else {
+        marketData = token.market_data || {};
+      }
+
       if (response.ok) {
         const data = await response.json();
         const tokenData = data[token.ca];
 
         if (tokenData) {
-          token.market_data.current_price = tokenData.usd || 0;
-          token.market_data.price_change_24h = tokenData.usd_24h_change;
-          token.market_data.market_cap = tokenData.usd_market_cap;
-          // Let TypeORM handle the updated_at timestamp automatically
+          marketData.current_price = tokenData.usd || 0;
+          marketData.price_change_24h = tokenData.usd_24h_change;
+          marketData.market_cap = tokenData.usd_market_cap;
+          token.market_data = marketData;
           priceUpdated = true;
         }
       } else if (response.status === 429) {
@@ -321,11 +348,11 @@ export class SimpleTokenService {
             token.ca,
           );
           if (dexScreenerPriceData) {
-            token.market_data.current_price = dexScreenerPriceData.price || 0;
-            token.market_data.price_change_24h =
+            marketData.current_price = dexScreenerPriceData.price || 0;
+            marketData.price_change_24h =
               dexScreenerPriceData.price_change_24h || 0;
-            token.market_data.market_cap = dexScreenerPriceData.market_cap || 0;
-            // Let TypeORM handle the updated_at timestamp automatically
+            marketData.market_cap = dexScreenerPriceData.market_cap || 0;
+            token.market_data = marketData;
             priceUpdated = true;
             this.logger.log(
               `Updated price for ${token.ca} using DexScreener fallback`,

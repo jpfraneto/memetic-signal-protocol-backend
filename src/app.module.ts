@@ -41,7 +41,7 @@ import { WalletBan } from './models/WalletBan/WalletBan.model';
           url,
           ssl,
           synchronize: false,
-          logging: getConfig().isProduction ? false : 'all',
+          logging: false,
           entities: [User, Signal, NotificationQueue, Token, PriceSnapshot, FidStats, WalletAuthorization, DailySignalCount, FidBan, WalletBan],
           // Pool (pg uses max instead of connectionLimit)
           extra: { max: 10 },

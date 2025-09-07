@@ -867,7 +867,7 @@ export class AuthController {
     );
 
     const domain = {
-      name: 'ProjectLighthouseV19',
+      name: 'ProjectLighthouseV18-Min',
       version: '1',
       chainId: 8453,
       verifyingContract: config.blockchain.contractAddress as `0x${string}`,

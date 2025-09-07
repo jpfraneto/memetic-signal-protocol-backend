@@ -12,6 +12,8 @@ import {
   NotificationDetails,
 } from '../../../models/NotificationQueue';
 import { FarcasterNotificationResponse } from './notification.types';
+import { NeynarAPIClient } from '@neynar/nodejs-sdk';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class NotificationService {
@@ -20,6 +22,7 @@ export class NotificationService {
   private rateLimitTracker = new Map<string, number[]>();
   private isProcessing = false;
   private lastProcessingTime = 0;
+  private neynarClient: NeynarAPIClient | null = null;
 
   constructor(
     @InjectRepository(User)
@@ -29,7 +32,16 @@ export class NotificationService {
     private readonly queueRepository: Repository<NotificationQueue>,
 
     private readonly userService: UserService,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    const apiKey = this.configService.get<string>('NEYNAR_API_KEY');
+    if (apiKey) {
+      this.neynarClient = new NeynarAPIClient({ apiKey });
+      this.logger.log('Neynar client initialized for signal settlement notifications');
+    } else {
+      this.logger.warn('NEYNAR_API_KEY not found, signal settlement notifications will be disabled');
+    }
+  }
 
   /**
    * Handles when a user adds the frame to their profile
@@ -634,6 +646,109 @@ export class NotificationService {
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * Sends signal settlement notification via Neynar
+   */
+  async sendSignalSettledNotification(
+    fid: number,
+    signalResult: {
+      tokenSymbol: string;
+      direction: 'UP' | 'DOWN';
+      duration: number;
+      won: boolean;
+      mfsScore: number;
+    }
+  ): Promise<boolean> {
+    if (!this.neynarClient) {
+      this.logger.warn('Neynar client not initialized, skipping signal notification');
+      return false;
+    }
+
+    try {
+      const { tokenSymbol, direction, duration, won, mfsScore } = signalResult;
+      
+      const resultEmoji = won ? '🎉' : '📉';
+      const resultText = won ? 'won' : 'lost';
+      const scoreSign = mfsScore >= 0 ? '+' : '';
+      
+      // Format score based on magnitude
+      let formattedScore;
+      if (Math.abs(mfsScore) >= 1000000) {
+        formattedScore = `${scoreSign}${(mfsScore / 1000000).toFixed(2)}M`;
+      } else if (Math.abs(mfsScore) >= 1000) {
+        formattedScore = `${scoreSign}${(mfsScore / 1000).toFixed(2)}K`;
+      } else {
+        formattedScore = `${scoreSign}${mfsScore.toFixed(2)}`;
+      }
+      
+      const mfsText = `MFS: ${formattedScore}`;
+      
+      const title = `${resultEmoji} Signal Settled`;
+      const body = `Your ${direction} signal on ${tokenSymbol} (${duration}d) ${resultText}! ${mfsText}`;
+      const targetUrl = `${this.config.notifications.baseUrl || 'https://sigil.lat'}/signal`;
+
+      await this.neynarClient.publishFrameNotifications({
+        targetFids: [fid],
+        notification: {
+          title,
+          body,
+          target_url: targetUrl,
+        },
+      });
+
+      this.logger.log(`Signal settlement notification sent to FID ${fid}: ${title} - ${body}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send signal settlement notification to FID ${fid}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Sends batch signal settlement notifications via Neynar
+   */
+  async sendBatchSignalNotifications(
+    notifications: Array<{
+      fid: number;
+      signalResult: {
+        tokenSymbol: string;
+        direction: 'UP' | 'DOWN';
+        duration: number;
+        won: boolean;
+        mfsScore: number;
+      };
+    }>
+  ): Promise<{ sent: number; failed: number }> {
+    if (!this.neynarClient) {
+      this.logger.warn('Neynar client not initialized, skipping batch notifications');
+      return { sent: 0, failed: notifications.length };
+    }
+
+    this.logger.log(`Sending batch signal settlement notifications to ${notifications.length} users`);
+    
+    let sent = 0;
+    let failed = 0;
+
+    for (const notification of notifications) {
+      const success = await this.sendSignalSettledNotification(
+        notification.fid,
+        notification.signalResult
+      );
+      
+      if (success) {
+        sent++;
+      } else {
+        failed++;
+      }
+
+      // Add small delay between notifications to avoid rate limiting
+      await this.sleep(100);
+    }
+
+    this.logger.log(`Batch signal settlement notifications complete: ${sent} sent, ${failed} failed`);
+    return { sent, failed };
   }
 
   /**

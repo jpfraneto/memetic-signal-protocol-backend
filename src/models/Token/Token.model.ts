@@ -55,5 +55,8 @@ export class Token {
   updated_at: Date;
 
   @Column({ type: 'varchar', nullable: false })
+  coingecko_id: string;
+
+  @Column({ type: 'varchar', nullable: true })
   coin_id: string;
 }

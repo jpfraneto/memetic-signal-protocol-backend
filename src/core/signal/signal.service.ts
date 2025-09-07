@@ -160,7 +160,7 @@ export class SignalService {
     }
 
     // Determine status based on prediction correctness
-    const isExpired = new Date() >= signal.expires_at;
+    const isExpired = new Date() >= new Date(Number(signal.expires_at) * 1000);
 
     let newStatus: SignalStatus;
     if (isExpired) {
@@ -243,9 +243,9 @@ export class SignalService {
       ca: signal.ca,
       mc: signal.mc,
       direction: directionString === 'UP',
-      timestamp: signal.timestamp,
-      block_number: signal.block_number,
-      expires_at: signal.expires_at,
+      timestamp: signal.timestamp.toISOString(),
+      block_number: Number(signal.block_number),
+      expires_at: new Date(Number(signal.expires_at) * 1000),
       status:
         statusString === 'ACTIVE'
           ? SignalStatus.ACTIVE

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SignalController } from './signal.controller';
 import { SignalService } from './signal.service';
 import { SignalSchedulerService } from './signal-scheduler.service';
+import { SignalResolutionService } from './signal-resolution.service';
 import { SessionDataService } from './services/session-data.service';
 import { Signal } from '../../models/Signal/Signal.model';
 import { User } from '../../models/User/User.model';
@@ -20,6 +21,9 @@ import { TokensModule } from '../tokens/tokens.module';
 import { UserModule } from '../user/user.module';
 import { AuthModule } from '../auth/auth.module';
 import { ZapperService } from '../zapper/services/zapper.service';
+import { NotificationModule } from '../notification/notification.module';
+import { BlockchainModule } from '../blockchain/blockchain.module';
+import { MFSModule } from '../mfs/mfs.module';
 
 @Module({
   imports: [
@@ -36,16 +40,20 @@ import { ZapperService } from '../zapper/services/zapper.service';
     TokensModule,
     forwardRef(() => UserModule),
     forwardRef(() => AuthModule),
+    NotificationModule,
+    BlockchainModule,
+    MFSModule,
   ],
   controllers: [SignalController],
   providers: [
     SignalService,
     SignalSchedulerService,
+    SignalResolutionService,
     SessionDataService,
     TokenPriceService,
     LeaderboardService,
     ZapperService,
   ],
-  exports: [SignalService, SignalSchedulerService, SessionDataService],
+  exports: [SignalService, SignalSchedulerService, SignalResolutionService, SessionDataService],
 })
 export class SignalModule {}

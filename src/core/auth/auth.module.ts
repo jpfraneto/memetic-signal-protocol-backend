@@ -17,6 +17,7 @@ import { AdminGuard } from 'src/security/guards';
 import { UserModule } from '../user/user.module';
 import { ZapperModule } from '../zapper/zapper.module';
 import { SignalModule } from '../signal/signal.module';
+import { BlockchainModule } from '../blockchain/blockchain.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { SignalModule } from '../signal/signal.module';
     forwardRef(() => UserModule),
     ZapperModule,
     SignalModule,
+    BlockchainModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, MeEndpointService, AdminGuard],

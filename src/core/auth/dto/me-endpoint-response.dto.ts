@@ -94,6 +94,42 @@ export class LeaderboardUserDto {
   winRate?: number;
 }
 
+export class TodaySignalDto {
+  @ApiProperty({ description: 'Signal ID from contract' })
+  signalId: number;
+
+  @ApiProperty({ description: 'Token contract address' })
+  ca: string;
+
+  @ApiProperty({ description: 'Signal direction: up or down' })
+  direction: 'up' | 'down';
+
+  @ApiProperty({ description: 'Duration in days', nullable: true })
+  timeframe?: number;
+
+  @ApiProperty({ description: 'Duration in days' })
+  duration: number;
+
+  @ApiProperty({ description: 'Signal creation timestamp (Unix seconds)' })
+  createdAt: number;
+
+  @ApiProperty({ description: 'Signal expiration timestamp (Unix seconds)' })
+  expiresAt: number;
+
+  @ApiProperty({ description: 'Transaction hash' })
+  transactionHash: string;
+
+  @ApiProperty({ description: 'Block number' })
+  blockNumber: string;
+
+  @ApiProperty({ description: 'Token information', required: false })
+  token?: {
+    name: string;
+    symbol: string;
+    image?: string;
+  };
+}
+
 
 export class MeEndpointResponseDto {
   @ApiProperty({ description: 'Success status' })
@@ -115,6 +151,13 @@ export class MeEndpointResponseDto {
 
   @ApiProperty({ description: 'Leaderboard data', type: [LeaderboardUserDto] })
   leaderboard: LeaderboardUserDto[];
+
+  @ApiProperty({ 
+    description: 'Today\'s signal for the user (null if no signal today)', 
+    type: TodaySignalDto,
+    nullable: true 
+  })
+  todaySignal: TodaySignalDto | null;
 }
 
 export class ErrorDetailsDto {

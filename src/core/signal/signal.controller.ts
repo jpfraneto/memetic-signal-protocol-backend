@@ -16,6 +16,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FastifyReply } from 'fastify';
 
 import { SignalService } from './signal.service';
+import { SignalResolutionService } from './signal-resolution.service';
 import { GetSignalsFeedDto } from './dto/get-signals-feed.dto';
 
 import { hasResponse, hasError } from '../../utils';
@@ -25,7 +26,10 @@ import { Session } from '../../security/decorators';
 @ApiTags('signal-service')
 @Controller('signal-service')
 export class SignalController {
-  constructor(private readonly signalService: SignalService) {}
+  constructor(
+    private readonly signalService: SignalService,
+    private readonly signalResolutionService: SignalResolutionService,
+  ) {}
 
   @Get('feed')
   @ApiOperation({ summary: 'Get signal feed with pagination' })
@@ -100,6 +104,50 @@ export class SignalController {
         HttpStatus.INTERNAL_SERVER_ERROR,
         'getSignalById',
         'Failed to fetch signal details',
+      );
+    }
+  }
+
+  // Debug/Admin endpoints for signal resolution
+  @Post('admin/trigger-resolution')
+  @ApiOperation({ summary: 'Manually trigger signal resolution (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Signal resolution triggered successfully' })
+  async triggerSignalResolution(@Res() res: FastifyReply) {
+    try {
+      await this.signalResolutionService.triggerSignalResolution();
+      return hasResponse(res, {
+        message: 'Signal resolution triggered successfully',
+        triggered: true,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error triggering signal resolution:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'triggerSignalResolution',
+        'Failed to trigger signal resolution',
+      );
+    }
+  }
+
+  @Get('admin/resolution-stats')
+  @ApiOperation({ summary: 'Get signal resolution statistics (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Signal resolution statistics retrieved' })
+  async getResolutionStats(@Res() res: FastifyReply) {
+    try {
+      const stats = await this.signalResolutionService.getResolutionStats();
+      return hasResponse(res, {
+        message: 'Resolution statistics retrieved successfully',
+        ...stats
+      });
+    } catch (error) {
+      console.error('Error fetching resolution stats:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'getResolutionStats',
+        'Failed to fetch resolution statistics',
       );
     }
   }

@@ -124,19 +124,27 @@ check-postgres:
 	fi
 	@echo "ℹ️  Connecting to Railway PostgreSQL database"
 
-# Reset database by truncating tables and re-syncing schema
-db-reset: db-sync db-seed
-	@echo "Database has been reset and seeded successfully!"
+# Reset database by completely wiping it clean and starting fresh
+db-reset:
+	@echo "🚨 WARNING: This will completely wipe your database!"
+	@echo "This will:"
+	@echo "  1. Drop ALL tables"
+	@echo "  2. Recreate schema from scratch"
+	@echo "  3. Run seed data"
+	@echo ""
+	@read -p "Are you sure? Type 'yes' to continue: " CONFIRM && \
+	if [ "$$CONFIRM" = "yes" ]; then \
+		echo "🔄 Resetting database..."; \
+		npx ts-node src/scripts/reset-database.ts; \
+	else \
+		echo "❌ Database reset cancelled."; \
+	fi
 
 # Sync database schema (create tables)
 db-sync:
 	@echo "Syncing database schema..."
 	@npx ts-node src/scripts/sync-database.ts
 
-# Seed the database with seed-database.ts script
-db-seed:
-	@echo "Calling the seed-database.ts script..."
-	@npx ts-node src/core/training/services/seed-database.ts
 
 db-recalculate-calls:
 	@echo "🔄 Recalculating total calls for all users..."
@@ -145,7 +153,7 @@ db-recalculate-calls:
 # Show available commands
 help:
 	@echo "Available commands:"
-	@echo "  make db-reset   - Reset database (truncate + re-sync + seed)"
+	@echo "  make db-reset   - COMPLETELY wipe database and recreate from scratch"
 	@echo "  make db-sync    - Sync database schema with Railway PostgreSQL"
 	@echo "  make db-seed    - Seed the database with workout data"
 	@echo "  make db-recalculate-calls - Recalculate total calls for all users"

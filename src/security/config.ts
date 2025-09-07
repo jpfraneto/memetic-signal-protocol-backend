@@ -65,9 +65,7 @@ export const getConfig = () => {
     },
     blockchain: {
       backendPrivateKey: process.env.PRIVATE_KEY,
-      contractAddress:
-        process.env.CONTRACT_ADDRESS ||
-        '0xd02De59d7Cc4dbbB609BB84fAb85936739ae0068',
+      contractAddress: process.env.CONTRACT_ADDRESS,
     },
     notifications: {
       enabled: process.env.NOTIFICATIONS_ENABLED !== 'false',
@@ -207,6 +205,7 @@ const domains: Domains = {
     'https://miniapp.anky.app',
     'https://sigil.lat',
     'https://www.sigil.lat',
+    'https://memeticsignalprotocol.com',
   ],
   STAGING: [
     'https://staging-msp.app',
@@ -215,7 +214,11 @@ const domains: Domains = {
     'https://sigil.lat',
     'https://www.sigil.lat',
   ],
-  PRO: ['https://sigil.lat', 'https://www.sigil.lat'],
+  PRO: [
+    'https://sigil.lat',
+    'https://www.sigil.lat',
+    'https://memeticsignalprotocol.com',
+  ],
 };
 
 export default domains;

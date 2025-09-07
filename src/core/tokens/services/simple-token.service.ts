@@ -75,7 +75,10 @@ export class SimpleTokenService {
       try {
         token.market_data = JSON.parse(token.market_data);
       } catch (error) {
-        this.logger.warn(`Failed to parse market_data for token ${token.ca}:`, error);
+        this.logger.warn(
+          `Failed to parse market_data for token ${token.ca}:`,
+          error,
+        );
         token.market_data = {
           current_price: 0,
           ath: 0,

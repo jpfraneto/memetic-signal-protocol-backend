@@ -28,14 +28,14 @@ import { MFSModule } from '../mfs/mfs.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Signal, 
-      User, 
-      Token, 
-      FidStats, 
-      WalletAuthorization, 
-      DailySignalCount, 
-      FidBan, 
-      WalletBan
+      Signal,
+      User,
+      Token,
+      FidStats,
+      WalletAuthorization,
+      DailySignalCount,
+      FidBan,
+      WalletBan,
     ]),
     TokensModule,
     forwardRef(() => UserModule),
@@ -54,6 +54,11 @@ import { MFSModule } from '../mfs/mfs.module';
     LeaderboardService,
     ZapperService,
   ],
-  exports: [SignalService, SignalSchedulerService, SignalResolutionService, SessionDataService],
+  exports: [
+    SignalService,
+    SignalSchedulerService,
+    SignalResolutionService,
+    SessionDataService,
+  ],
 })
 export class SignalModule {}

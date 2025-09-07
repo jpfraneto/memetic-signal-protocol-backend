@@ -30,30 +30,34 @@ export class TokenPriceService {
       }
 
       this.cacheStats.misses++;
-      
+
       // Fetch from SimpleTokenService
-      const tokenInfo = await this.simpleTokenService.getTokenInfo(contractAddress);
+      const tokenInfo =
+        await this.simpleTokenService.getTokenInfo(contractAddress);
       const price = tokenInfo.market_data?.current_price || 0;
-      
+
       // Cache the result
       this.priceCache.set(contractAddress, { price, timestamp: Date.now() });
-      
+
       return price;
     } catch (error) {
-      this.logger.error(`Error getting token price for ${contractAddress}:`, error);
+      this.logger.error(
+        `Error getting token price for ${contractAddress}:`,
+        error,
+      );
       return 0;
     }
   }
 
   async getTokenPrices(contractAddresses: string[]): Promise<TokenPrice> {
     const priceMap: TokenPrice = {};
-    
+
     try {
       // Process addresses in batches to avoid overwhelming the API
       const batchSize = 10;
       for (let i = 0; i < contractAddresses.length; i += batchSize) {
         const batch = contractAddresses.slice(i, i + batchSize);
-        
+
         await Promise.all(
           batch.map(async (address) => {
             try {
@@ -62,18 +66,18 @@ export class TokenPriceService {
               this.logger.warn(`Failed to get price for ${address}:`, error);
               priceMap[address] = 0;
             }
-          })
+          }),
         );
-        
+
         // Small delay between batches
         if (i + batchSize < contractAddresses.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
     } catch (error) {
       this.logger.error('Error getting token prices:', error);
     }
-    
+
     return priceMap;
   }
 
@@ -81,7 +85,10 @@ export class TokenPriceService {
     try {
       return await this.simpleTokenService.getTokenInfo(contractAddress);
     } catch (error) {
-      this.logger.error(`Error getting token info for ${contractAddress}:`, error);
+      this.logger.error(
+        `Error getting token info for ${contractAddress}:`,
+        error,
+      );
       return null;
     }
   }

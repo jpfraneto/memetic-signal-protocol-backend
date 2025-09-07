@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  Index,
+} from 'typeorm';
 
 @Entity({ name: 'price_snapshots' })
 @Index('idx_price_snapshot_token_time', ['tokenAddress', 'snapshotAt'])

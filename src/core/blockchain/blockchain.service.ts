@@ -12,20 +12,20 @@ export class BlockchainService {
 
   constructor() {
     const config = getConfig();
-    
+
     // Initialize provider
     this.provider = new ethers.JsonRpcProvider(
-      process.env.BASE_RPC_URL || 'https://mainnet.base.org'
+      process.env.BASE_RPC_URL || 'https://mainnet.base.org',
     );
 
     // Initialize wallet (resolver wallet)
     if (!config.blockchain.backendPrivateKey) {
       throw new Error('PRIVATE_KEY environment variable is required');
     }
-    
+
     this.wallet = new ethers.Wallet(
       config.blockchain.backendPrivateKey,
-      this.provider
+      this.provider,
     );
 
     // Initialize contract
@@ -36,7 +36,7 @@ export class BlockchainService {
     this.contract = new ethers.Contract(
       config.blockchain.contractAddress,
       contractAbi,
-      this.wallet
+      this.wallet,
     );
   }
 
@@ -45,12 +45,16 @@ export class BlockchainService {
    */
   async resolveSignal(signalId: number, mfsDelta: bigint): Promise<string> {
     try {
-      this.logger.log(`Resolving signal ${signalId} with MFS delta: ${mfsDelta}`);
-      
+      this.logger.log(
+        `Resolving signal ${signalId} with MFS delta: ${mfsDelta}`,
+      );
+
       const tx = await this.contract.resolveSignal(signalId, mfsDelta);
       const receipt = await tx.wait();
-      
-      this.logger.log(`Signal ${signalId} resolved successfully. Tx: ${receipt.hash}`);
+
+      this.logger.log(
+        `Signal ${signalId} resolved successfully. Tx: ${receipt.hash}`,
+      );
       return receipt.hash;
     } catch (error) {
       this.logger.error(`Failed to resolve signal ${signalId}:`, error);
@@ -63,22 +67,24 @@ export class BlockchainService {
    */
   async batchResolveSignals(
     signalIds: number[],
-    mfsDeltas: bigint[]
+    mfsDeltas: bigint[],
   ): Promise<string> {
     try {
       if (signalIds.length !== mfsDeltas.length) {
-        throw new Error('Signal IDs and MFS deltas arrays must have the same length');
+        throw new Error(
+          'Signal IDs and MFS deltas arrays must have the same length',
+        );
       }
 
       this.logger.log(
-        `Batch resolving ${signalIds.length} signals: ${signalIds.join(', ')}`
+        `Batch resolving ${signalIds.length} signals: ${signalIds.join(', ')}`,
       );
 
       const tx = await this.contract.batchResolveSignals(signalIds, mfsDeltas);
       const receipt = await tx.wait();
 
       this.logger.log(
-        `Batch resolved ${signalIds.length} signals successfully. Tx: ${receipt.hash}`
+        `Batch resolved ${signalIds.length} signals successfully. Tx: ${receipt.hash}`,
       );
       return receipt.hash;
     } catch (error) {
@@ -122,7 +128,7 @@ export class BlockchainService {
    * Get the current gas price for estimating transaction costs
    */
   async getGasPrice(): Promise<bigint> {
-    return await this.provider.getFeeData().then(data => data.gasPrice || 0n);
+    return await this.provider.getFeeData().then((data) => data.gasPrice || 0n);
   }
 
   /**
@@ -144,7 +150,9 @@ export class BlockchainService {
   async isResolver(): Promise<boolean> {
     try {
       const resolverAddress = await this.contract.resolver();
-      return resolverAddress.toLowerCase() === this.wallet.address.toLowerCase();
+      return (
+        resolverAddress.toLowerCase() === this.wallet.address.toLowerCase()
+      );
     } catch (error) {
       this.logger.error('Failed to check resolver status:', error);
       return false;
@@ -183,7 +191,9 @@ export class BlockchainService {
     try {
       const deploymentTimestamp = await this.getDeploymentTimestamp();
       const currentTimestamp = Math.floor(Date.now() / 1000);
-      const dayIndex = Math.floor((currentTimestamp - deploymentTimestamp) / 86400);
+      const dayIndex = Math.floor(
+        (currentTimestamp - deploymentTimestamp) / 86400,
+      );
       return dayIndex;
     } catch (error) {
       this.logger.error('Failed to get current day index:', error);

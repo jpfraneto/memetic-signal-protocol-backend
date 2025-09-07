@@ -10,4 +10,3 @@ export class CreateAccountDto {
   @IsNotEmpty()
   acceptTerms: boolean;
 }
-

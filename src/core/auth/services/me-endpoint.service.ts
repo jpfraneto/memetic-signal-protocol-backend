@@ -60,12 +60,13 @@ export class MeEndpointService {
       this.logger.log(`[/me] User validated: ${user.username} (${user.fid})`);
 
       // 2. Get all data in parallel with fallbacks
-      const [feedData, featuredTokens, leaderboard, todaySignal] = await Promise.allSettled([
-        this.getFeedDataWithFallback(),
-        this.getFeaturedTokensWithFallback(fid),
-        this.getLeaderboardsWithFallback(),
-        this.getTodaySignalWithFallback(fid),
-      ]);
+      const [feedData, featuredTokens, leaderboard, todaySignal] =
+        await Promise.allSettled([
+          this.getFeedDataWithFallback(),
+          this.getFeaturedTokensWithFallback(fid),
+          this.getLeaderboardsWithFallback(),
+          this.getTodaySignalWithFallback(fid),
+        ]);
 
       const response: MeEndpointResponseDto = {
         success: true,
@@ -77,9 +78,7 @@ export class MeEndpointService {
         featuredTokens:
           featuredTokens.status === 'fulfilled' ? featuredTokens.value : [],
         leaderboard:
-          leaderboard.status === 'fulfilled'
-            ? leaderboard.value
-            : [],
+          leaderboard.status === 'fulfilled' ? leaderboard.value : [],
         todaySignal:
           todaySignal.status === 'fulfilled' ? todaySignal.value : null,
       };
@@ -239,7 +238,7 @@ export class MeEndpointService {
           s.ca,
           s.mc,
           s.direction,
-          s.duration,
+          s.duration_days,
           s.timestamp,
           s.status,
           s.expires_at,
@@ -283,7 +282,7 @@ export class MeEndpointService {
           t.market_data,
           t.created_at as token_created_at,
           t.updated_at as token_updated_at,
-          t.coin_id,
+          t.coingecko_id,
           ps_initial.market_cap as initial_market_cap,
           ps_current.market_cap as current_market_cap
         FROM signals s
@@ -367,7 +366,6 @@ export class MeEndpointService {
           created_at: row.token_created_at,
           updated_at: row.token_updated_at,
           coingecko_id: row.coingecko_id,
-          coin_id: row.coin_id,
         };
 
         // Create Signal object with proper structure
@@ -377,7 +375,7 @@ export class MeEndpointService {
         signal.fid = row.fid;
         signal.ca = row.ca;
         signal.direction = row.direction;
-        signal.duration_days = row.duration;
+        signal.duration_days = row.duration_days;
         signal.created_at = row.created_at;
         signal.expires_at = row.expires_at;
         signal.timestamp = row.timestamp;
@@ -416,7 +414,7 @@ export class MeEndpointService {
           'signal.ca',
           'signal.mc',
           'signal.direction',
-          'signal.duration',
+          'signal.duration_days',
           'signal.timestamp',
           'signal.status',
           'signal.expires_at',
@@ -455,9 +453,9 @@ export class MeEndpointService {
 
     try {
       const zapperTokens = await this.zapperService.getTrendingTokens(fid, 8);
-      
+
       // Format Zapper tokens to match frontend Token interface expectations
-      const formattedTokens = zapperTokens.map(zapperToken => ({
+      const formattedTokens = zapperTokens.map((zapperToken) => ({
         ca: zapperToken.tokenAddress.toLowerCase(),
         name: zapperToken.token.name,
         symbol: zapperToken.token.symbol,
@@ -471,7 +469,7 @@ export class MeEndpointService {
           ath_date: new Date(), // Default date
           market_cap: zapperToken.token.priceData.marketCap || 0,
           price_change_24h: zapperToken.token.priceData.priceChange24h || 0,
-        }
+        },
       }));
 
       // Cache for 5 minutes
@@ -499,7 +497,9 @@ export class MeEndpointService {
   /**
    * Get today's signal with fallback
    */
-  async getTodaySignalWithFallback(fid: number): Promise<TodaySignalDto | null> {
+  async getTodaySignalWithFallback(
+    fid: number,
+  ): Promise<TodaySignalDto | null> {
     const cacheKey = `today-signal:${fid}`;
     const cached = await this.cacheManager.get<TodaySignalDto | null>(cacheKey);
 
@@ -514,7 +514,10 @@ export class MeEndpointService {
       await this.cacheManager.set(cacheKey, todaySignal, 5 * 60 * 1000);
       return todaySignal;
     } catch (error) {
-      this.logger.error(`[/me] Today signal fetch failed for FID ${fid}:`, error);
+      this.logger.error(
+        `[/me] Today signal fetch failed for FID ${fid}:`,
+        error,
+      );
       return null;
     }
   }
@@ -586,24 +589,27 @@ export class MeEndpointService {
     try {
       // Get current day index based on contract deployment time
       const currentDayIndex = await this.blockchainService.getCurrentDayIndex();
-      const deploymentTimestamp = await this.blockchainService.getDeploymentTimestamp();
-      
+      const deploymentTimestamp =
+        await this.blockchainService.getDeploymentTimestamp();
+
       // Calculate today's time window (in Unix seconds)
-      const todayStartTimestamp = deploymentTimestamp + (currentDayIndex * 86400);
+      const todayStartTimestamp = deploymentTimestamp + currentDayIndex * 86400;
       const todayEndTimestamp = todayStartTimestamp + 86400;
 
-      this.logger.debug(`[/me] Looking for today's signal for FID ${fid}. Day index: ${currentDayIndex}, Window: ${todayStartTimestamp} - ${todayEndTimestamp}`);
+      this.logger.debug(
+        `[/me] Looking for today's signal for FID ${fid}. Day index: ${currentDayIndex}, Window: ${todayStartTimestamp} - ${todayEndTimestamp}`,
+      );
 
       // Find signal created today for this user
       const signal = await this.signalRepository
         .createQueryBuilder('signal')
         .leftJoinAndSelect('signal.token', 'token')
         .where('signal.fid = :fid', { fid })
-        .andWhere('signal.created_at >= :todayStart', { 
-          todayStart: todayStartTimestamp.toString() 
+        .andWhere('signal.created_at >= :todayStart', {
+          todayStart: todayStartTimestamp.toString(),
         })
-        .andWhere('signal.created_at < :todayEnd', { 
-          todayEnd: todayEndTimestamp.toString() 
+        .andWhere('signal.created_at < :todayEnd', {
+          todayEnd: todayEndTimestamp.toString(),
         })
         .orderBy('signal.created_at', 'DESC')
         .getOne();
@@ -624,18 +630,24 @@ export class MeEndpointService {
         expiresAt: Number(signal.expires_at),
         transactionHash: signal.transaction_hash,
         blockNumber: signal.block_number.toString(),
-        token: signal.token ? {
-          name: signal.token.name || 'Unknown Token',
-          symbol: signal.token.symbol || 'UNKNOWN',
-          image: signal.token.image || '',
-        } : undefined,
+        token: signal.token
+          ? {
+              name: signal.token.name || 'Unknown Token',
+              symbol: signal.token.symbol || 'UNKNOWN',
+              image: signal.token.image || '',
+            }
+          : undefined,
       };
 
-      this.logger.log(`[/me] Found today's signal for FID ${fid}: Signal ${signal.signal_id} (${todaySignalDto.direction} on ${todaySignalDto.token?.symbol})`);
+      this.logger.log(
+        `[/me] Found today's signal for FID ${fid}: Signal ${signal.signal_id} (${todaySignalDto.direction} on ${todaySignalDto.token?.symbol})`,
+      );
       return todaySignalDto;
-
     } catch (error) {
-      this.logger.error(`[/me] Error fetching today's signal for FID ${fid}:`, error);
+      this.logger.error(
+        `[/me] Error fetching today's signal for FID ${fid}:`,
+        error,
+      );
       throw error;
     }
   }

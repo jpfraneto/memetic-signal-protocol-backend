@@ -36,7 +36,6 @@ export class SignalSchedulerService {
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async settleExpiredSignals() {
-
     try {
       const now = new Date();
 
@@ -45,7 +44,9 @@ export class SignalSchedulerService {
         .createQueryBuilder('signal')
         .leftJoinAndSelect('signal.user', 'user')
         .where('signal.status = :status', { status: SignalStatus.ACTIVE })
-        .andWhere('signal.expires_at < :now', { now: BigInt(Math.floor(now.getTime() / 1000)) })
+        .andWhere('signal.expires_at < :now', {
+          now: BigInt(Math.floor(now.getTime() / 1000)),
+        })
         .limit(50)
         .getMany();
 
@@ -77,7 +78,7 @@ export class SignalSchedulerService {
         try {
           // Process the single token in the signal
           let totalCorrect = 0;
-          let totalTokens = 1;
+          const totalTokens = 1;
 
           const currentPrice = priceMap[signal.ca];
 
@@ -103,8 +104,11 @@ export class SignalSchedulerService {
           // Calculate MFS Signal Score: Market Cap Change (in $) × Direction × e^(-λ×(days-1))
           const marketCapChangeDollars = currentPrice - entryPrice; // Absolute dollar difference
           const direction = isCorrect ? 1 : -1; // +1 if correct prediction, -1 if incorrect
-          const decayMultiplier = Math.exp(-0.075 * Math.max(0, signal.duration - 1)); // Day 1 = multiplier 1
-          const mfsSignalScore = marketCapChangeDollars * direction * decayMultiplier;
+          const decayMultiplier = Math.exp(
+            -0.075 * Math.max(0, signal.duration - 1),
+          ); // Day 1 = multiplier 1
+          const mfsSignalScore =
+            marketCapChangeDollars * direction * decayMultiplier;
 
           // Determine overall signal result
           const isWin = totalCorrect >= 1; // Since we only have 1 token now
@@ -113,12 +117,15 @@ export class SignalSchedulerService {
           settledSignals.push(signal);
 
           // Prepare notification data if user has notifications enabled
-          if (signal.user?.notifications_enabled && signal.user?.notification_token) {
+          if (
+            signal.user?.notifications_enabled &&
+            signal.user?.notification_token
+          ) {
             // Get token info for notification
             const token = await this.tokenRepository.findOne({
-              where: { ca: signal.ca }
+              where: { ca: signal.ca },
             });
-            
+
             notificationsToSend.push({
               fid: signal.user.fid,
               signalResult: {
@@ -143,7 +150,6 @@ export class SignalSchedulerService {
           } else {
             userUpdate.losses += 1;
           }
-
         } catch (error) {
           this.logger.error(
             `Error settling signal ${signal.transaction_hash}:`,
@@ -168,7 +174,9 @@ export class SignalSchedulerService {
       // Send batch notifications
       if (notificationsToSend.length > 0) {
         try {
-          await this.notificationService.sendBatchSignalNotifications(notificationsToSend);
+          await this.notificationService.sendBatchSignalNotifications(
+            notificationsToSend,
+          );
         } catch (error) {
           this.logger.error('Error sending batch notifications:', error);
         }

@@ -130,7 +130,6 @@ export class TodaySignalDto {
   };
 }
 
-
 export class MeEndpointResponseDto {
   @ApiProperty({ description: 'Success status' })
   success: boolean;
@@ -152,10 +151,10 @@ export class MeEndpointResponseDto {
   @ApiProperty({ description: 'Leaderboard data', type: [LeaderboardUserDto] })
   leaderboard: LeaderboardUserDto[];
 
-  @ApiProperty({ 
-    description: 'Today\'s signal for the user (null if no signal today)', 
+  @ApiProperty({
+    description: "Today's signal for the user (null if no signal today)",
     type: TodaySignalDto,
-    nullable: true 
+    nullable: true,
   })
   todaySignal: TodaySignalDto | null;
 }

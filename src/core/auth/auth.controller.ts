@@ -479,7 +479,7 @@ export class AuthController {
         );
         console.log('📅 [POST /me] Daily status value:', body.userDailyStatus);
 
-        let dailyUpdateData: any = {
+        const dailyUpdateData: any = {
           updatedAt: new Date(),
         };
 

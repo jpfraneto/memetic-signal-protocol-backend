@@ -37,9 +37,13 @@ export class NotificationService {
     const apiKey = this.configService.get<string>('NEYNAR_API_KEY');
     if (apiKey) {
       this.neynarClient = new NeynarAPIClient({ apiKey });
-      this.logger.log('Neynar client initialized for signal settlement notifications');
+      this.logger.log(
+        'Neynar client initialized for signal settlement notifications',
+      );
     } else {
-      this.logger.warn('NEYNAR_API_KEY not found, signal settlement notifications will be disabled');
+      this.logger.warn(
+        'NEYNAR_API_KEY not found, signal settlement notifications will be disabled',
+      );
     }
   }
 
@@ -659,20 +663,22 @@ export class NotificationService {
       duration: number;
       won: boolean;
       mfsScore: number;
-    }
+    },
   ): Promise<boolean> {
     if (!this.neynarClient) {
-      this.logger.warn('Neynar client not initialized, skipping signal notification');
+      this.logger.warn(
+        'Neynar client not initialized, skipping signal notification',
+      );
       return false;
     }
 
     try {
       const { tokenSymbol, direction, duration, won, mfsScore } = signalResult;
-      
+
       const resultEmoji = won ? '🎉' : '📉';
       const resultText = won ? 'won' : 'lost';
       const scoreSign = mfsScore >= 0 ? '+' : '';
-      
+
       // Format score based on magnitude
       let formattedScore;
       if (Math.abs(mfsScore) >= 1000000) {
@@ -682,9 +688,9 @@ export class NotificationService {
       } else {
         formattedScore = `${scoreSign}${mfsScore.toFixed(2)}`;
       }
-      
+
       const mfsText = `MFS: ${formattedScore}`;
-      
+
       const title = `${resultEmoji} Signal Settled`;
       const body = `Your ${direction} signal on ${tokenSymbol} (${duration}d) ${resultText}! ${mfsText}`;
       const targetUrl = `${this.config.notifications.baseUrl || 'https://sigil.lat'}/signal`;
@@ -698,10 +704,15 @@ export class NotificationService {
         },
       });
 
-      this.logger.log(`Signal settlement notification sent to FID ${fid}: ${title} - ${body}`);
+      this.logger.log(
+        `Signal settlement notification sent to FID ${fid}: ${title} - ${body}`,
+      );
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send signal settlement notification to FID ${fid}:`, error);
+      this.logger.error(
+        `Failed to send signal settlement notification to FID ${fid}:`,
+        error,
+      );
       return false;
     }
   }
@@ -719,24 +730,28 @@ export class NotificationService {
         won: boolean;
         mfsScore: number;
       };
-    }>
+    }>,
   ): Promise<{ sent: number; failed: number }> {
     if (!this.neynarClient) {
-      this.logger.warn('Neynar client not initialized, skipping batch notifications');
+      this.logger.warn(
+        'Neynar client not initialized, skipping batch notifications',
+      );
       return { sent: 0, failed: notifications.length };
     }
 
-    this.logger.log(`Sending batch signal settlement notifications to ${notifications.length} users`);
-    
+    this.logger.log(
+      `Sending batch signal settlement notifications to ${notifications.length} users`,
+    );
+
     let sent = 0;
     let failed = 0;
 
     for (const notification of notifications) {
       const success = await this.sendSignalSettledNotification(
         notification.fid,
-        notification.signalResult
+        notification.signalResult,
       );
-      
+
       if (success) {
         sent++;
       } else {
@@ -747,7 +762,9 @@ export class NotificationService {
       await this.sleep(100);
     }
 
-    this.logger.log(`Batch signal settlement notifications complete: ${sent} sent, ${failed} failed`);
+    this.logger.log(
+      `Batch signal settlement notifications complete: ${sent} sent, ${failed} failed`,
+    );
     return { sent, failed };
   }
 

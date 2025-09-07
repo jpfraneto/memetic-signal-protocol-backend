@@ -111,14 +111,17 @@ export class SignalController {
   // Debug/Admin endpoints for signal resolution
   @Post('admin/trigger-resolution')
   @ApiOperation({ summary: 'Manually trigger signal resolution (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Signal resolution triggered successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Signal resolution triggered successfully',
+  })
   async triggerSignalResolution(@Res() res: FastifyReply) {
     try {
       await this.signalResolutionService.triggerSignalResolution();
       return hasResponse(res, {
         message: 'Signal resolution triggered successfully',
         triggered: true,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error('Error triggering signal resolution:', error);
@@ -133,13 +136,16 @@ export class SignalController {
 
   @Get('admin/resolution-stats')
   @ApiOperation({ summary: 'Get signal resolution statistics (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Signal resolution statistics retrieved' })
+  @ApiResponse({
+    status: 200,
+    description: 'Signal resolution statistics retrieved',
+  })
   async getResolutionStats(@Res() res: FastifyReply) {
     try {
       const stats = await this.signalResolutionService.getResolutionStats();
       return hasResponse(res, {
         message: 'Resolution statistics retrieved successfully',
-        ...stats
+        ...stats,
       });
     } catch (error) {
       console.error('Error fetching resolution stats:', error);

@@ -58,12 +58,14 @@ export class SignalResolutionService {
       // Check if we're authorized as the resolver
       const isResolver = await this.blockchainService.isResolver();
       if (!isResolver) {
-        this.logger.error('Backend wallet is not authorized as contract resolver');
+        this.logger.error(
+          'Backend wallet is not authorized as contract resolver',
+        );
         return;
       }
 
       const nowTimestamp = Math.floor(Date.now() / 1000); // Current timestamp in seconds
-      
+
       const expiredSignals = await this.signalRepository.find({
         where: {
           resolved: false, // Only unresolved signals
@@ -79,11 +81,13 @@ export class SignalResolutionService {
         return;
       }
 
-      this.logger.log(`Found ${expiredSignals.length} expired signals to resolve`);
+      this.logger.log(
+        `Found ${expiredSignals.length} expired signals to resolve`,
+      );
 
       // Process signals in batch
       const batch = await this.prepareBatch(expiredSignals);
-      
+
       if (batch.signalIds.length === 0) {
         this.logger.log('No signals ready for blockchain resolution');
         return;
@@ -92,8 +96,9 @@ export class SignalResolutionService {
       // Execute batch resolution on blockchain
       await this.executeBlockchainResolution(batch);
 
-      this.logger.log(`Successfully resolved ${batch.signalIds.length} signals on-chain`);
-
+      this.logger.log(
+        `Successfully resolved ${batch.signalIds.length} signals on-chain`,
+      );
     } catch (error) {
       this.logger.error('Error in resolveExpiredSignals:', error);
     }
@@ -102,7 +107,9 @@ export class SignalResolutionService {
   /**
    * Prepare a batch of signals for resolution
    */
-  private async prepareBatch(signals: Signal[]): Promise<SignalResolutionBatch> {
+  private async prepareBatch(
+    signals: Signal[],
+  ): Promise<SignalResolutionBatch> {
     const batch: SignalResolutionBatch = {
       signals: [],
       signalIds: [],
@@ -111,15 +118,18 @@ export class SignalResolutionService {
     };
 
     // Get unique token addresses for price fetching
-    const uniqueTokenAddresses = [...new Set(signals.map(s => s.ca))];
-    const priceMap = await this.tokenPriceService.getTokenPrices(uniqueTokenAddresses);
+    const uniqueTokenAddresses = [...new Set(signals.map((s) => s.ca))];
+    const priceMap =
+      await this.tokenPriceService.getTokenPrices(uniqueTokenAddresses);
 
     for (const signal of signals) {
       try {
         const currentMarketCap = priceMap[signal.ca];
-        
+
         if (!currentMarketCap) {
-          this.logger.warn(`Could not fetch price for ${signal.ca}, skipping signal ${signal.transaction_hash}`);
+          this.logger.warn(
+            `Could not fetch price for ${signal.ca}, skipping signal ${signal.transaction_hash}`,
+          );
           continue;
         }
 
@@ -127,7 +137,7 @@ export class SignalResolutionService {
         const isCorrect = this.mfsService.isPredictionCorrect(
           signal.mc,
           currentMarketCap,
-          signal.direction
+          signal.direction,
         );
 
         const mfsInput: MFSCalculationInput = {
@@ -152,9 +162,12 @@ export class SignalResolutionService {
         batch.mfsDeltas.push(mfsResult.mfsDelta);
 
         // Prepare notification if user has them enabled
-        if (signal.user?.notifications_enabled && signal.user?.notification_token) {
+        if (
+          signal.user?.notifications_enabled &&
+          signal.user?.notification_token
+        ) {
           const token = await this.tokenRepository.findOne({
-            where: { ca: signal.ca }
+            where: { ca: signal.ca },
           });
 
           batch.notifications.push({
@@ -170,11 +183,13 @@ export class SignalResolutionService {
         }
 
         this.logger.log(
-          `Prepared signal ${signalId} (${signal.transaction_hash}) for resolution: ${isCorrect ? 'WON' : 'LOST'} (MFS: ${this.mfsService.formatMFSDelta(mfsResult.mfsDelta)})`
+          `Prepared signal ${signalId} (${signal.transaction_hash}) for resolution: ${isCorrect ? 'WON' : 'LOST'} (MFS: ${this.mfsService.formatMFSDelta(mfsResult.mfsDelta)})`,
         );
-
       } catch (error) {
-        this.logger.error(`Error preparing signal ${signal.transaction_hash}:`, error);
+        this.logger.error(
+          `Error preparing signal ${signal.transaction_hash}:`,
+          error,
+        );
       }
     }
 
@@ -184,27 +199,31 @@ export class SignalResolutionService {
   /**
    * Execute blockchain resolution with retries
    */
-  private async executeBlockchainResolution(batch: SignalResolutionBatch): Promise<void> {
+  private async executeBlockchainResolution(
+    batch: SignalResolutionBatch,
+  ): Promise<void> {
     let attempt = 0;
     let success = false;
 
     while (attempt < this.MAX_RETRIES && !success) {
       try {
         attempt++;
-        
-        this.logger.log(`Attempting blockchain resolution (attempt ${attempt}/${this.MAX_RETRIES})`);
-        
+
+        this.logger.log(
+          `Attempting blockchain resolution (attempt ${attempt}/${this.MAX_RETRIES})`,
+        );
+
         // Execute batch resolution on smart contract
         const txHash = await this.blockchainService.batchResolveSignals(
           batch.signalIds,
-          batch.mfsDeltas
+          batch.mfsDeltas,
         );
 
         // Mark signals as resolved in database (Ponder indexer will update the resolved flag)
         for (const signal of batch.signals) {
           signal.resolved = true;
         }
-        
+
         await this.signalRepository.save(batch.signals);
 
         // Update user statistics
@@ -213,8 +232,13 @@ export class SignalResolutionService {
         // Send notifications
         if (batch.notifications.length > 0) {
           try {
-            const { sent, failed } = await this.notificationService.sendBatchSignalNotifications(batch.notifications);
-            this.logger.log(`Notifications sent: ${sent} successful, ${failed} failed`);
+            const { sent, failed } =
+              await this.notificationService.sendBatchSignalNotifications(
+                batch.notifications,
+              );
+            this.logger.log(
+              `Notifications sent: ${sent} successful, ${failed} failed`,
+            );
           } catch (error) {
             this.logger.error('Error sending batch notifications:', error);
           }
@@ -222,24 +246,28 @@ export class SignalResolutionService {
 
         this.logger.log(`Blockchain resolution successful. Tx: ${txHash}`);
         success = true;
-
       } catch (error) {
-        this.logger.error(`Blockchain resolution attempt ${attempt} failed:`, error);
-        
+        this.logger.error(
+          `Blockchain resolution attempt ${attempt} failed:`,
+          error,
+        );
+
         if (attempt === this.MAX_RETRIES) {
           // On final failure, mark signals as lost but don't send to blockchain
           for (const signal of batch.signals) {
             signal.status = SignalStatus.LOST;
           }
           await this.signalRepository.save(batch.signals);
-          
-          this.logger.error(`Failed to resolve signals on blockchain after ${this.MAX_RETRIES} attempts. Marked as lost in database.`);
+
+          this.logger.error(
+            `Failed to resolve signals on blockchain after ${this.MAX_RETRIES} attempts. Marked as lost in database.`,
+          );
           throw error;
         }
 
         // Wait before retry (exponential backoff)
         const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
   }
@@ -278,13 +306,17 @@ export class SignalResolutionService {
         }
 
         // Update counts
-        user.active_signals = Math.max(0, user.active_signals - (updates.wins + updates.losses));
+        user.active_signals = Math.max(
+          0,
+          user.active_signals - (updates.wins + updates.losses),
+        );
         user.settled_signals += updates.wins + updates.losses;
 
         // Recalculate win rate
         if (user.settled_signals > 0) {
           const previousWins = Math.round(
-            (user.win_rate / 100) * (user.settled_signals - updates.wins - updates.losses)
+            (user.win_rate / 100) *
+              (user.settled_signals - updates.wins - updates.losses),
           );
           const totalWins = previousWins + updates.wins;
           user.win_rate = (totalWins / user.settled_signals) * 100;
@@ -295,22 +327,21 @@ export class SignalResolutionService {
           const winRateWeight = user.win_rate / 100;
           const volumeWeight = Math.min(user.settled_signals / 100, 1);
           const consistencyBonus = user.settled_signals >= 20 ? 0.05 : 0;
-          user.mfs_score = winRateWeight * 0.7 + volumeWeight * 0.25 + consistencyBonus;
+          user.mfs_score =
+            winRateWeight * 0.7 + volumeWeight * 0.25 + consistencyBonus;
           user.mfs_score = Math.min(Math.max(user.mfs_score, 0), 1);
         }
 
         await this.userRepository.save(user);
 
         this.logger.log(
-          `Updated stats for user ${userId}: +${updates.wins} wins, +${updates.losses} losses. Win rate: ${user.win_rate.toFixed(2)}%, MFS: ${user.mfs_score.toFixed(3)}`
+          `Updated stats for user ${userId}: +${updates.wins} wins, +${updates.losses} losses. Win rate: ${user.win_rate.toFixed(2)}%, MFS: ${user.mfs_score.toFixed(3)}`,
         );
-
       } catch (error) {
         this.logger.error(`Error updating user stats for ${userId}:`, error);
       }
     }
   }
-
 
   /**
    * Manual trigger for testing
@@ -328,7 +359,13 @@ export class SignalResolutionService {
     failedResolutions: number;
   }> {
     const nowTimestamp = Math.floor(Date.now() / 1000);
-    const todayStart = Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime() / 1000);
+    const todayStart = Math.floor(
+      new Date(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        new Date().getDate(),
+      ).getTime() / 1000,
+    );
 
     const [pendingResolutions, resolvedToday] = await Promise.all([
       this.signalRepository.count({

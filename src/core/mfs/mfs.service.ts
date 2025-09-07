@@ -25,7 +25,9 @@ export class MFSService {
   constructor() {
     // Get decay constant from config (default to 0.888 to match your existing system)
     this.DECAY_CONSTANT = parseFloat(process.env.MSP_DECAY_CONSTANT || '0.888');
-    this.logger.log(`Initialized MFS Service with decay constant: ${this.DECAY_CONSTANT}`);
+    this.logger.log(
+      `Initialized MFS Service with decay constant: ${this.DECAY_CONSTANT}`,
+    );
   }
 
   /**
@@ -44,11 +46,10 @@ export class MFSService {
 
     // Calculate market cap change in absolute dollars
     const marketCapChange = exitMarketCap - entryMarketCap;
-    
+
     // Calculate percentage change for logging
-    const marketCapChangePercentage = entryMarketCap > 0 
-      ? (marketCapChange / entryMarketCap) * 100 
-      : 0;
+    const marketCapChangePercentage =
+      entryMarketCap > 0 ? (marketCapChange / entryMarketCap) * 100 : 0;
 
     // Determine direction multiplier based on correctness
     const directionMultiplier = isCorrect ? 1 : -1;
@@ -89,7 +90,7 @@ export class MFSService {
    * Calculate batch MFS deltas for multiple signals
    */
   calculateBatchMFSDeltas(inputs: MFSCalculationInput[]): MFSResult[] {
-    return inputs.map(input => this.calculateMFSDelta(input));
+    return inputs.map((input) => this.calculateMFSDelta(input));
   }
 
   /**
@@ -98,10 +99,10 @@ export class MFSService {
   isPredictionCorrect(
     entryMarketCap: number,
     exitMarketCap: number,
-    direction: boolean
+    direction: boolean,
   ): boolean {
     const marketCapChange = exitMarketCap - entryMarketCap;
-    
+
     if (direction) {
       // UP prediction - correct if market cap increased
       return marketCapChange > 0;
@@ -134,7 +135,7 @@ export class MFSService {
     // -0.075×(days-1) = ln(0.01)
     // days-1 = -ln(0.01) / 0.075
     // days = 1 + (-ln(0.01) / 0.075)
-    const effectiveDays = Math.ceil(1 + (-Math.log(0.01) / this.DECAY_CONSTANT));
+    const effectiveDays = Math.ceil(1 + -Math.log(0.01) / this.DECAY_CONSTANT);
     return effectiveDays;
   }
 }

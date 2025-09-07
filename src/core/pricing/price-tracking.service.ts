@@ -43,7 +43,9 @@ export class PriceTrackingService {
         .where('signal.status = :status', { status: SignalStatus.ACTIVE })
         .getRawMany();
 
-      this.logger.log(`Found ${activeContracts.length} unique contracts with active signals`);
+      this.logger.log(
+        `Found ${activeContracts.length} unique contracts with active signals`,
+      );
 
       if (activeContracts.length === 0) {
         this.logger.log('No active signals to track, skipping price job');
@@ -51,14 +53,15 @@ export class PriceTrackingService {
       }
 
       // 2. Fetch current prices and market caps
-      const contractAddresses = activeContracts.map(row => row.ca);
+      const contractAddresses = activeContracts.map((row) => row.ca);
       const priceSnapshots: PriceSnapshot[] = [];
       const currentTime = new Date();
 
       for (const contractAddress of contractAddresses) {
         try {
-          const tokenInfo = await this.tokenPriceService.getTokenInfo(contractAddress);
-          
+          const tokenInfo =
+            await this.tokenPriceService.getTokenInfo(contractAddress);
+
           if (tokenInfo && tokenInfo.marketCap && tokenInfo.price) {
             const snapshot = new PriceSnapshot();
             snapshot.tokenAddress = contractAddress;
@@ -66,13 +69,18 @@ export class PriceTrackingService {
             snapshot.price = tokenInfo.price;
             snapshot.volume24h = tokenInfo.volume24h || 0;
             snapshot.snapshotAt = currentTime;
-            
+
             priceSnapshots.push(snapshot);
           } else {
-            this.logger.warn(`No price data available for contract ${contractAddress}`);
+            this.logger.warn(
+              `No price data available for contract ${contractAddress}`,
+            );
           }
         } catch (error) {
-          this.logger.error(`Failed to fetch price data for ${contractAddress}:`, error);
+          this.logger.error(
+            `Failed to fetch price data for ${contractAddress}:`,
+            error,
+          );
         }
       }
 
@@ -89,7 +97,6 @@ export class PriceTrackingService {
       await this.scoringService.updateLeaderboardRankings();
 
       this.logger.log('Price tracking job completed successfully');
-
     } catch (error) {
       this.logger.error('Price tracking job failed:', error);
     }
@@ -106,7 +113,10 @@ export class PriceTrackingService {
   /**
    * Get price history for a token
    */
-  async getPriceHistory(tokenAddress: string, days: number = 7): Promise<PriceSnapshot[]> {
+  async getPriceHistory(
+    tokenAddress: string,
+    days: number = 7,
+  ): Promise<PriceSnapshot[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -161,21 +171,22 @@ export class PriceTrackingService {
     latestSnapshot: Date;
     oldestSnapshot: Date;
   }> {
-    const [totalCount, uniqueTokensResult, latestResult, oldestResult] = await Promise.all([
-      this.priceSnapshotRepository.count(),
-      this.priceSnapshotRepository
-        .createQueryBuilder()
-        .select('COUNT(DISTINCT tokenAddress)', 'count')
-        .getRawOne(),
-      this.priceSnapshotRepository
-        .createQueryBuilder()
-        .select('MAX(snapshotAt)', 'date')
-        .getRawOne(),
-      this.priceSnapshotRepository
-        .createQueryBuilder()
-        .select('MIN(snapshotAt)', 'date')
-        .getRawOne(),
-    ]);
+    const [totalCount, uniqueTokensResult, latestResult, oldestResult] =
+      await Promise.all([
+        this.priceSnapshotRepository.count(),
+        this.priceSnapshotRepository
+          .createQueryBuilder()
+          .select('COUNT(DISTINCT tokenAddress)', 'count')
+          .getRawOne(),
+        this.priceSnapshotRepository
+          .createQueryBuilder()
+          .select('MAX(snapshotAt)', 'date')
+          .getRawOne(),
+        this.priceSnapshotRepository
+          .createQueryBuilder()
+          .select('MIN(snapshotAt)', 'date')
+          .getRawOne(),
+      ]);
 
     return {
       totalSnapshots: totalCount,

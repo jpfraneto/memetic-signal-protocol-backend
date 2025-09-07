@@ -36,29 +36,22 @@ export class SignalSchedulerService {
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async settleExpiredSignals() {
-    this.logger.log('Starting settlement of expired signals...');
 
     try {
       const now = new Date();
 
       // Find all active signals that have expired
-      const expiredSignals = await this.signalRepository.find({
-        where: {
-          status: SignalStatus.ACTIVE,
-          expires_at: LessThan(BigInt(Math.floor(now.getTime() / 1000))),
-        },
-        relations: ['user'],
-        take: 50, // Process in batches to avoid overwhelming the API
-      });
+      const expiredSignals = await this.signalRepository
+        .createQueryBuilder('signal')
+        .leftJoinAndSelect('signal.user', 'user')
+        .where('signal.status = :status', { status: SignalStatus.ACTIVE })
+        .andWhere('signal.expires_at < :now', { now: BigInt(Math.floor(now.getTime() / 1000)) })
+        .limit(50)
+        .getMany();
 
       if (expiredSignals.length === 0) {
-        this.logger.log('No expired signals found');
         return;
       }
-
-      this.logger.log(
-        `Found ${expiredSignals.length} expired signals to settle`,
-      );
 
       // Get unique token addresses to batch fetch prices
       const uniqueTokenAddresses = [
@@ -89,9 +82,6 @@ export class SignalSchedulerService {
           const currentPrice = priceMap[signal.ca];
 
           if (!currentPrice) {
-            this.logger.warn(
-              `Could not fetch price for ${signal.ca}, skipping signal`,
-            );
             continue;
           }
 
@@ -154,9 +144,6 @@ export class SignalSchedulerService {
             userUpdate.losses += 1;
           }
 
-          this.logger.log(
-            `Settled signal ${signal.transaction_hash}: ${signal.status} (${totalCorrect}/${totalTokens} correct)`,
-          );
         } catch (error) {
           this.logger.error(
             `Error settling signal ${signal.transaction_hash}:`,
@@ -180,16 +167,16 @@ export class SignalSchedulerService {
 
       // Send batch notifications
       if (notificationsToSend.length > 0) {
-        this.logger.log(`Sending ${notificationsToSend.length} signal settlement notifications`);
         try {
-          const { sent, failed } = await this.notificationService.sendBatchSignalNotifications(notificationsToSend);
-          this.logger.log(`Notifications sent: ${sent} successful, ${failed} failed`);
+          await this.notificationService.sendBatchSignalNotifications(notificationsToSend);
         } catch (error) {
           this.logger.error('Error sending batch notifications:', error);
         }
       }
 
-      this.logger.log(`Successfully settled ${settledSignals.length} signals`);
+      if (settledSignals.length > 0) {
+        this.logger.log(`Settled ${settledSignals.length} signals`);
+      }
     } catch (error) {
       this.logger.error('Error in settleExpiredSignals:', error);
     }
@@ -197,11 +184,8 @@ export class SignalSchedulerService {
 
   @Cron(CronExpression.EVERY_HOUR)
   async updateLeaderboardRanks() {
-    this.logger.log('Updating leaderboard ranks...');
-
     try {
       await this.leaderboardService.updateUserRanks();
-      this.logger.log('Leaderboard ranks updated successfully');
     } catch (error) {
       this.logger.error('Error updating leaderboard ranks:', error);
     }
@@ -209,14 +193,8 @@ export class SignalSchedulerService {
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async cleanupTokenPriceCache() {
-    this.logger.log('Cleaning up token price cache...');
-
     try {
       this.tokenPriceService.cleanupCache();
-      const stats = this.tokenPriceService.getCacheStats();
-      this.logger.log(
-        `Cache cleanup complete. Cache stats: hits=${stats.hits}, misses=${stats.misses}, size=${stats.size}`,
-      );
     } catch (error) {
       this.logger.error('Error cleaning up cache:', error);
     }
@@ -232,7 +210,6 @@ export class SignalSchedulerService {
         where: { fid: userId },
       });
       if (!user) {
-        this.logger.warn(`User ${userId} not found for stats update`);
         return;
       }
 
@@ -262,10 +239,6 @@ export class SignalSchedulerService {
       }
 
       await this.userRepository.save(user);
-
-      this.logger.log(
-        `Updated stats for user ${userId}: ${wins} wins, ${losses} losses. New win rate: ${user.win_rate.toFixed(2)}%, MFS: ${user.mfs_score.toFixed(3)}`,
-      );
     } catch (error) {
       this.logger.error(`Error updating user stats for ${userId}:`, error);
     }

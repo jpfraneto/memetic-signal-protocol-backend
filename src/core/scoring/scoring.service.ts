@@ -61,7 +61,7 @@ export class ScoringService {
       .orderBy('ps.snapshotAt', 'DESC')
       .getOne();
 
-    const mc = signal?.mc || 0;
+    const mc = signal?.entry_market_cap || 0;
 
     if (mc === 0) {
       this.logger.warn(
@@ -156,7 +156,7 @@ export class ScoringService {
 
       // Update signal status
       await this.signalRepository.update(signal.transaction_hash, {
-        status: isCorrect ? SignalStatus.WON : SignalStatus.LOST,
+        resolved: isCorrect ? true : false,
       });
 
       // Update user score if signal was correct

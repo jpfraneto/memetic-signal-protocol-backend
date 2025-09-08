@@ -33,6 +33,9 @@ export const getConfig = () => {
       domain: process.env.SESSION_DOMAIN || '127.0.0.1',
     },
     db: {
+      redis: {
+        url: process.env.REDIS_URL,
+      },
       name:
         process.env.DATABASE_NAME ||
         process.env.DATABASE_URL?.split('/').pop() ||
@@ -218,6 +221,7 @@ const domains: Domains = {
     'https://sigil.lat',
     'https://www.sigil.lat',
     'https://memeticsignalprotocol.com',
+    'https://miniapp.anky.app',
   ],
 };
 

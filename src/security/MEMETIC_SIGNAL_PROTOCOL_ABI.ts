@@ -1,12 +1,5 @@
-export const contractAbi = [
-  {
-    inputs: [
-      { internalType: 'address', name: '_backendSigner', type: 'address' },
-      { internalType: 'address', name: '_resolver', type: 'address' },
-    ],
-    stateMutability: 'nonpayable',
-    type: 'constructor',
-  },
+export const MEMETIC_SIGNAL_PROTOCOL_ABI = [
+  { inputs: [], stateMutability: 'nonpayable', type: 'constructor' },
   { inputs: [], name: 'AlreadyResolved', type: 'error' },
   { inputs: [], name: 'AuthorizationExpired', type: 'error' },
   { inputs: [], name: 'BadLengths', type: 'error' },
@@ -26,9 +19,11 @@ export const contractAbi = [
   { inputs: [], name: 'ExpectedPause', type: 'error' },
   { inputs: [], name: 'FidBannedErr', type: 'error' },
   { inputs: [], name: 'InvalidAuth', type: 'error' },
-  { inputs: [], name: 'InvalidCA', type: 'error' },
   { inputs: [], name: 'InvalidDuration', type: 'error' },
   { inputs: [], name: 'InvalidFID', type: 'error' },
+  { inputs: [], name: 'InvalidMarketCap', type: 'error' },
+  { inputs: [], name: 'InvalidToken', type: 'error' },
+  { inputs: [], name: 'NotExpired', type: 'error' },
   { inputs: [], name: 'NotResolver', type: 'error' },
   {
     inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
@@ -41,6 +36,7 @@ export const contractAbi = [
     type: 'error',
   },
   { inputs: [], name: 'SignalNotFound', type: 'error' },
+  { inputs: [], name: 'TooBig', type: 'error' },
   { inputs: [], name: 'WalletBannedErr', type: 'error' },
   { inputs: [], name: 'ZeroAddress', type: 'error' },
   {
@@ -139,13 +135,24 @@ export const contractAbi = [
         type: 'uint256',
       },
       { indexed: true, internalType: 'uint256', name: 'fid', type: 'uint256' },
-      { indexed: true, internalType: 'address', name: 'ca', type: 'address' },
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'token',
+        type: 'address',
+      },
       { indexed: false, internalType: 'bool', name: 'direction', type: 'bool' },
       {
         indexed: false,
         internalType: 'uint32',
         name: 'durationDays',
         type: 'uint32',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'entryMarketCap',
+        type: 'uint256',
       },
       {
         indexed: false,
@@ -161,6 +168,56 @@ export const contractAbi = [
       },
     ],
     name: 'SignalCreated',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'uint256',
+        name: 'signalId',
+        type: 'uint256',
+      },
+      { indexed: true, internalType: 'uint256', name: 'fid', type: 'uint256' },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'oldEntryMarketCap',
+        type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'newEntryMarketCap',
+        type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'int256',
+        name: 'oldMfsDelta',
+        type: 'int256',
+      },
+      {
+        indexed: false,
+        internalType: 'int256',
+        name: 'newMfsDelta',
+        type: 'int256',
+      },
+      {
+        indexed: false,
+        internalType: 'int256',
+        name: 'newTotalMFS',
+        type: 'int256',
+      },
+      {
+        indexed: false,
+        internalType: 'string',
+        name: 'reason',
+        type: 'string',
+      },
+    ],
+    name: 'SignalManuallyUpdated',
     type: 'event',
   },
   {
@@ -271,6 +328,13 @@ export const contractAbi = [
   },
   {
     inputs: [],
+    name: 'MAX_BATCH',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
     name: 'MAX_DURATION_DAYS',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
@@ -329,6 +393,13 @@ export const contractAbi = [
     type: 'function',
   },
   {
+    inputs: [{ internalType: 'uint256', name: 'fid', type: 'uint256' }],
+    name: 'canSignalToday',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [
       { internalType: 'uint256', name: '', type: 'uint256' },
       { internalType: 'uint256', name: '', type: 'uint256' },
@@ -363,10 +434,68 @@ export const contractAbi = [
     type: 'function',
   },
   {
+    inputs: [
+      { internalType: 'uint256', name: 'fid', type: 'uint256' },
+      { internalType: 'uint256', name: 'dayIdx', type: 'uint256' },
+    ],
+    name: 'getDailySignalCount',
+    outputs: [{ internalType: 'uint8', name: '', type: 'uint8' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [{ internalType: 'uint256', name: 'fid', type: 'uint256' }],
     name: 'getFidSignals',
     outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }],
     stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'uint256', name: 'fid', type: 'uint256' },
+      { internalType: 'uint256', name: 'start', type: 'uint256' },
+      { internalType: 'uint256', name: 'size', type: 'uint256' },
+    ],
+    name: 'getFidSignalsRange',
+    outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: 'signalId', type: 'uint256' }],
+    name: 'getSignal',
+    outputs: [
+      {
+        components: [
+          { internalType: 'uint256', name: 'fid', type: 'uint256' },
+          { internalType: 'uint256', name: 'entryMarketCap', type: 'uint256' },
+          { internalType: 'int256', name: 'mfsDelta', type: 'int256' },
+          { internalType: 'address', name: 'token', type: 'address' },
+          { internalType: 'uint64', name: 'createdAt', type: 'uint64' },
+          { internalType: 'uint64', name: 'expiresAt', type: 'uint64' },
+          { internalType: 'uint32', name: 'durationDays', type: 'uint32' },
+          { internalType: 'bool', name: 'resolved', type: 'bool' },
+          { internalType: 'bool', name: 'manuallyUpdated', type: 'bool' },
+          { internalType: 'bool', name: 'direction', type: 'bool' },
+        ],
+        internalType: 'struct MemeticSignalProtocol.Signal',
+        name: '',
+        type: 'tuple',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'uint256', name: 'signalId', type: 'uint256' },
+      { internalType: 'uint256', name: 'newEntryMarketCap', type: 'uint256' },
+      { internalType: 'int256', name: 'newMfsDelta', type: 'int256' },
+      { internalType: 'string', name: 'reason', type: 'string' },
+    ],
+    name: 'manuallyUpdateSignal',
+    outputs: [],
+    stateMutability: 'nonpayable',
     type: 'function',
   },
   {
@@ -437,9 +566,10 @@ export const contractAbi = [
   },
   {
     inputs: [
-      { internalType: 'address', name: 'ca', type: 'address' },
+      { internalType: 'address', name: 'token', type: 'address' },
       { internalType: 'bool', name: 'direction', type: 'bool' },
-      { internalType: 'uint256', name: 'durationDays', type: 'uint256' },
+      { internalType: 'uint32', name: 'durationDays', type: 'uint32' },
+      { internalType: 'uint256', name: 'entryMarketCap', type: 'uint256' },
       { internalType: 'bytes', name: 'authData', type: 'bytes' },
     ],
     name: 'signal',
@@ -452,13 +582,15 @@ export const contractAbi = [
     name: 'signals',
     outputs: [
       { internalType: 'uint256', name: 'fid', type: 'uint256' },
-      { internalType: 'address', name: 'ca', type: 'address' },
-      { internalType: 'bool', name: 'direction', type: 'bool' },
-      { internalType: 'uint32', name: 'durationDays', type: 'uint32' },
+      { internalType: 'uint256', name: 'entryMarketCap', type: 'uint256' },
+      { internalType: 'int256', name: 'mfsDelta', type: 'int256' },
+      { internalType: 'address', name: 'token', type: 'address' },
       { internalType: 'uint64', name: 'createdAt', type: 'uint64' },
       { internalType: 'uint64', name: 'expiresAt', type: 'uint64' },
+      { internalType: 'uint32', name: 'durationDays', type: 'uint32' },
       { internalType: 'bool', name: 'resolved', type: 'bool' },
-      { internalType: 'int256', name: 'mfsApplied', type: 'int256' },
+      { internalType: 'bool', name: 'manuallyUpdated', type: 'bool' },
+      { internalType: 'bool', name: 'direction', type: 'bool' },
     ],
     stateMutability: 'view',
     type: 'function',
@@ -473,6 +605,13 @@ export const contractAbi = [
   {
     inputs: [{ internalType: 'address', name: 'newOwner', type: 'address' }],
     name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'unauthorizeSelf',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',

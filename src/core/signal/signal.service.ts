@@ -147,8 +147,8 @@ export class SignalService {
       );
     }
 
-    if (signal.status !== SignalStatus.ACTIVE) {
-      throw new ConflictException('Signal is not active');
+    if (signal.resolved) {
+      throw new ConflictException('Signal is already resolved');
     }
 
     // Validate exit market cap
@@ -170,7 +170,7 @@ export class SignalService {
     }
 
     // Update signal
-    signal.status = newStatus;
+    signal.resolved = true;
 
     const savedSignal = await this.signalRepository.save(signal);
 
@@ -195,14 +195,12 @@ export class SignalService {
 
     const totalSignals = userWithSignals.signals.length;
     const activeSignals = userWithSignals.signals.filter(
-      (s) => s.status === SignalStatus.ACTIVE,
+      (s) => !s.resolved,
     ).length;
     const settledSignals = userWithSignals.signals.filter((s) =>
-      [SignalStatus.WON, SignalStatus.LOST].includes(s.status),
+      [true, false].includes(s.resolved),
     ).length;
-    const wonSignals = userWithSignals.signals.filter(
-      (s) => s.status === SignalStatus.WON,
-    ).length;
+    const wonSignals = userWithSignals.signals.filter((s) => s.resolved).length;
 
     const winRate =
       settledSignals > 0 ? (wonSignals / settledSignals) * 100 : 0;
@@ -230,18 +228,17 @@ export class SignalService {
     const directionString = signal.direction ? 'UP' : 'DOWN';
 
     // Convert numeric status to string
-    const statusString =
-      signal.status === SignalStatus.ACTIVE
-        ? 'ACTIVE'
-        : signal.status === SignalStatus.WON
-          ? 'WON'
-          : 'LOST';
+    const statusString = signal.resolved
+      ? 'ACTIVE'
+      : signal.resolved
+        ? 'WON'
+        : 'LOST';
 
     return {
       transaction_hash: signal.transaction_hash,
       fid: signal.fid,
       ca: signal.ca,
-      mc: signal.mc,
+      entry_market_cap: signal.entry_market_cap,
       direction: directionString === 'UP',
       timestamp: signal.timestamp.toISOString(),
       block_number: Number(signal.block_number),

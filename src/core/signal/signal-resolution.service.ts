@@ -31,7 +31,7 @@ interface SignalResolutionBatch {
 @Injectable()
 export class SignalResolutionService {
   private readonly logger = new Logger(SignalResolutionService.name);
-  private readonly BATCH_SIZE = 50; // Process signals in batches
+  private readonly BATCH_SIZE = 90; // Process signals in batches of 90 (smart contract limit is 100)
   private readonly MAX_RETRIES = 3;
 
   constructor(
@@ -48,11 +48,11 @@ export class SignalResolutionService {
   ) {}
 
   /**
-   * Main cron job - runs every 30 minutes to resolve expired signals
+   * Hourly batch processing cron - processes all expired signals
    */
-  @Cron('0,30 * * * *') // Every 30 minutes at :00 and :30
-  async resolveExpiredSignals() {
-    this.logger.log('Starting 30-minute signal resolution cycle...');
+  @Cron('0 * * * *') // Every hour at minute 0 - COST-OPTIMIZED BATCHING
+  async processHourlyBatchResolution() {
+    this.logger.log('Starting hourly batch resolution cycle...');
 
     try {
       // Check if we're authorized as the resolver
@@ -66,42 +66,73 @@ export class SignalResolutionService {
 
       const nowTimestamp = Math.floor(Date.now() / 1000); // Current timestamp in seconds
 
+      // Query database directly for expired, unresolved signals
       const expiredSignals = await this.signalRepository.find({
         where: {
           resolved: false, // Only unresolved signals
           expires_at: LessThan(BigInt(nowTimestamp)), // Expired signals (bigint comparison)
         },
         relations: ['user'],
-        take: this.BATCH_SIZE,
         order: { expires_at: 'ASC' }, // Process oldest expired signals first
       });
 
       if (expiredSignals.length === 0) {
-        this.logger.log('No expired unresolved signals found');
+        this.logger.log('No expired signals ready for batch resolution');
         return;
       }
 
       this.logger.log(
-        `Found ${expiredSignals.length} expired signals to resolve`,
+        `Found ${expiredSignals.length} expired signals ready for batch resolution`,
       );
 
-      // Process signals in batch
-      const batch = await this.prepareBatch(expiredSignals);
+      // Process in batches of 90 (smart contract limit is 100, leaving buffer)
+      const batches = this.chunkArray(expiredSignals, this.BATCH_SIZE);
 
-      if (batch.signalIds.length === 0) {
-        this.logger.log('No signals ready for blockchain resolution');
-        return;
+      let totalProcessed = 0;
+      for (const signalBatch of batches) {
+        try {
+          const batch = await this.prepareBatch(signalBatch);
+
+          if (batch.signalIds.length === 0) {
+            this.logger.log(
+              'No signals ready for blockchain resolution in this batch',
+            );
+            continue;
+          }
+
+          // Execute blockchain resolution
+          await this.executeBlockchainResolution(batch);
+          totalProcessed += batch.signalIds.length;
+
+          this.logger.log(
+            `Successfully processed batch of ${batch.signalIds.length} signals`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to process batch of ${signalBatch.length} signals:`,
+            error,
+          );
+          // Continue with next batch even if one fails
+        }
       }
 
-      // Execute batch resolution on blockchain
-      await this.executeBlockchainResolution(batch);
-
       this.logger.log(
-        `Successfully resolved ${batch.signalIds.length} signals on-chain`,
+        `Hourly batch resolution complete: ${totalProcessed} signals processed in ${batches.length} batches`,
       );
     } catch (error) {
-      this.logger.error('Error in resolveExpiredSignals:', error);
+      this.logger.error('Error in hourly batch resolution cycle:', error);
     }
+  }
+
+  /**
+   * Split array into chunks of specified size
+   */
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
   }
 
   /**
@@ -135,13 +166,13 @@ export class SignalResolutionService {
 
         // Calculate MFS delta
         const isCorrect = this.mfsService.isPredictionCorrect(
-          signal.mc,
+          signal.entry_market_cap,
           currentMarketCap,
           signal.direction,
         );
 
         const mfsInput: MFSCalculationInput = {
-          entryMarketCap: signal.mc,
+          entryMarketCap: signal.entry_market_cap,
           exitMarketCap: currentMarketCap,
           direction: signal.direction,
           durationDays: signal.duration_days,
@@ -151,8 +182,8 @@ export class SignalResolutionService {
         const mfsResult = this.mfsService.calculateMFSDelta(mfsInput);
 
         // Update signal in database (but don't save yet - wait for blockchain confirmation)
-        signal.status = isCorrect ? SignalStatus.WON : SignalStatus.LOST;
-        signal.mfs_applied = mfsResult.mfsDelta.toString();
+        signal.resolved = isCorrect ? true : false;
+        signal.mfs_delta = mfsResult.mfsDelta.toString();
 
         // Use the signal_id directly from the Signal model
         const signalId = signal.signal_id;
@@ -255,7 +286,7 @@ export class SignalResolutionService {
         if (attempt === this.MAX_RETRIES) {
           // On final failure, mark signals as lost but don't send to blockchain
           for (const signal of batch.signals) {
-            signal.status = SignalStatus.LOST;
+            signal.resolved = false;
           }
           await this.signalRepository.save(batch.signals);
 
@@ -286,7 +317,7 @@ export class SignalResolutionService {
       }
 
       const update = userUpdates.get(userId)!;
-      if (signal.status === SignalStatus.WON) {
+      if (signal.resolved) {
         update.wins += 1;
       } else {
         update.losses += 1;
@@ -344,10 +375,10 @@ export class SignalResolutionService {
   }
 
   /**
-   * Manual trigger for testing
+   * Manual trigger for hourly batch processing
    */
   async triggerSignalResolution(): Promise<void> {
-    await this.resolveExpiredSignals();
+    await this.processHourlyBatchResolution();
   }
 
   /**
@@ -387,5 +418,44 @@ export class SignalResolutionService {
       resolvedToday,
       failedResolutions: 0, // TODO: Track failed resolutions
     };
+  }
+
+  /**
+   * Get batch processing statistics
+   */
+  async getBatchStats(): Promise<{
+    signalsReadyForBatch: number;
+    nextBatchProcessing: string;
+  }> {
+    try {
+      const nowTimestamp = Math.floor(Date.now() / 1000);
+
+      // Count expired unresolved signals
+      const readyCount = await this.signalRepository.count({
+        where: {
+          resolved: false,
+          expires_at: LessThan(BigInt(nowTimestamp)),
+        },
+      });
+
+      // Calculate next hourly batch time
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      const minutesUntilBatch = Math.ceil(
+        (nextHour.getTime() - now.getTime()) / (1000 * 60),
+      );
+
+      return {
+        signalsReadyForBatch: readyCount,
+        nextBatchProcessing: `In ${minutesUntilBatch} minutes (top of next hour)`,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get batch stats:', error);
+      return {
+        signalsReadyForBatch: 0,
+        nextBatchProcessing: 'Unknown - error occurred',
+      };
+    }
   }
 }

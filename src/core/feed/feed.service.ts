@@ -212,9 +212,9 @@ export class FeedService {
         uniqueSignalersResult,
       ] = await Promise.all([
         this.signalRepository.count(),
-        this.signalRepository.count({ where: { status: SignalStatus.ACTIVE } }),
-        this.signalRepository.count({ where: { status: SignalStatus.WON } }),
-        this.signalRepository.count({ where: { status: SignalStatus.LOST } }),
+        this.signalRepository.count({ where: { resolved: false } }),
+        this.signalRepository.count({ where: { resolved: true } }),
+        this.signalRepository.count({ where: { resolved: false } }),
         this.signalRepository
           .createQueryBuilder('signal')
           .select('COUNT(DISTINCT signal.ca)', 'count')

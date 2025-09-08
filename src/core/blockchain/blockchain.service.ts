@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 import { getConfig } from '../../security/config';
-import { contractAbi } from '../../security/contract_abi';
+import { MEMETIC_SIGNAL_PROTOCOL_ABI } from '../../security/MEMETIC_SIGNAL_PROTOCOL_ABI';
 
 @Injectable()
 export class BlockchainService {
@@ -35,7 +35,7 @@ export class BlockchainService {
 
     this.contract = new ethers.Contract(
       config.blockchain.contractAddress,
-      contractAbi,
+      MEMETIC_SIGNAL_PROTOCOL_ABI,
       this.wallet,
     );
   }

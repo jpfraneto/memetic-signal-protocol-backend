@@ -32,8 +32,8 @@ export class MFSService {
 
   /**
    * Calculate MFS delta for a signal
-   * Formula: Market Cap Change (in $) × Direction × e^(-λ×(days-1))
-   * Where λ = decay constant (default: 0.888)
+   * Formula: Market Cap Change (in $USDC) × Direction × e^(-λ×(days-1))
+   * Where λ = decay constant (for this system it is 0.888)
    */
   calculateMFSDelta(input: MFSCalculationInput): MFSResult {
     const {

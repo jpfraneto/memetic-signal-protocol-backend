@@ -86,7 +86,7 @@ export class SignalSchedulerService {
             continue;
           }
 
-          const entryPrice = signal.mc;
+          const entryPrice = signal.entry_market_cap;
           const pnlPercentage = this.tokenPriceService.calculatePnL(
             entryPrice,
             currentPrice,
@@ -112,7 +112,7 @@ export class SignalSchedulerService {
 
           // Determine overall signal result
           const isWin = totalCorrect >= 1; // Since we only have 1 token now
-          signal.status = isWin ? SignalStatus.WON : SignalStatus.LOST;
+          signal.resolved = isWin ? true : false;
 
           settledSignals.push(signal);
 
@@ -156,7 +156,7 @@ export class SignalSchedulerService {
             error,
           );
           // Mark as lost if we can't process it
-          signal.status = SignalStatus.LOST;
+          signal.resolved = false;
           settledSignals.push(signal);
         }
       }

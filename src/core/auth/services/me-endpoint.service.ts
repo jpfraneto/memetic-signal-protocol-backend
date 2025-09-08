@@ -236,11 +236,11 @@ export class MeEndpointService {
           s.transaction_hash,
           s.fid,
           s.ca,
-          s.mc,
+          s.entry_market_cap,
           s.direction,
           s.duration_days,
           s.timestamp,
-          s.status,
+          s.resolved,
           s.expires_at,
           s.block_number,
           u.username,
@@ -381,9 +381,8 @@ export class MeEndpointService {
         signal.timestamp = row.timestamp;
         signal.block_number = row.block_number;
         signal.resolved = row.resolved || false;
-        signal.mfs_applied = row.mfs_applied || '0';
-        signal.status = row.status;
-        signal.mc = row.mc;
+        signal.mfs_delta = row.mfs_delta || '0';
+        signal.entry_market_cap = row.entry_market_cap;
         signal.user = user;
         signal.token = token;
 
@@ -412,7 +411,8 @@ export class MeEndpointService {
           'signal.transaction_hash',
           'signal.fid',
           'signal.ca',
-          'signal.mc',
+          'signal.entry_market_cap',
+          'signal.resolved',
           'signal.direction',
           'signal.duration_days',
           'signal.timestamp',

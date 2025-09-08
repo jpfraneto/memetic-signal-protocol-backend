@@ -19,17 +19,20 @@ export class Signal {
   @Column({ type: 'varchar', length: 66 })
   transaction_hash: string;
 
+  @Column({ type: 'varchar', length: 66 })
+  ca: string;
+
   @Column({ type: 'int' })
   fid: number;
-
-  @Column({ type: 'varchar', length: 42 })
-  ca: string; // Contract address - hex format
 
   @Column({ type: 'boolean' })
   direction: boolean; // false = DOWN, true = UP
 
   @Column({ type: 'int' })
   duration_days: number; // Duration in days (uint32)
+
+  @Column({ type: 'int' })
+  entry_market_cap: number; // Market cap in USD when signal created (uint256)
 
   @Column({ type: 'bigint' })
   created_at: bigint; // uint64 timestamp from contract
@@ -47,13 +50,10 @@ export class Signal {
   resolved: boolean; // Whether signal has been resolved on-chain
 
   @Column({ type: 'text', default: '0' })
-  mfs_applied: string; // int256 MFS delta applied (as string for precision)
+  mfs_delta: string; // int256 MFS delta applied (as string for precision)
 
-  @Column({ type: 'int', default: 0 })
-  status: number; // 0 = active, 1 = won, 2 = lost (legacy backend status)
-
-  @Column({ type: 'int' })
-  mc: number; // Market cap when signal was created
+  @Column({ type: 'boolean', default: false })
+  manually_updated: boolean; // Whether owner has manually updated this signal
 
   // Optional relations for backend convenience (not part of Ponder schema)
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

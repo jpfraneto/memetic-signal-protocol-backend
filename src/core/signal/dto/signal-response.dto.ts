@@ -16,7 +16,7 @@ export class SignalResponseDto {
   direction: boolean;
 
   @ApiProperty({ description: 'Market cap when signal was created' })
-  mc: number;
+  entry_market_cap: number;
 
   @ApiProperty({ description: 'Signal duration in days' })
   duration: number;

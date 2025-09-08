@@ -20,6 +20,7 @@ import { Session } from '../../security/decorators';
 import { HttpStatus, hasError, hasResponse } from '../../utils';
 import { User } from '../../models';
 import { SignalSchedulerService } from '../signal/signal-scheduler.service';
+import { SignalResolutionService } from '../signal/signal-resolution.service';
 
 const adminFids = [16098];
 
@@ -33,6 +34,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly signalSchedulerService: SignalSchedulerService,
+    private readonly signalResolutionService: SignalResolutionService,
   ) {
     console.log('AdminController initialized');
   }
@@ -499,6 +501,119 @@ export class AdminController {
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
         'triggerCacheCleanup',
+        error.message,
+      );
+    }
+  }
+
+
+  /**
+   * Get signal resolution statistics
+   */
+  @Get('signals/resolution-stats')
+  async getResolutionStats(
+    @Session() user: QuickAuthPayload,
+    @Res() res: FastifyReply,
+  ) {
+    console.log(`getResolutionStats called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'getResolutionStats',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Fetching resolution statistics...');
+      const stats = await this.signalResolutionService.getResolutionStats();
+      console.log('Resolution statistics retrieved:', stats);
+      return hasResponse(res, { stats });
+    } catch (error) {
+      console.error('Error in getResolutionStats:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'getResolutionStats',
+        error.message,
+      );
+    }
+  }
+
+  /**
+   * Trigger manual signal resolution (fallback cron)
+   */
+  @Post('signals/trigger-resolution')
+  async triggerSignalResolution(
+    @Session() user: QuickAuthPayload,
+    @Res() res: FastifyReply,
+  ) {
+    console.log(`triggerSignalResolution called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'triggerSignalResolution',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Triggering manual signal resolution...');
+      await this.signalResolutionService.triggerSignalResolution();
+      console.log('Signal resolution triggered successfully');
+
+      return hasResponse(res, {
+        message: 'Signal resolution triggered successfully',
+      });
+    } catch (error) {
+      console.error('Error in triggerSignalResolution:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'triggerSignalResolution',
+        error.message,
+      );
+    }
+  }
+
+
+  /**
+   * Get batch processing statistics  
+   */
+  @Get('signals/batch-stats')
+  async getBatchStats(
+    @Session() user: QuickAuthPayload,
+    @Res() res: FastifyReply,
+  ) {
+    console.log(`getBatchStats called - user: ${user.sub}`);
+
+    if (!adminFids.includes(user.sub)) {
+      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      return hasError(
+        res,
+        HttpStatus.FORBIDDEN,
+        'getBatchStats',
+        'Admin access required',
+      );
+    }
+
+    try {
+      console.log('Fetching batch processing statistics...');
+      const stats = await this.signalResolutionService.getBatchStats();
+      console.log('Batch statistics retrieved:', stats);
+      return hasResponse(res, { stats });
+    } catch (error) {
+      console.error('Error in getBatchStats:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'getBatchStats',
         error.message,
       );
     }

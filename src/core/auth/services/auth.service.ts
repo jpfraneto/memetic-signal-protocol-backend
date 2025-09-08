@@ -64,7 +64,7 @@ export class AuthService implements OnModuleInit {
    */
   async verifyQuickAuthToken(token: string) {
     await this.ensureFarcasterClient();
-
+    console.log('IN HERE THE TOKEN IS', token);
     try {
       const domain = 'memeticsignalprotocol.com';
       const payload = await this.farcasterClient.verifyJwt({ token, domain });

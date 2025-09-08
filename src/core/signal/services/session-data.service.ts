@@ -52,7 +52,6 @@ export class SessionDataService {
         isVerified: signal.user?.is_verified || false,
         ca: signal.ca,
         timestamp: signal.timestamp,
-        status: signal.status,
         expires_at: signal.expires_at, // Already a Date object
       }));
     } catch (error) {

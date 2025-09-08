@@ -12,6 +12,7 @@ import { WalletAuthorization } from './models/WalletAuthorization/WalletAuthoriz
 import { DailySignalCount } from './models/DailySignalCount/DailySignalCount.model';
 import { FidBan } from './models/FidBan/FidBan.model';
 import { WalletBan } from './models/WalletBan/WalletBan.model';
+import { PriceSnapshot } from './models/PriceSnapshot/PriceSnapshot.model';
 
 // Create data source for TypeORM CLI commands
 export const AppDataSource = new DataSource({
@@ -35,6 +36,7 @@ export const AppDataSource = new DataSource({
     DailySignalCount,
     FidBan,
     WalletBan,
+    PriceSnapshot,
   ],
   migrations: [],
   subscribers: ['src/database/subscribers/*.ts'],

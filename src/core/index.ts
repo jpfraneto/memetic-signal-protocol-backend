@@ -14,7 +14,7 @@ import { PricingModule } from './pricing/pricing.module';
  * Module Responsibilities:
  * - AuthModule: Farcaster QuickAuth integration
  * - UserModule: User management, profiles, stats
- * - SignalModule: Single token prediction signals with 88-second sessions
+ * - SignalModule: Single token prediction signals with hourly batch resolution
  * - TokensModule: Token price and metadata API
  * - LeaderboardModule: User rankings and MFS scoring
  * - ZapperModule: Trending tokens from Zapper API integration
@@ -25,7 +25,7 @@ const CoreModules = [
   UserModule, // Foundation - user management
   AuthModule, // Authentication & session management
   AdminModule, // Administrative functions
-  SignalModule, // Single token signal predictions with persistent sessions
+  SignalModule, // Single token signal predictions with hourly batch resolution
   TokensModule, // Token price and metadata API
   LeaderboardModule, // User rankings and scoring
   ZapperModule, // Trending tokens from Zapper API

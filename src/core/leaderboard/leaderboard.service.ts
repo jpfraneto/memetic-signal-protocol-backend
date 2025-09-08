@@ -105,7 +105,7 @@ export class LeaderboardService {
         .where('user.settled_signals >= 5')
         .orderBy('user.mfs_score', 'DESC')
         .addOrderBy('user.win_rate', 'DESC')
-        .addOrderBy('user.settledSignals', 'DESC')
+        .addOrderBy('user.settled_signals', 'DESC')
         .getMany();
 
       // Update ranks

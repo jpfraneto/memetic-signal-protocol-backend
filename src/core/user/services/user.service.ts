@@ -279,7 +279,7 @@ export class UserService {
       .where('user.fid = :fid', { fid });
 
     if (status) {
-      queryBuilder.andWhere('signal.status = :status', { status });
+      queryBuilder.andWhere('signal.resolved = :status', { status });
     }
 
     queryBuilder

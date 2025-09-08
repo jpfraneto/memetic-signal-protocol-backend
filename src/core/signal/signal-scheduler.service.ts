@@ -43,7 +43,7 @@ export class SignalSchedulerService {
       const expiredSignals = await this.signalRepository
         .createQueryBuilder('signal')
         .leftJoinAndSelect('signal.user', 'user')
-        .where('signal.status = :status', { status: SignalStatus.ACTIVE })
+        .where('signal.resolved = :status', { status: false })
         .andWhere('signal.expires_at < :now', {
           now: BigInt(Math.floor(now.getTime() / 1000)),
         })

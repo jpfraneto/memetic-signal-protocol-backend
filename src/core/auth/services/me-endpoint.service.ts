@@ -408,6 +408,7 @@ export class MeEndpointService {
         .leftJoin('signal.user', 'user')
         .leftJoin('signal.token', 'token')
         .select([
+          'signal.signal_id',
           'signal.transaction_hash',
           'signal.fid',
           'signal.ca',
@@ -415,10 +416,11 @@ export class MeEndpointService {
           'signal.resolved',
           'signal.direction',
           'signal.duration_days',
+          'signal.created_at',
           'signal.timestamp',
-          'signal.status',
           'signal.expires_at',
           'signal.block_number',
+          'signal.mfs_delta',
           'user.username',
           'user.display_name',
           'user.pfp_url',
@@ -452,7 +454,7 @@ export class MeEndpointService {
     }
 
     try {
-      const zapperTokens = await this.zapperService.getTrendingTokens(fid, 8);
+      const zapperTokens = await this.zapperService.getTrendingTokens(fid, 30);
 
       // Format Zapper tokens to match frontend Token interface expectations
       const formattedTokens = zapperTokens.map((zapperToken) => ({
@@ -626,6 +628,8 @@ export class MeEndpointService {
         direction: signal.direction ? 'up' : 'down',
         timeframe: signal.duration_days, // Keep for backwards compatibility
         duration: signal.duration_days,
+        entry_market_cap: signal.entry_market_cap,
+        resolved: signal.resolved,
         createdAt: Number(signal.created_at),
         expiresAt: Number(signal.expires_at),
         transactionHash: signal.transaction_hash,

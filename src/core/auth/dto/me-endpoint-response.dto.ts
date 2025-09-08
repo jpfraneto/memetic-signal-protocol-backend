@@ -107,8 +107,14 @@ export class TodaySignalDto {
   @ApiProperty({ description: 'Duration in days', nullable: true })
   timeframe?: number;
 
+  @ApiProperty({ description: 'Entry market cap' })
+  entry_market_cap: number;
+
   @ApiProperty({ description: 'Duration in days' })
   duration: number;
+
+  @ApiProperty({ description: 'Resolved' })
+  resolved: boolean;
 
   @ApiProperty({ description: 'Signal creation timestamp (Unix seconds)' })
   createdAt: number;

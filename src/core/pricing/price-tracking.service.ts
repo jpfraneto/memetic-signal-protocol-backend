@@ -40,7 +40,7 @@ export class PriceTrackingService {
       const activeContracts = await this.signalRepository
         .createQueryBuilder('signal')
         .select('DISTINCT signal.ca', 'ca')
-        .where('signal.status = :status', { status: SignalStatus.ACTIVE })
+        .where('signal.resolved = :status', { status: false })
         .getRawMany();
 
       this.logger.log(

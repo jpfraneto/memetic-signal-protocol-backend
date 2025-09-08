@@ -121,7 +121,7 @@ export class ZapperService {
 
       const variables = {
         fid,
-        first: Math.max(count, 16), // Always fetch at least 16 to have a good selection
+        first: Math.max(count, 30), // Always fetch at least 16 to have a good selection
       };
 
       const response = await fetch(this.ZAPPER_API_URL, {

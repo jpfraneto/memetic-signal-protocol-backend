@@ -107,15 +107,15 @@ export class SignalResolutionService {
             );
 
             const mfsInput: MFSCalculationInput = {
-              entryMarketCap: signal.entry_market_cap,
-              exitMarketCap: exitMarketCap,
+              entryMarketCap: Math.floor(Number(signal.entry_market_cap)),
+              exitMarketCap: Math.floor(Number(exitMarketCap)),
               direction: signal.direction,
               durationDays: signal.duration_days,
               isCorrect,
             };
 
             const mfsResult = this.mfsService.calculateMFSDelta(mfsInput);
-            mfsDelta = mfsResult.mfsDelta;
+            mfsDelta = Math.floor(mfsResult.mfsDelta);
           } else {
             this.logger.warn(
               `No historical market cap found for ${signal.ca} at ${signalEndDate.toISOString()}, resolving with MFS delta 0`,

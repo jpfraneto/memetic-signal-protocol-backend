@@ -115,7 +115,7 @@ export class SignalResolutionService {
             };
 
             const mfsResult = this.mfsService.calculateMFSDelta(mfsInput);
-            mfsDelta = Math.floor(mfsResult.mfsDelta);
+            mfsDelta = mfsResult.mfsDelta;
           } else {
             this.logger.warn(
               `No historical market cap found for ${signal.ca} at ${signalEndDate.toISOString()}, resolving with MFS delta 0`,
@@ -349,13 +349,13 @@ export class SignalResolutionService {
    * Update user statistics after signal resolution
    */
   private async updateUserStatistics(signals: Signal[]): Promise<void> {
-    const userUpdates = new Map<number, { wins: number; losses: number }>();
+    const userUpdates = new Map<number, { wins: number; losses: number; mfsDeltas: number[] }>();
 
     // Aggregate updates by user
     for (const signal of signals) {
       const userId = signal.user.fid;
       if (!userUpdates.has(userId)) {
-        userUpdates.set(userId, { wins: 0, losses: 0 });
+        userUpdates.set(userId, { wins: 0, losses: 0, mfsDeltas: [] });
       }
 
       const update = userUpdates.get(userId)!;
@@ -364,6 +364,9 @@ export class SignalResolutionService {
       } else {
         update.losses += 1;
       }
+      
+      // Collect MFS deltas for this user
+      update.mfsDeltas.push(signal.mfs_delta || 0);
     }
 
     // Apply updates
@@ -395,20 +398,14 @@ export class SignalResolutionService {
           user.win_rate = (totalWins / user.settled_signals) * 100;
         }
 
-        // Calculate MFS Score
-        if (user.settled_signals >= 5) {
-          const winRateWeight = user.win_rate / 100;
-          const volumeWeight = Math.min(user.settled_signals / 100, 1);
-          const consistencyBonus = user.settled_signals >= 20 ? 0.05 : 0;
-          user.mfs_score =
-            winRateWeight * 0.7 + volumeWeight * 0.25 + consistencyBonus;
-          user.mfs_score = Math.min(Math.max(user.mfs_score, 0), 1);
-        }
+        // Simple MFS Score calculation: add all mfs_deltas to the previous score
+        const totalMfsDelta = updates.mfsDeltas.reduce((sum, delta) => sum + delta, 0);
+        user.mfs_score += totalMfsDelta;
 
         await this.userRepository.save(user);
 
         this.logger.log(
-          `Updated stats for user ${userId}: +${updates.wins} wins, +${updates.losses} losses. Win rate: ${user.win_rate.toFixed(2)}%, MFS: ${user.mfs_score.toFixed(3)}`,
+          `Updated stats for user ${userId}: +${updates.wins} wins, +${updates.losses} losses. Win rate: ${user.win_rate.toFixed(2)}%, MFS: ${user.mfs_score.toFixed(3)} (+${totalMfsDelta.toFixed(3)})`,
         );
       } catch (error) {
         this.logger.error(`Error updating user stats for ${userId}:`, error);

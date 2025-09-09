@@ -20,11 +20,10 @@ export interface MFSResult {
 export class MFSService {
   private readonly logger = new Logger(MFSService.name);
   private readonly DECAY_CONSTANT: number;
-  private readonly SCALE_FACTOR = 1e18; // Scale factor for BigInt precision
 
   constructor() {
-    // Get decay constant from config (default to 0.888 to match your existing system)
-    this.DECAY_CONSTANT = parseFloat(process.env.MSP_DECAY_CONSTANT || '0.888');
+    // Get decay constant from config (default to 0.088 as per specification)
+    this.DECAY_CONSTANT = parseFloat(process.env.MSP_DECAY_CONSTANT || '0.088');
     this.logger.log(
       `Initialized MFS Service with decay constant: ${this.DECAY_CONSTANT}`,
     );
@@ -32,8 +31,8 @@ export class MFSService {
 
   /**
    * Calculate MFS delta for a signal
-   * Formula: Market Cap Change (in $USDC) × Direction × e^(-λ×(days-1))
-   * Where λ = decay constant (for this system it is 0.888)
+   * Formula: abs((exitMC - entryMC) / entryMC) × 1000 × correctnessMultiplier × e^(-λ×(days-1))
+   * Where λ = 0.088 (decay constant favoring shorter-term accuracy)
    */
   calculateMFSDelta(input: MFSCalculationInput): MFSResult {
     const {
@@ -44,15 +43,18 @@ export class MFSService {
       isCorrect,
     } = input;
 
-    // Calculate market cap change in absolute dollars
+    // Calculate market cap change in absolute dollars for logging
     const marketCapChange = exitMarketCap - entryMarketCap;
 
-    // Calculate percentage change for logging
+    // Calculate percentage change
     const marketCapChangePercentage =
       entryMarketCap > 0 ? (marketCapChange / entryMarketCap) * 100 : 0;
 
-    // Determine direction multiplier based on correctness
-    const directionMultiplier = isCorrect ? 1 : -1;
+    // Calculate absolute percentage change (as per formula)
+    const absPercentageChange = entryMarketCap > 0 ? Math.abs(marketCapChange / entryMarketCap) : 0;
+
+    // Determine correctness multiplier
+    const correctnessMultiplier = isCorrect ? 1 : -1;
 
     // Calculate exponential decay multiplier
     // Day 1 signals get full multiplier (e^0 = 1)
@@ -60,11 +62,8 @@ export class MFSService {
     const decayExponent = -this.DECAY_CONSTANT * Math.max(0, durationDays - 1);
     const decayMultiplier = Math.exp(decayExponent);
 
-    // Calculate raw MFS score in dollars
-    const rawMFSScore = marketCapChange * directionMultiplier * decayMultiplier;
-
-    // Convert to BigInt with scaling factor for smart contract
-    const mfsDelta = Math.floor(rawMFSScore * this.SCALE_FACTOR);
+    // Apply the correct MFS formula: abs((exitMC - entryMC) / entryMC) × 1000 × correctnessMultiplier × e^(-λ×(days-1))
+    const mfsDelta = absPercentageChange * 1000 * correctnessMultiplier * decayMultiplier;
 
     this.logger.debug(`MFS Calculation:
       Entry MC: $${entryMarketCap.toLocaleString()}
@@ -75,7 +74,8 @@ export class MFSService {
       Correct: ${isCorrect}
       Decay Constant (λ): ${this.DECAY_CONSTANT}
       Decay Multiplier: ${decayMultiplier.toFixed(6)}
-      MFS Delta: ${mfsDelta.toString()}`);
+      Abs % Change: ${absPercentageChange.toFixed(6)}
+      MFS Delta: ${mfsDelta.toFixed(6)}`);
 
     return {
       mfsDelta,
@@ -113,10 +113,10 @@ export class MFSService {
   }
 
   /**
-   * Convert BigInt MFS delta back to human-readable format
+   * Format MFS delta for display
    */
-  formatMFSDelta(mfsDelta: bigint): number {
-    return Number(mfsDelta) / this.SCALE_FACTOR;
+  formatMFSDelta(mfsDelta: number): string {
+    return mfsDelta.toFixed(6);
   }
 
   /**
@@ -131,10 +131,10 @@ export class MFSService {
    * Calculate the effective scoring window (days where decay multiplier > 0.01)
    */
   getEffectiveScoringWindow(): number {
-    // Find when e^(-0.075×(days-1)) = 0.01
-    // -0.075×(days-1) = ln(0.01)
-    // days-1 = -ln(0.01) / 0.075
-    // days = 1 + (-ln(0.01) / 0.075)
+    // Find when e^(-0.088×(days-1)) = 0.01
+    // -0.088×(days-1) = ln(0.01)
+    // days-1 = -ln(0.01) / 0.088
+    // days = 1 + (-ln(0.01) / 0.088)
     const effectiveDays = Math.ceil(1 + -Math.log(0.01) / this.DECAY_CONSTANT);
     return effectiveDays;
   }

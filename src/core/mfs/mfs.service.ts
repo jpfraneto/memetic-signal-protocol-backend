@@ -9,7 +9,7 @@ export interface MFSCalculationInput {
 }
 
 export interface MFSResult {
-  mfsDelta: bigint;
+  mfsDelta: number;
   isCorrect: boolean;
   marketCapChange: number;
   marketCapChangePercentage: number;
@@ -64,7 +64,7 @@ export class MFSService {
     const rawMFSScore = marketCapChange * directionMultiplier * decayMultiplier;
 
     // Convert to BigInt with scaling factor for smart contract
-    const mfsDelta = BigInt(Math.floor(rawMFSScore * this.SCALE_FACTOR));
+    const mfsDelta = Math.floor(rawMFSScore * this.SCALE_FACTOR);
 
     this.logger.debug(`MFS Calculation:
       Entry MC: $${entryMarketCap.toLocaleString()}

@@ -49,8 +49,8 @@ export class Signal {
   @Column({ type: 'boolean', default: false })
   resolved: boolean; // Whether signal has been resolved on-chain
 
-  @Column({ type: 'text', default: '0' })
-  mfs_delta: string; // int256 MFS delta applied (as string for precision)
+  @Column({ type: 'int', default: 0 })
+  mfs_delta: number; // int256 MFS delta applied (as string for precision)
 
   @Column({ type: 'boolean', default: false })
   manually_updated: boolean; // Whether owner has manually updated this signal

@@ -15,7 +15,7 @@ import { MFSService, MFSCalculationInput } from '../mfs/mfs.service';
 interface SignalResolutionBatch {
   signals: Signal[];
   signalIds: number[];
-  mfsDeltas: bigint[];
+  mfsDeltas: number[];
   notifications: Array<{
     fid: number;
     signalResult: {
@@ -183,7 +183,7 @@ export class SignalResolutionService {
 
         // Update signal in database (but don't save yet - wait for blockchain confirmation)
         signal.resolved = isCorrect ? true : false;
-        signal.mfs_delta = mfsResult.mfsDelta.toString();
+        signal.mfs_delta = mfsResult.mfsDelta;
 
         // Use the signal_id directly from the Signal model
         const signalId = signal.signal_id;
@@ -208,13 +208,13 @@ export class SignalResolutionService {
               direction: signal.direction ? 'UP' : 'DOWN',
               duration: signal.duration_days,
               won: isCorrect,
-              mfsScore: this.mfsService.formatMFSDelta(mfsResult.mfsDelta),
+              mfsScore: mfsResult.mfsDelta,
             },
           });
         }
 
         this.logger.log(
-          `Prepared signal ${signalId} (${signal.transaction_hash}) for resolution: ${isCorrect ? 'WON' : 'LOST'} (MFS: ${this.mfsService.formatMFSDelta(mfsResult.mfsDelta)})`,
+          `Prepared signal ${signalId} (${signal.transaction_hash}) for resolution: ${isCorrect ? 'WON' : 'LOST'} (MFS: ${mfsResult.mfsDelta})`,
         );
       } catch (error) {
         this.logger.error(
@@ -247,7 +247,7 @@ export class SignalResolutionService {
         // Execute batch resolution on smart contract
         const txHash = await this.blockchainService.batchResolveSignals(
           batch.signalIds,
-          batch.mfsDeltas,
+          batch.mfsDeltas.map((delta) => BigInt(delta)),
         );
 
         // Mark signals as resolved in database (Ponder indexer will update the resolved flag)

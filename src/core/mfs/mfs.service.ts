@@ -51,7 +51,8 @@ export class MFSService {
       entryMarketCap > 0 ? (marketCapChange / entryMarketCap) * 100 : 0;
 
     // Calculate absolute percentage change (as per formula)
-    const absPercentageChange = entryMarketCap > 0 ? Math.abs(marketCapChange / entryMarketCap) : 0;
+    const absPercentageChange =
+      entryMarketCap > 0 ? Math.abs(marketCapChange / entryMarketCap) : 0;
 
     // Determine correctness multiplier
     const correctnessMultiplier = isCorrect ? 1 : -1;
@@ -63,7 +64,9 @@ export class MFSService {
     const decayMultiplier = Math.exp(decayExponent);
 
     // Apply the correct MFS formula: abs((exitMC - entryMC) / entryMC) × 1000 × correctnessMultiplier × e^(-λ×(days-1))
-    const mfsDelta = absPercentageChange * 1000 * correctnessMultiplier * decayMultiplier;
+    const mfsDelta = Math.round(
+      absPercentageChange * 1000 * correctnessMultiplier * decayMultiplier,
+    );
 
     this.logger.debug(`MFS Calculation:
       Entry MC: $${entryMarketCap.toLocaleString()}
@@ -75,7 +78,7 @@ export class MFSService {
       Decay Constant (λ): ${this.DECAY_CONSTANT}
       Decay Multiplier: ${decayMultiplier.toFixed(6)}
       Abs % Change: ${absPercentageChange.toFixed(6)}
-      MFS Delta: ${mfsDelta.toFixed(6)}`);
+      MFS Delta: ${mfsDelta}`);
 
     return {
       mfsDelta,

@@ -1,5 +1,5 @@
 // Dependencies
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 
 // Utils
 import { logger } from '../../../main';
@@ -18,6 +18,7 @@ import { logger } from '../../../main';
  */
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
   private farcasterClient: any;
 
   constructor() {}
@@ -64,7 +65,10 @@ export class AuthService implements OnModuleInit {
    */
   async verifyQuickAuthToken(token: string) {
     await this.ensureFarcasterClient();
-    console.log('IN HERE THE TOKEN IS', token);
+    this.logger.debug(
+      'Verifying QuickAuth token',
+      token ? `Token length: ${token.length}` : 'No token provided',
+    );
     try {
       const domain = 'memeticsignalprotocol.com';
       const payload = await this.farcasterClient.verifyJwt({ token, domain });

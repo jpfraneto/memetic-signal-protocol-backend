@@ -36,7 +36,7 @@ export class AdminController {
     private readonly signalSchedulerService: SignalSchedulerService,
     private readonly signalResolutionService: SignalResolutionService,
   ) {
-    console.log('AdminController initialized');
+    this.logger.log('AdminController initialized');
   }
 
   /**
@@ -50,13 +50,17 @@ export class AdminController {
     @Query('search') search: string = '',
     @Res() res: FastifyReply,
   ) {
-    console.log(
-      `getAllUsers called - user: ${user.sub}, page: ${page}, limit: ${limit}, search: "${search}"`,
-    );
+    this.logger.log(`getAllUsers called by user ${user.sub}`, {
+      page,
+      limit,
+      search,
+    });
 
     // Check admin permissions
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -66,13 +70,13 @@ export class AdminController {
     }
 
     try {
-      console.log('Fetching users from service...');
+      this.logger.log('Fetching users from admin service');
       const [users, count] = await this.adminService.getAllUsers(
         page,
         limit,
         search,
       );
-      console.log(
+      this.logger.log(
         `Found ${count} total users, returning ${users.length} results`,
       );
 
@@ -86,7 +90,7 @@ export class AdminController {
         },
       });
     } catch (error) {
-      console.error('Error in getAllUsers:', error);
+      this.logger.error('Error in getAllUsers', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -105,10 +109,12 @@ export class AdminController {
     @Param('id') id: number,
     @Res() res: FastifyReply,
   ) {
-    console.log(`getUserById called - user: ${user.sub}, id: ${id}`);
+    this.logger.log(`getUserById called by user ${user.sub}`, { userId: id });
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -118,16 +124,16 @@ export class AdminController {
     }
 
     try {
-      console.log(`Fetching user ${id}...`);
+      this.logger.log(`Fetching user ${id}`);
       const userData = await this.adminService.getUserById(id);
-      console.log('User found:', {
+      this.logger.log('User found', {
         fid: userData.fid,
         username: userData.username,
       });
 
       return hasResponse(res, { user: userData });
     } catch (error) {
-      console.error('Error in getUserById:', error);
+      this.logger.error('Error in getUserById:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -147,10 +153,15 @@ export class AdminController {
     @Body() updateData: Partial<User>,
     @Res() res: FastifyReply,
   ) {
-    console.log(`updateUser called - user: ${user.sub}, id: ${id}`, updateData);
+    this.logger.log(`updateUser called by user ${user.sub}`, {
+      userId: id,
+      updateData,
+    });
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -160,9 +171,9 @@ export class AdminController {
     }
 
     try {
-      console.log(`Updating user ${id}...`);
+      this.logger.log(`Updating user ${id}`);
       const updatedUser = await this.adminService.updateUser(id, updateData);
-      console.log('User updated successfully:', {
+      this.logger.log('User updated successfully', {
         fid: updatedUser.fid,
         username: updatedUser.username,
         role: updatedUser.role,
@@ -173,7 +184,7 @@ export class AdminController {
         message: 'User updated successfully',
       });
     } catch (error) {
-      console.error('Error in updateUser:', error);
+      this.logger.error('Error in updateUser:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -192,10 +203,12 @@ export class AdminController {
     @Param('id') id: number,
     @Res() res: FastifyReply,
   ) {
-    console.log(`deleteUser called - user: ${user.sub}, id: ${id}`);
+    this.logger.log(`deleteUser called by user ${user.sub}`, { userId: id });
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -205,14 +218,14 @@ export class AdminController {
     }
 
     try {
-      console.log(`Deleting user ${id}...`);
+      this.logger.log(`Deleting user ${id}`);
       await this.adminService.deleteUser(id);
-      console.log('User deleted successfully');
+      this.logger.log('User deleted successfully');
       return hasResponse(res, {
         message: 'User deleted successfully',
       });
     } catch (error) {
-      console.error('Error in deleteUser:', error);
+      this.logger.error('Error in deleteUser:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -230,10 +243,12 @@ export class AdminController {
     @Session() user: QuickAuthPayload,
     @Res() res: FastifyReply,
   ) {
-    console.log(`getAdminUsers called - user: ${user.sub}`);
+    this.logger.log(`getAdminUsers called by user ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -243,12 +258,12 @@ export class AdminController {
     }
 
     try {
-      console.log('Fetching admin users...');
+      this.logger.log('Fetching admin users');
       const adminUsers = await this.adminService.getAdminUsers();
-      console.log(`Found ${adminUsers.length} admin users`);
+      this.logger.log(`Found ${adminUsers.length} admin users`);
       return hasResponse(res, { adminUsers });
     } catch (error) {
-      console.error('Error in getAdminUsers:', error);
+      this.logger.error('Error in getAdminUsers:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -267,10 +282,14 @@ export class AdminController {
     @Param('id') id: number,
     @Res() res: FastifyReply,
   ) {
-    console.log(`promoteToAdmin called - user: ${user.sub}, id: ${id}`);
+    this.logger.log(`promoteToAdmin called by user ${user.sub}`, {
+      userId: id,
+    });
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -280,9 +299,9 @@ export class AdminController {
     }
 
     try {
-      console.log(`Promoting user ${id} to admin...`);
+      this.logger.log(`Promoting user ${id} to admin`);
       const promotedUser = await this.adminService.promoteToAdmin(id);
-      console.log('User promoted successfully:', {
+      this.logger.log('User promoted successfully', {
         fid: promotedUser.fid,
         username: promotedUser.username,
         role: promotedUser.role,
@@ -293,7 +312,7 @@ export class AdminController {
         message: 'User promoted to admin successfully',
       });
     } catch (error) {
-      console.error('Error in promoteToAdmin:', error);
+      this.logger.error('Error in promoteToAdmin:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -312,10 +331,12 @@ export class AdminController {
     @Param('id') id: number,
     @Res() res: FastifyReply,
   ) {
-    console.log(`demoteToUser called - user: ${user.sub}, id: ${id}`);
+    this.logger.log(`demoteToUser called by user ${user.sub}`, { userId: id });
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -325,9 +346,9 @@ export class AdminController {
     }
 
     try {
-      console.log(`Demoting user ${id} to regular user...`);
+      this.logger.log(`Demoting user ${id} to regular user`);
       const demotedUser = await this.adminService.demoteToUser(id);
-      console.log('User demoted successfully:', {
+      this.logger.log('User demoted successfully', {
         fid: demotedUser.fid,
         username: demotedUser.username,
         role: demotedUser.role,
@@ -338,7 +359,7 @@ export class AdminController {
         message: 'User demoted to regular user successfully',
       });
     } catch (error) {
-      console.error('Error in demoteToUser:', error);
+      this.logger.error('Error in demoteToUser:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -356,10 +377,12 @@ export class AdminController {
     @Session() user: QuickAuthPayload,
     @Res() res: FastifyReply,
   ) {
-    console.log(`getUserStats called - user: ${user.sub}`);
+    this.logger.log(`getUserStats called by user ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -369,12 +392,12 @@ export class AdminController {
     }
 
     try {
-      console.log('Fetching user statistics...');
+      this.logger.log('Fetching user statistics');
       const stats = await this.adminService.getUserStats();
-      console.log('User statistics retrieved:', stats);
+      this.logger.log('User statistics retrieved', stats);
       return hasResponse(res, { stats });
     } catch (error) {
-      console.error('Error in getUserStats:', error);
+      this.logger.error('Error in getUserStats:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -392,10 +415,12 @@ export class AdminController {
     @Session() user: QuickAuthPayload,
     @Res() res: FastifyReply,
   ) {
-    console.log(`getUsersWithNotifications called - user: ${user.sub}`);
+    this.logger.log(`getUsersWithNotifications called by user ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -405,12 +430,12 @@ export class AdminController {
     }
 
     try {
-      console.log('Fetching users with notifications enabled...');
+      this.logger.log('Fetching users with notifications enabled');
       const users = await this.adminService.getUsersWithNotifications();
-      console.log(`Found ${users.length} users with notifications enabled`);
+      this.logger.log(`Found ${users.length} users with notifications enabled`);
       return hasResponse(res, { users });
     } catch (error) {
-      console.error('Error in getUsersWithNotifications:', error);
+      this.logger.error('Error in getUsersWithNotifications:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -429,12 +454,14 @@ export class AdminController {
     @Param('id') id: number,
     @Res() res: FastifyReply,
   ) {
-    console.log(
-      `disableUserNotifications called - user: ${user.sub}, id: ${id}`,
-    );
+    this.logger.log(`disableUserNotifications called by user ${user.sub}`, {
+      userId: id,
+    });
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -444,9 +471,9 @@ export class AdminController {
     }
 
     try {
-      console.log(`Disabling notifications for user ${id}...`);
+      this.logger.log(`Disabling notifications for user ${id}`);
       const updatedUser = await this.adminService.disableUserNotifications(id);
-      console.log('User notifications disabled successfully:', {
+      this.logger.log('User notifications disabled successfully', {
         fid: updatedUser.fid,
         username: updatedUser.username,
         notificationsEnabled: updatedUser.notifications_enabled,
@@ -457,7 +484,7 @@ export class AdminController {
         message: 'User notifications disabled successfully',
       });
     } catch (error) {
-      console.error('Error in disableUserNotifications:', error);
+      this.logger.error('Error in disableUserNotifications:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -475,10 +502,12 @@ export class AdminController {
     @Session() user: QuickAuthPayload,
     @Res() res: FastifyReply,
   ) {
-    console.log(`triggerCacheCleanup called - user: ${user.sub}`);
+    this.logger.log(`triggerCacheCleanup called by user ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -488,15 +517,15 @@ export class AdminController {
     }
 
     try {
-      console.log('Triggering cache cleanup...');
+      this.logger.log('Triggering cache cleanup');
       await this.signalSchedulerService.triggerCacheCleanup();
-      console.log('Cache cleanup triggered successfully');
+      this.logger.log('Cache cleanup triggered successfully');
 
       return hasResponse(res, {
         message: 'Cache cleanup triggered successfully',
       });
     } catch (error) {
-      console.error('Error in triggerCacheCleanup:', error);
+      this.logger.error('Error in triggerCacheCleanup:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -506,7 +535,6 @@ export class AdminController {
     }
   }
 
-
   /**
    * Get signal resolution statistics
    */
@@ -515,10 +543,12 @@ export class AdminController {
     @Session() user: QuickAuthPayload,
     @Res() res: FastifyReply,
   ) {
-    console.log(`getResolutionStats called - user: ${user.sub}`);
+    this.logger.log(`getResolutionStats called by user ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -528,12 +558,12 @@ export class AdminController {
     }
 
     try {
-      console.log('Fetching resolution statistics...');
+      this.logger.log('Fetching resolution statistics');
       const stats = await this.signalResolutionService.getResolutionStats();
-      console.log('Resolution statistics retrieved:', stats);
+      this.logger.log('Resolution statistics retrieved', stats);
       return hasResponse(res, { stats });
     } catch (error) {
-      console.error('Error in getResolutionStats:', error);
+      this.logger.error('Error in getResolutionStats:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -551,10 +581,12 @@ export class AdminController {
     @Session() user: QuickAuthPayload,
     @Res() res: FastifyReply,
   ) {
-    console.log(`triggerSignalResolution called - user: ${user.sub}`);
+    this.logger.log(`triggerSignalResolution called by user ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -564,15 +596,15 @@ export class AdminController {
     }
 
     try {
-      console.log('Triggering manual signal resolution...');
+      this.logger.log('Triggering manual signal resolution');
       await this.signalResolutionService.triggerSignalResolution();
-      console.log('Signal resolution triggered successfully');
+      this.logger.log('Signal resolution triggered successfully');
 
       return hasResponse(res, {
         message: 'Signal resolution triggered successfully',
       });
     } catch (error) {
-      console.error('Error in triggerSignalResolution:', error);
+      this.logger.error('Error in triggerSignalResolution:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -582,19 +614,20 @@ export class AdminController {
     }
   }
 
-
   /**
-   * Get batch processing statistics  
+   * Get batch processing statistics
    */
   @Get('signals/batch-stats')
   async getBatchStats(
     @Session() user: QuickAuthPayload,
     @Res() res: FastifyReply,
   ) {
-    console.log(`getBatchStats called - user: ${user.sub}`);
+    this.logger.log(`getBatchStats called by user ${user.sub}`);
 
     if (!adminFids.includes(user.sub)) {
-      console.log(`Access denied for user ${user.sub} - not in admin list`);
+      this.logger.warn(
+        `Access denied for user ${user.sub} - not in admin list`,
+      );
       return hasError(
         res,
         HttpStatus.FORBIDDEN,
@@ -604,12 +637,12 @@ export class AdminController {
     }
 
     try {
-      console.log('Fetching batch processing statistics...');
+      this.logger.log('Fetching batch processing statistics');
       const stats = await this.signalResolutionService.getBatchStats();
-      console.log('Batch statistics retrieved:', stats);
+      this.logger.log('Batch statistics retrieved', stats);
       return hasResponse(res, { stats });
     } catch (error) {
-      console.error('Error in getBatchStats:', error);
+      this.logger.error('Error in getBatchStats:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,

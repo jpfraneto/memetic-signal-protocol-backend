@@ -1,5 +1,5 @@
 // Dependencies
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -18,6 +18,8 @@ import { SignalResponseDto } from 'src/core/signal/dto/signal-response.dto';
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -146,8 +148,8 @@ export class UserService {
 
     await this.userRepository.save(user);
 
-    console.log(
-      `✅ [UserService] Updated goal for user ${user.username} (FID: ${fid}): ${goal}`,
+    this.logger.log(
+      `Updated goal for user ${user.username} (FID: ${fid}): ${goal}`,
     );
     return user;
   }
@@ -314,7 +316,7 @@ export class UserService {
     user.total_signals = totalSignals;
     await this.userRepository.save(user);
 
-    console.log(`✅ Updated total signals for user ${fid}: ${totalSignals}`);
+    this.logger.log(`Updated total signals for user ${fid}: ${totalSignals}`);
   }
 
   /**
@@ -332,6 +334,6 @@ export class UserService {
       await this.userRepository.save(user);
     }
 
-    console.log(`✅ Recalculated total signals for ${users.length} users`);
+    this.logger.log(`Recalculated total signals for ${users.length} users`);
   }
 }

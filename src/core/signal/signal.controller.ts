@@ -11,6 +11,7 @@ import {
   UseGuards,
   Headers,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FastifyReply } from 'fastify';
@@ -26,6 +27,8 @@ import { Session } from '../../security/decorators';
 @ApiTags('signal-service')
 @Controller('signal-service')
 export class SignalController {
+  private readonly logger = new Logger(SignalController.name);
+
   constructor(
     private readonly signalService: SignalService,
     private readonly signalResolutionService: SignalResolutionService,
@@ -59,10 +62,12 @@ export class SignalController {
   ) {
     try {
       const result = await this.signalService.getSignalsFeed(query);
-      console.log('THE RESULT HEREEEE', result);
-      console.log(
+      this.logger.log('THE RESULT HEREEEE', result);
+      this.logger.log(
         'TOKENSSS',
-        result.signals.map((signal) => console.log('TOKEN NNN', signal.token)),
+        result.signals.map((signal) =>
+          this.logger.log('TOKEN NNN', signal.token),
+        ),
       );
       return hasResponse(res, result);
     } catch (error) {
@@ -124,7 +129,7 @@ export class SignalController {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('Error triggering signal resolution:', error);
+      this.logger.error('Error triggering signal resolution:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -148,7 +153,7 @@ export class SignalController {
         ...stats,
       });
     } catch (error) {
-      console.error('Error fetching resolution stats:', error);
+      this.logger.error('Error fetching resolution stats:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,

@@ -133,14 +133,18 @@ export class SimpleTokenService {
       try {
         await this.rateLimit();
         const coinDataUrl = `${this.COINGECKO_API_URL}/coins/base/contract/${ca}`;
-        console.log('THE COIN DATA URL IS', coinDataUrl);
+        this.logger.debug('Fetching token data from CoinGecko', {
+          coinDataUrl,
+        });
         const coinDataResponse = await fetch(coinDataUrl, {
           headers: {
             accept: 'application/json',
             'x-cg-pro-api-key': process.env.COINGECKO_API_KEY || '',
           },
         });
-        console.log('THE COIN DATA RESPONSE IS', coinDataResponse);
+        this.logger.debug('CoinGecko response received', {
+          status: coinDataResponse.status,
+        });
         if (coinDataResponse.ok) {
           coinData = await coinDataResponse.json();
         }
@@ -161,7 +165,10 @@ export class SimpleTokenService {
         }
       }
 
-      console.log('THE COIN DATA IS', coinData);
+      this.logger.debug('Token data retrieved', {
+        tokenName: coinData?.name,
+        symbol: coinData?.symbol,
+      });
 
       if (!coinData) {
         throw new Error('Token not found or invalid contract address');
@@ -192,7 +199,11 @@ export class SimpleTokenService {
           price_change_24h: coinData?.market_data?.price_change_24h,
         },
       };
-      console.log('THE TOKEN DATA', tokenData);
+      this.logger.debug('Token data processed', {
+        ca,
+        name: tokenData.name,
+        symbol: tokenData.symbol,
+      });
 
       if (existingToken) {
         Object.assign(existingToken, tokenData);
@@ -203,7 +214,10 @@ export class SimpleTokenService {
       }
     } catch (error) {
       this.logger.error(`Failed to fetch token metadata for ${ca}:`, error);
-      console.log('THE ERROR IS:', error);
+      this.logger.error('Failed to fetch token metadata', {
+        ca,
+        error: error.message,
+      });
       throw new Error('Token not found or invalid contract address');
     }
   }
@@ -211,17 +225,21 @@ export class SimpleTokenService {
   private async fetchFromDexScreener(ca: string): Promise<any> {
     try {
       const dexScreenerUrl = `https://api.dexscreener.com/tokens/v1/base/${ca}`;
-      console.log('THE DEXSCREENER URL IS', dexScreenerUrl);
+      this.logger.debug('Fetching from DexScreener', { dexScreenerUrl });
 
       const response = await fetch(dexScreenerUrl);
-      console.log('THE DEXSCREENER RESPONSE IS', response);
+      this.logger.debug('DexScreener response received', {
+        status: response.status,
+      });
 
       if (!response.ok) {
         throw new Error(`DexScreener API returned ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('THE DEXSCREENER DATA IS', data);
+      this.logger.debug('DexScreener data retrieved', {
+        dataLength: Array.isArray(data) ? data.length : 'not array',
+      });
 
       // DexScreener returns an array, we want the first (most relevant) result
       if (!data || !Array.isArray(data) || data.length === 0) {

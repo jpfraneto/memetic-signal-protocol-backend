@@ -204,7 +204,6 @@ export class MeEndpointService {
     }>(cacheKey);
 
     if (cachedFeed) {
-      console.log('THE CACHED FEED IS', cachedFeed);
       this.logger.log('[/me] Using cached feed data');
       return cachedFeed;
     }

@@ -1,4 +1,12 @@
-import { Controller, Get, Param, HttpStatus, Res, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  HttpStatus,
+  Res,
+  Query,
+  Logger,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FastifyReply } from 'fastify';
 
@@ -10,6 +18,8 @@ import { hasError, hasResponse } from '../../utils';
 @ApiTags('token-service')
 @Controller('token-service')
 export class TokensController {
+  private readonly logger = new Logger(TokensController.name);
+
   constructor(
     private readonly tokenPriceService: TokenPriceService,
     private readonly simpleTokenService: SimpleTokenService,
@@ -59,7 +69,10 @@ export class TokensController {
         },
       });
     } catch (error) {
-      console.error('❌ [TokensController] Error fetching token price:', error);
+      this.logger.error(
+        '❌ [TokensController] Error fetching token price:',
+        error,
+      );
 
       return hasError(
         res,
@@ -113,7 +126,10 @@ export class TokensController {
         data: tokenInfo,
       });
     } catch (error) {
-      console.error('❌ [TokensController] Error fetching token info:', error);
+      this.logger.error(
+        '❌ [TokensController] Error fetching token info:',
+        error,
+      );
 
       return hasError(
         res,
@@ -187,7 +203,7 @@ export class TokensController {
         data: prices,
       });
     } catch (error) {
-      console.error(
+      this.logger.error(
         '❌ [TokensController] Error fetching token prices:',
         error,
       );
@@ -223,7 +239,10 @@ export class TokensController {
         data: { token: tokenInfo },
       });
     } catch (error) {
-      console.error('❌ [TokensController] Error fetching token info:', error);
+      this.logger.error(
+        '❌ [TokensController] Error fetching token info:',
+        error,
+      );
 
       if (error.message?.includes('Invalid contract address format')) {
         return hasError(
@@ -326,7 +345,7 @@ export class TokensController {
             });
           }
         } catch (addressError) {
-          console.error(
+          this.logger.error(
             '❌ [TokenSearch] Error searching by address:',
             addressError,
           );
@@ -370,7 +389,7 @@ export class TokensController {
             data: searchResults,
           });
         } catch (nameError) {
-          console.error(
+          this.logger.error(
             '❌ [TokenSearch] Error searching by name/symbol:',
             nameError,
           );
@@ -384,7 +403,7 @@ export class TokensController {
         }
       }
     } catch (error) {
-      console.error('❌ [TokenSearch] Unexpected error:', error);
+      this.logger.error('❌ [TokenSearch] Unexpected error:', error);
 
       return hasError(
         res,

@@ -19,7 +19,10 @@ interface TokenInfo {
 @Injectable()
 export class TokenPriceService {
   private readonly logger = new Logger(TokenPriceService.name);
-  private priceCache = new Map<string, { tokenInfo: TokenInfo; timestamp: number }>();
+  private priceCache = new Map<
+    string,
+    { tokenInfo: TokenInfo; timestamp: number }
+  >();
   private readonly CACHE_TTL = 5 * 60 * 1000;
   private cacheStats = { hits: 0, misses: 0 };
   private readonly COINGECKO_API_URL = 'https://pro-api.coingecko.com/api/v3';
@@ -33,7 +36,7 @@ export class TokenPriceService {
     const timeSinceLastRequest = now - this.lastRequestTime;
     if (timeSinceLastRequest < this.REQUEST_DELAY) {
       await new Promise((resolve) =>
-        setTimeout(resolve, this.REQUEST_DELAY - timeSinceLastRequest)
+        setTimeout(resolve, this.REQUEST_DELAY - timeSinceLastRequest),
       );
     }
     this.lastRequestTime = Date.now();
@@ -61,7 +64,7 @@ export class TokenPriceService {
       } else {
         this.logger.warn(
           `CoinGecko metadata fetch failed for ${ca}:`,
-          coinDataResponse.status
+          coinDataResponse.status,
         );
         return null;
       }
@@ -73,7 +76,7 @@ export class TokenPriceService {
 
   private async fetchHistoricalMarketData(
     coinId: string,
-    timestamp: Date
+    timestamp: Date,
   ): Promise<{ price: number; marketCap: number }> {
     try {
       await this.rateLimit();
@@ -104,7 +107,7 @@ export class TokenPriceService {
           let closestPrice = data.prices[0];
           let closestMarketCap = data.market_caps[0];
           let closestTimeDiff = Math.abs(
-            data.prices[0][0] - unixTimestamp * 1000
+            data.prices[0][0] - unixTimestamp * 1000,
           );
 
           for (let i = 0; i < data.prices.length; i++) {
@@ -121,7 +124,7 @@ export class TokenPriceService {
 
           this.logger.log(
             `Historical data found for ${coinId} at ${timestamp}:`,
-            `Price: ${closestPrice[1]}, Market Cap: ${closestMarketCap[1]}`
+            `Price: ${closestPrice[1]}, Market Cap: ${closestMarketCap[1]}`,
           );
 
           return {
@@ -136,13 +139,13 @@ export class TokenPriceService {
       }
 
       this.logger.warn(
-        `No historical market data found for ${coinId} at ${timestamp}`
+        `No historical market data found for ${coinId} at ${timestamp}`,
       );
       return { price: 0, marketCap: 0 };
     } catch (error) {
       this.logger.error(
         `Failed to fetch historical market data for ${coinId}:`,
-        error
+        error,
       );
       return { price: 0, marketCap: 0 };
     }
@@ -222,11 +225,16 @@ export class TokenPriceService {
     return priceMap;
   }
 
-  async getTokenInfo(contractAddress: string, timestamp?: Date): Promise<TokenInfo | null> {
+  async getTokenInfo(
+    contractAddress: string,
+    timestamp?: Date,
+  ): Promise<TokenInfo | null> {
     try {
       const normalizedAddress = contractAddress.toLowerCase();
-      const cacheKey = timestamp ? `${normalizedAddress}-${timestamp.getTime()}` : normalizedAddress;
-      
+      const cacheKey = timestamp
+        ? `${normalizedAddress}-${timestamp.getTime()}`
+        : normalizedAddress;
+
       // Check cache first
       const cached = this.priceCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
@@ -237,7 +245,7 @@ export class TokenPriceService {
       this.cacheStats.misses++;
 
       this.logger.log(
-        `Fetching token information for ${normalizedAddress}${timestamp ? ` at ${timestamp}` : ''}`
+        `Fetching token information for ${normalizedAddress}${timestamp ? ` at ${timestamp}` : ''}`,
       );
 
       // Step 1: Get token metadata from CoinGecko
@@ -246,18 +254,21 @@ export class TokenPriceService {
       // Step 2: If CoinGecko fails, try DexScreener as fallback (current price only)
       if (!coinData && !timestamp) {
         this.logger.log(
-          `CoinGecko failed, trying DexScreener for ${normalizedAddress}`
+          `CoinGecko failed, trying DexScreener for ${normalizedAddress}`,
         );
         try {
           coinData = await this.fetchFromDexScreener(normalizedAddress);
         } catch (error) {
           this.logger.warn(
             `DexScreener also failed for ${normalizedAddress}:`,
-            error
+            error,
           );
           // Return zeros if both fail
           const fallbackResult = { price: 0, marketCap: 0, volume24h: 0 };
-          this.priceCache.set(cacheKey, { tokenInfo: fallbackResult, timestamp: Date.now() });
+          this.priceCache.set(cacheKey, {
+            tokenInfo: fallbackResult,
+            timestamp: Date.now(),
+          });
           return fallbackResult;
         }
       }
@@ -270,7 +281,7 @@ export class TokenPriceService {
       if (timestamp && coinData?.id) {
         const historicalData = await this.fetchHistoricalMarketData(
           coinData.id,
-          timestamp
+          timestamp,
         );
         price = historicalData.price;
         marketCap = historicalData.marketCap;
@@ -283,9 +294,14 @@ export class TokenPriceService {
 
       // If no data found, return zeros (fallback)
       if (!coinData) {
-        this.logger.warn(`No token data found for ${normalizedAddress}, returning zeros`);
+        this.logger.warn(
+          `No token data found for ${normalizedAddress}, returning zeros`,
+        );
         const fallbackResult = { price: 0, marketCap: 0, volume24h: 0 };
-        this.priceCache.set(cacheKey, { tokenInfo: fallbackResult, timestamp: Date.now() });
+        this.priceCache.set(cacheKey, {
+          tokenInfo: fallbackResult,
+          timestamp: Date.now(),
+        });
         return fallbackResult;
       }
 
@@ -296,7 +312,10 @@ export class TokenPriceService {
       };
 
       // Cache the result
-      this.priceCache.set(cacheKey, { tokenInfo: result, timestamp: Date.now() });
+      this.priceCache.set(cacheKey, {
+        tokenInfo: result,
+        timestamp: Date.now(),
+      });
 
       this.logger.log(`Token information complete for ${normalizedAddress}:`, {
         price,
@@ -308,7 +327,7 @@ export class TokenPriceService {
     } catch (error) {
       this.logger.error(
         `Error getting token info for ${contractAddress}:`,
-        error
+        error,
       );
       // Return zeros on any error
       return { price: 0, marketCap: 0, volume24h: 0 };

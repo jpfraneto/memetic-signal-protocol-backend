@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { Logger } from '@nestjs/common';
 
 interface Signaler {
   fid: number;
@@ -10,6 +11,8 @@ interface Signaler {
 interface InitialSeed {
   signalers: Signaler[];
 }
+
+const logger = new Logger('GetAllCasts');
 
 async function fetchCastsForUser(fid: number): Promise<any[]> {
   const apiKey = process.env.NEYNAR_API_KEY;

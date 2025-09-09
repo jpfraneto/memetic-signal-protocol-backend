@@ -151,7 +151,6 @@ export class ZapperService {
       }
 
       const tokens = data.data.tokenTrends.edges.map((edge) => edge.node);
-      this.logger.log('FETCHED TOKENS', tokens);
 
       // Cache the results
       this.tokenTrendsCache = {

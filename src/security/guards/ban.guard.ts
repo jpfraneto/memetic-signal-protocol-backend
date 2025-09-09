@@ -5,6 +5,7 @@ import {
   Injectable,
   ForbiddenException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
 
@@ -27,6 +28,8 @@ import { UserService } from '../../core/user/services';
  */
 @Injectable()
 export class BanGuard extends AuthorizationGuard implements CanActivate {
+  private readonly logger = new Logger(BanGuard.name);
+
   constructor(
     authService: AuthService,
     private readonly userService: UserService,
@@ -89,7 +92,7 @@ export class BanGuard extends AuthorizationGuard implements CanActivate {
         throw error;
       }
 
-      console.error('❌ [BanGuard] Error checking user ban status:', error);
+      this.logger.error('❌ [BanGuard] Error checking user ban status:', error);
       throw new InternalServerErrorException(
         'Failed to verify user access permissions',
       );

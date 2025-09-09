@@ -1,5 +1,8 @@
 import { DataSource } from 'typeorm';
+import { Logger } from '@nestjs/common';
 import { getConfig } from './security/config';
+
+const logger = new Logger('DataSource');
 
 // Import all entities
 import { User } from './models/User/User.model';
@@ -51,8 +54,8 @@ export const AppDataSource = new DataSource({
 // Initialize data source
 AppDataSource.initialize()
   .then(() => {
-    console.log('Data Source has been initialized!');
+    logger.log('Data Source has been initialized!');
   })
   .catch((err) => {
-    console.error('Error during Data Source initialization', err);
+    logger.error('Error during Data Source initialization', err);
   });

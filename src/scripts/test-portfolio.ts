@@ -1,7 +1,10 @@
 import { PortfolioService } from '../core/zapper/services/portfolio.service';
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('TestPortfolio');
 
 async function testPortfolioService() {
-  console.log('🧪 Testing Portfolio Service...');
+  logger.log('🧪 Testing Portfolio Service...');
 
   const portfolioService = new PortfolioService();
 
@@ -9,33 +12,33 @@ async function testPortfolioService() {
   const testAddress = '0x3d280fde2ddb59323c891cf30995e1862510342f';
 
   try {
-    console.log(`📊 Fetching portfolio for address: ${testAddress}`);
+    logger.log(`📊 Fetching portfolio for address: ${testAddress}`);
 
     const portfolio = await portfolioService.getPortfolioForUser(testAddress, [
       'ETHEREUM_MAINNET',
     ]);
 
-    console.log(
+    logger.log(
       `✅ Successfully fetched portfolio with ${portfolio.length} tokens`,
     );
 
     if (portfolio.length > 0) {
-      console.log('\n📋 Portfolio Summary:');
+      logger.log('\n📋 Portfolio Summary:');
       portfolio.slice(0, 5).forEach((token, index) => {
-        console.log(`${index + 1}. ${token.name} (${token.symbol})`);
-        console.log(`   Balance: ${token.balance}`);
-        console.log(`   Value: $${token.balanceUSD.toFixed(2)}`);
-        console.log('');
+        logger.log(`${index + 1}. ${token.name} (${token.symbol})`);
+        logger.log(`   Balance: ${token.balance}`);
+        logger.log(`   Value: $${token.balanceUSD.toFixed(2)}`);
+        logger.log('');
       });
     } else {
-      console.log('📭 No tokens found in portfolio');
+      logger.log('📭 No tokens found in portfolio');
     }
   } catch (error) {
-    console.error('❌ Error testing portfolio service:', error);
+    logger.error('❌ Error testing portfolio service:', error);
   }
 
-  console.log('🏁 Portfolio service test completed');
+  logger.log('🏁 Portfolio service test completed');
 }
 
 // Run the test
-testPortfolioService().catch(console.error);
+testPortfolioService().catch((error) => logger.error('Test failed:', error));

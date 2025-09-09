@@ -29,15 +29,19 @@ export class PriceTrackingService {
 
     try {
       const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
-      
+
       // Find signals that are expired but not resolved
       const expiredSignals = await this.signalRepository
         .createQueryBuilder('signal')
         .where('signal.resolved = :resolved', { resolved: false })
-        .andWhere('signal.expires_at < :currentTimestamp', { currentTimestamp: currentTimestamp.toString() })
+        .andWhere('signal.expires_at < :currentTimestamp', {
+          currentTimestamp: currentTimestamp.toString(),
+        })
         .getMany();
 
-      this.logger.log(`Found ${expiredSignals.length} expired signals to resolve`);
+      this.logger.log(
+        `Found ${expiredSignals.length} expired signals to resolve`,
+      );
 
       if (expiredSignals.length === 0) {
         return;
@@ -61,67 +65,90 @@ export class PriceTrackingService {
     try {
       // Double check expiry conditions
       const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
-      const signalExpiryTime = BigInt(signal.timestamp) + BigInt(signal.duration_days * 86400);
-      
-      if (signal.expires_at >= currentTimestamp || signalExpiryTime >= currentTimestamp) {
-        this.logger.warn(`Signal ${signal.signal_id} not yet expired, skipping`);
+      const signalExpiryTime =
+        BigInt(signal.timestamp) + BigInt(signal.duration_days * 86400);
+
+      if (
+        signal.expires_at >= currentTimestamp ||
+        signalExpiryTime >= currentTimestamp
+      ) {
+        this.logger.warn(
+          `Signal ${signal.signal_id} not yet expired, skipping`,
+        );
         return;
       }
 
       // Fetch token price at expiry moment
       const expiryDate = new Date(Number(signal.expires_at) * 1000);
-      const tokenInfo = await this.tokenPriceService.getTokenInfo(signal.ca, expiryDate);
-      
+      const tokenInfo = await this.tokenPriceService.getTokenInfo(
+        signal.ca,
+        expiryDate,
+      );
+
       // Handle case where no price data is available - set MFS to 0
       if (!tokenInfo || tokenInfo.marketCap === 0) {
-        this.logger.warn(`No market cap data available for signal ${signal.signal_id} at expiry, setting MFS to 0`);
-        
+        this.logger.warn(
+          `No market cap data available for signal ${signal.signal_id} at expiry, setting MFS to 0`,
+        );
+
         // Update signal as resolved with 0 MFS delta
         await this.dataSource.transaction(async (manager) => {
           await manager.update(Signal, signal.signal_id, {
             resolved: true,
-            mfs_delta: 0
+            mfs_delta: 0,
           });
           // No need to update user MFS since delta is 0
         });
-        
-        this.logger.log(`Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: 0 (no price data)`);
+
+        this.logger.log(
+          `Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: 0 (no price data)`,
+        );
         return;
       }
 
       const exitMarketCap = Number(tokenInfo.marketCap);
       const entryMarketCap = signal.entry_market_cap;
-      
+
       // Handle division by zero case
       if (entryMarketCap === 0) {
-        this.logger.warn(`Entry market cap is 0 for signal ${signal.signal_id}, setting MFS to 0`);
-        
+        this.logger.warn(
+          `Entry market cap is 0 for signal ${signal.signal_id}, setting MFS to 0`,
+        );
+
         await this.dataSource.transaction(async (manager) => {
           await manager.update(Signal, signal.signal_id, {
             resolved: true,
-            mfs_delta: 0
+            mfs_delta: 0,
           });
         });
-        
-        this.logger.log(`Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: 0 (entry market cap is 0)`);
+
+        this.logger.log(
+          `Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: 0 (entry market cap is 0)`,
+        );
         return;
       }
-      
+
       // Calculate MFS using the smart contract formula
-      const percentageChange = Math.abs((exitMarketCap - entryMarketCap) / entryMarketCap);
-      const wasCorrect = (signal.direction && exitMarketCap > entryMarketCap) || (!signal.direction && exitMarketCap < entryMarketCap);
+      const percentageChange = Math.abs(
+        (exitMarketCap - entryMarketCap) / entryMarketCap,
+      );
+      const wasCorrect =
+        (signal.direction && exitMarketCap > entryMarketCap) ||
+        (!signal.direction && exitMarketCap < entryMarketCap);
       const correctnessMultiplier = wasCorrect ? 1 : -1;
       const lambda = 0.088;
       const timeDecay = Math.exp(-lambda * (signal.duration_days - 1));
-      
-      const mfsDelta = Math.floor(percentageChange * 1000 * correctnessMultiplier * timeDecay);
+
+      const mfsDelta = Math.floor(
+        percentageChange * 1000 * correctnessMultiplier * timeDecay,
+      );
 
       // Update signal and user in transaction
       await this.dataSource.transaction(async (manager) => {
         // Update signal
         await manager.update(Signal, signal.signal_id, {
           resolved: true,
-          mfs_delta: mfsDelta
+          mfs_delta: mfsDelta,
         });
 
         // Update user's MFS score
@@ -133,7 +160,9 @@ export class PriceTrackingService {
           .execute();
       });
 
-      this.logger.log(`Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: ${mfsDelta}`);
+      this.logger.log(
+        `Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: ${mfsDelta}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to resolve signal ${signal.signal_id}:`, error);
     }
@@ -157,27 +186,36 @@ export class PriceTrackingService {
     expiredButUnresolved: number;
   }> {
     const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
-    
-    const [totalSignals, resolvedSignals, pendingSignals, expiredButUnresolved] = await Promise.all([
+
+    const [
+      totalSignals,
+      resolvedSignals,
+      pendingSignals,
+      expiredButUnresolved,
+    ] = await Promise.all([
       this.signalRepository.count(),
       this.signalRepository.count({ where: { resolved: true } }),
       this.signalRepository
         .createQueryBuilder('signal')
         .where('signal.resolved = :resolved', { resolved: false })
-        .andWhere('signal.expires_at > :currentTimestamp', { currentTimestamp: currentTimestamp.toString() })
+        .andWhere('signal.expires_at > :currentTimestamp', {
+          currentTimestamp: currentTimestamp.toString(),
+        })
         .getCount(),
       this.signalRepository
         .createQueryBuilder('signal')
         .where('signal.resolved = :resolved', { resolved: false })
-        .andWhere('signal.expires_at < :currentTimestamp', { currentTimestamp: currentTimestamp.toString() })
-        .getCount()
+        .andWhere('signal.expires_at < :currentTimestamp', {
+          currentTimestamp: currentTimestamp.toString(),
+        })
+        .getCount(),
     ]);
 
     return {
       totalSignals,
       resolvedSignals,
       pendingSignals,
-      expiredButUnresolved
+      expiredButUnresolved,
     };
   }
 }

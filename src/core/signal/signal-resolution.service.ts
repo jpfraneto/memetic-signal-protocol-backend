@@ -115,7 +115,9 @@ export class SignalResolutionService {
             };
 
             const mfsResult = this.mfsService.calculateMFSDelta(mfsInput);
+            console.log('IN HERE, THE MFS RESULT IS', mfsResult);
             mfsDelta = mfsResult.mfsDelta;
+            console.log('IN HERE THE MFS DELTA IS', mfsDelta);
           } else {
             this.logger.warn(
               `No historical market cap found for ${signal.ca} at ${signalEndDate.toISOString()}, resolving with MFS delta 0`,
@@ -175,98 +177,6 @@ export class SignalResolutionService {
       chunks.push(array.slice(i, i + size));
     }
     return chunks;
-  }
-
-  /**
-   * Prepare a batch of signals for resolution
-   */
-  private async prepareBatch(
-    signals: Signal[],
-  ): Promise<SignalResolutionBatch> {
-    const batch: SignalResolutionBatch = {
-      signals: [],
-      signalIds: [],
-      mfsDeltas: [],
-      notifications: [],
-    };
-
-    // Get unique token addresses for price fetching
-    const uniqueTokenAddresses = [...new Set(signals.map((s) => s.ca))];
-    const priceMap =
-      await this.tokenPriceService.getTokenPrices(uniqueTokenAddresses);
-
-    for (const signal of signals) {
-      try {
-        const currentMarketCap = priceMap[signal.ca];
-
-        if (!currentMarketCap) {
-          this.logger.warn(
-            `Could not fetch price for ${signal.ca}, skipping signal ${signal.transaction_hash}`,
-          );
-          continue;
-        }
-
-        // Calculate MFS delta
-        const isCorrect = this.mfsService.isPredictionCorrect(
-          signal.entry_market_cap,
-          currentMarketCap,
-          signal.direction,
-        );
-
-        const mfsInput: MFSCalculationInput = {
-          entryMarketCap: signal.entry_market_cap,
-          exitMarketCap: currentMarketCap,
-          direction: signal.direction,
-          durationDays: signal.duration_days,
-          isCorrect,
-        };
-
-        const mfsResult = this.mfsService.calculateMFSDelta(mfsInput);
-
-        // Update signal in database (but don't save yet - wait for blockchain confirmation)
-        signal.resolved = isCorrect ? true : false;
-        signal.mfs_delta = mfsResult.mfsDelta;
-
-        // Use the signal_id directly from the Signal model
-        const signalId = signal.signal_id;
-
-        batch.signals.push(signal);
-        batch.signalIds.push(signalId);
-        batch.mfsDeltas.push(mfsResult.mfsDelta);
-
-        // Prepare notification if user has them enabled
-        if (
-          signal.user?.notifications_enabled &&
-          signal.user?.notification_token
-        ) {
-          const token = await this.tokenRepository.findOne({
-            where: { ca: signal.ca },
-          });
-
-          batch.notifications.push({
-            fid: signal.user.fid,
-            signalResult: {
-              tokenSymbol: token?.symbol || 'TOKEN',
-              direction: signal.direction ? 'UP' : 'DOWN',
-              duration: signal.duration_days,
-              won: isCorrect,
-              mfsScore: mfsResult.mfsDelta,
-            },
-          });
-        }
-
-        this.logger.log(
-          `Prepared signal ${signalId} (${signal.transaction_hash}) for resolution: ${isCorrect ? 'WON' : 'LOST'} (MFS: ${mfsResult.mfsDelta})`,
-        );
-      } catch (error) {
-        this.logger.error(
-          `Error preparing signal ${signal.transaction_hash}:`,
-          error,
-        );
-      }
-    }
-
-    return batch;
   }
 
   /**
@@ -349,7 +259,10 @@ export class SignalResolutionService {
    * Update user statistics after signal resolution
    */
   private async updateUserStatistics(signals: Signal[]): Promise<void> {
-    const userUpdates = new Map<number, { wins: number; losses: number; mfsDeltas: number[] }>();
+    const userUpdates = new Map<
+      number,
+      { wins: number; losses: number; mfsDeltas: number[] }
+    >();
 
     // Aggregate updates by user
     for (const signal of signals) {
@@ -364,7 +277,7 @@ export class SignalResolutionService {
       } else {
         update.losses += 1;
       }
-      
+
       // Collect MFS deltas for this user
       update.mfsDeltas.push(signal.mfs_delta || 0);
     }
@@ -399,7 +312,10 @@ export class SignalResolutionService {
         }
 
         // Simple MFS Score calculation: add all mfs_deltas to the previous score
-        const totalMfsDelta = updates.mfsDeltas.reduce((sum, delta) => sum + delta, 0);
+        const totalMfsDelta = updates.mfsDeltas.reduce(
+          (sum, delta) => sum + delta,
+          0,
+        );
         user.mfs_score += totalMfsDelta;
 
         await this.userRepository.save(user);

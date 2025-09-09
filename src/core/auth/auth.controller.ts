@@ -7,6 +7,7 @@ import {
   Res,
   UseGuards,
   Body,
+  Logger,
 } from '@nestjs/common';
 import { createWalletClient, http, isAddress, encodeAbiParameters } from 'viem';
 import { base } from 'viem/chains';
@@ -32,8 +33,6 @@ enum DailySignalState {
 // Security
 import { AuthorizationGuard, QuickAuthPayload } from '../../security/guards';
 import { Session } from '../../security/decorators';
-
-import { logger } from '../../main';
 
 // Utils
 import { hasResponse, hasError, HttpStatus } from '../../utils';
@@ -66,6 +65,8 @@ import { SignalService } from '../signal/signal.service';
 @ApiTags('auth-service')
 @Controller('auth-service')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly userService: UserService,
     private readonly zapperService: ZapperService,
@@ -128,7 +129,6 @@ export class AuthController {
 
     // Validate FID first
     if (!fid || fid <= 0) {
-      logger.error(`[/me] Invalid FID provided: ${fid}`);
       return res.status(400).send({
         success: false,
         error: {
@@ -145,7 +145,7 @@ export class AuthController {
     }
 
     try {
-      logger.log(
+      this.logger.log(
         `[/me] Processing complete miniapp data request for FID: ${fid}`,
       );
 
@@ -154,7 +154,7 @@ export class AuthController {
         await this.meEndpointService.getCompleteUserData(fid);
 
       const duration = Date.now() - startTime;
-      logger.log(
+      this.logger.log(
         `[/me] Successfully completed request for FID ${fid} in ${duration}ms`,
       );
 
@@ -163,12 +163,15 @@ export class AuthController {
       const duration = Date.now() - startTime;
       const errorMessage = error.message || 'Unknown error';
 
-      logger.error(`[/me] Request failed for FID ${fid} after ${duration}ms:`, {
-        error: errorMessage,
-        stack: error.stack,
-        fid,
-        duration,
-      });
+      this.logger.error(
+        `[/me] Request failed for FID ${fid} after ${duration}ms:`,
+        {
+          error: errorMessage,
+          stack: error.stack,
+          fid,
+          duration,
+        },
+      );
 
       // Parse structured error codes
       if (errorMessage.includes('NEYNAR_API_UNAVAILABLE')) {
@@ -305,21 +308,23 @@ export class AuthController {
     @Res() res: FastifyReply,
   ) {
     try {
-      console.log(
-        '🚀 [POST /me] Starting user data sync for FID:',
-        session.sub,
+      this.logger.log(
+        `🚀 [POST /me] Starting user data sync for FID: ${session.sub}`,
       );
-      console.log('📋 [POST /me] Session data:', {
+      this.logger.log('📋 [POST /me] Session data:', {
         sub: session.sub,
         address: session.address,
         iat: session.iat,
         exp: session.exp,
       });
-      console.log('📦 [POST /me] Request body:', JSON.stringify(body, null, 2));
+      this.logger.log(
+        '📦 [POST /me] Request body:',
+        JSON.stringify(body, null, 2),
+      );
 
       // Ensure user exists (create if necessary)
       let user = await this.userService.getByFid(session.sub);
-      console.log('👤 [POST /me] Current user state:', {
+      this.logger.log('👤 [POST /me] Current user state:', {
         exists: !!user,
         fid: user?.fid,
         username: user?.username,
@@ -329,13 +334,12 @@ export class AuthController {
       });
 
       if (!user) {
-        console.log(
-          '🆕 [POST /me] Creating new user record for FID:',
-          session.sub,
+        this.logger.log(
+          `🆕 [POST /me] Creating new user record for FID: ${session.sub}`,
         );
         const neynar = new NeynarService();
         const neynarUser = await neynar.getUserByFid(session.sub);
-        console.log('📡 [POST /me] Neynar user data:', neynarUser);
+        this.logger.log('📡 [POST /me] Neynar user data:', neynarUser);
 
         const { user: newUser } = await this.userService.create(session.sub, {
           username: neynarUser.username,
@@ -346,7 +350,7 @@ export class AuthController {
         });
 
         user = newUser;
-        console.log('✅ [POST /me] New user created:', {
+        this.logger.log('✅ [POST /me] New user created:', {
           fid: user.fid,
           username: user.username,
           stateOnTheSystem: user.state_on_the_system,
@@ -355,9 +359,9 @@ export class AuthController {
 
       // Process contract account data if provided
       if (body.contractAccount) {
-        console.log('📄 [POST /me] Processing contract account data...');
+        this.logger.log('📄 [POST /me] Processing contract account data...');
         const contractAccount = body.contractAccount;
-        console.log('🏗️ [POST /me] Contract account details:', {
+        this.logger.log('🏗️ [POST /me] Contract account details:', {
           fid: contractAccount.fid,
           username: contractAccount.username,
           wallet_address: contractAccount.walletAddress,
@@ -366,16 +370,13 @@ export class AuthController {
         });
 
         // Validate that contract account FID matches authenticated user
-        console.log('🔍 [POST /me] Validating contract account FID...');
-        console.log(
-          '🔍 [POST /me] Contract FID:',
-          contractAccount.fid,
-          'Session FID:',
-          session.sub,
+        this.logger.log('🔍 [POST /me] Validating contract account FID...');
+        this.logger.log(
+          `🔍 [POST /me] Contract FID: ${contractAccount.fid}, Session FID: ${session.sub}`,
         );
         if (parseInt(contractAccount.fid) !== session.sub) {
-          console.log('❌ [POST /me] FID mismatch detected!');
-          logger.warn(
+          this.logger.log('❌ [POST /me] FID mismatch detected!');
+          this.logger.warn(
             `Contract account FID mismatch: ${contractAccount.fid} vs ${session.sub}`,
           );
           return hasError(
@@ -385,17 +386,16 @@ export class AuthController {
             'Contract account FID does not match authenticated user.',
           );
         }
-        console.log('✅ [POST /me] FID validation passed');
+        this.logger.log('✅ [POST /me] FID validation passed');
 
         // Validate wallet address format
-        console.log('🔍 [POST /me] Validating wallet address format...');
-        console.log(
-          '🔍 [POST /me] Wallet address:',
-          contractAccount.walletAddress,
+        this.logger.log('🔍 [POST /me] Validating wallet address format...');
+        this.logger.log(
+          `🔍 [POST /me] Wallet address: ${contractAccount.walletAddress}`,
         );
         if (!this.isValidEthereumAddress(contractAccount.walletAddress)) {
-          console.log('❌ [POST /me] Invalid wallet address format!');
-          logger.warn(
+          this.logger.log('❌ [POST /me] Invalid wallet address format!');
+          this.logger.warn(
             `Invalid wallet address format: ${contractAccount.walletAddress}`,
           );
           return hasError(
@@ -405,79 +405,85 @@ export class AuthController {
             'Invalid wallet address format.',
           );
         }
-        console.log('✅ [POST /me] Wallet address format validation passed');
+        this.logger.log(
+          '✅ [POST /me] Wallet address format validation passed',
+        );
 
         // Update user with contract account data
-        console.log('💾 [POST /me] Preparing contract account update data...');
+        this.logger.log(
+          '💾 [POST /me] Preparing contract account update data...',
+        );
         const updateData: any = {
           walletAddress: contractAccount.walletAddress,
           updatedAt: new Date(),
         };
 
         // Update username and pfpUrl if different
-        console.log('🔄 [POST /me] Checking for username/pfpUrl updates...');
-        console.log(
-          '🔄 [POST /me] Current username:',
-          user.username,
-          'Contract username:',
-          contractAccount.username,
+        this.logger.log(
+          '🔄 [POST /me] Checking for username/pfpUrl updates...',
         );
-        console.log(
-          '🔄 [POST /me] Current pfpUrl:',
-          user.pfp_url,
-          'Contract pfpUrl:',
-          contractAccount.pfp_url,
+        this.logger.log(
+          `🔄 [POST /me] Current username: ${user.username}, Contract username: ${contractAccount.username}`,
+        );
+        this.logger.log(
+          `🔄 [POST /me] Current pfpUrl: ${user.pfp_url}, Contract pfpUrl: ${contractAccount.pfp_url}`,
         );
 
         if (contractAccount.username !== user.username) {
           updateData.username = contractAccount.username;
-          console.log(
-            '📝 [POST /me] Username will be updated to:',
-            contractAccount.username,
+          this.logger.log(
+            `📝 [POST /me] Username will be updated to: ${contractAccount.username}`,
           );
         }
         if (contractAccount.pfp_url !== user.pfp_url) {
           updateData.pfpUrl = contractAccount.pfp_url;
-          console.log(
-            '📝 [POST /me] PFP URL will be updated to:',
-            contractAccount.pfp_url,
+          this.logger.log(
+            `📝 [POST /me] PFP URL will be updated to: ${contractAccount.pfp_url}`,
           );
         }
 
         // Set appropriate state based on current user state
-        console.log('🏗️ [POST /me] Checking user state transition...');
-        console.log('🏗️ [POST /me] Current state:', user.state_on_the_system);
+        this.logger.log('🏗️ [POST /me] Checking user state transition...');
+        this.logger.log(
+          `🏗️ [POST /me] Current state: ${user.state_on_the_system}`,
+        );
         if (
           user.state_on_the_system === UserStateOnTheSystemEnum.WITHOUT_ACCOUNT
         ) {
           updateData.state_on_the_system =
             UserStateOnTheSystemEnum.ACCOUNT_CREATED_WELCOME_SCREEN;
-          console.log(
+          this.logger.log(
             '🎉 [POST /me] Setting welcome screen state for new account!',
           );
-          logger.log(
+          this.logger.log(
             `User ${session.sub} account created - setting welcome screen state`,
           );
         }
 
-        console.log('💾 [POST /me] Final update data:', updateData);
+        this.logger.log('💾 [POST /me] Final update data:', updateData);
         await this.userService.update(session.sub, updateData);
 
         // Update local user object
         Object.assign(user, updateData);
 
-        console.log('✅ [POST /me] Contract account data updated successfully');
-        logger.log(`Updated user ${session.sub} with contract account data`);
+        this.logger.log(
+          '✅ [POST /me] Contract account data updated successfully',
+        );
+        this.logger.log(
+          `Updated user ${session.sub} with contract account data`,
+        );
       }
 
       // Process daily status if provided
       if (body.userDailyStatus) {
-        console.log('📅 [POST /me] Processing daily status data...');
-        console.log(
-          '📅 [POST /me] Daily status type:',
-          typeof body.userDailyStatus,
+        this.logger.log('📅 [POST /me] Processing daily status data...');
+        this.logger.log(
+          `📅 [POST /me] Daily status type: ${typeof body.userDailyStatus}`,
         );
-        console.log('📅 [POST /me] Daily status value:', body.userDailyStatus);
+        this.logger.log(
+          '📅 [POST /me] Daily status value:',
+          body.userDailyStatus,
+        );
 
         const dailyUpdateData: any = {
           updatedAt: new Date(),
@@ -485,40 +491,47 @@ export class AuthController {
 
         // Handle both object and array formats
         if (Array.isArray(body.userDailyStatus)) {
-          console.log('📅 [POST /me] Processing array format daily status...');
+          this.logger.log(
+            '📅 [POST /me] Processing array format daily status...',
+          );
           // Array format: [ usedToday, isNewDay, ]
           const [usedToday, isNewDay] = body.userDailyStatus;
 
-          console.log('📅 [POST /me] Array values:', {
+          this.logger.log('📅 [POST /me] Array values:', {
             usedToday,
             isNewDay,
           });
         } else {
-          console.log('📅 [POST /me] Processing object format daily status...');
+          this.logger.log(
+            '📅 [POST /me] Processing object format daily status...',
+          );
           // Object format
           const dailyStatus = body.userDailyStatus as UserDailyStatusDto;
-          console.log('📅 [POST /me] Object daily status:', dailyStatus);
+          this.logger.log('📅 [POST /me] Object daily status:', dailyStatus);
 
           dailyUpdateData.lastSignalDate = dailyStatus.lastSignalDate
             ? new Date(dailyStatus.lastSignalDate)
             : null;
         }
 
-        console.log('💾 [POST /me] Daily status update data:', dailyUpdateData);
+        this.logger.log(
+          '💾 [POST /me] Daily status update data:',
+          dailyUpdateData,
+        );
         await this.userService.update(session.sub, dailyUpdateData);
 
         // Update local user object
         Object.assign(user, dailyUpdateData);
 
-        console.log('✅ [POST /me] Daily status updated successfully');
-        logger.log(`Updated daily status for user ${session.sub}`);
+        this.logger.log('✅ [POST /me] Daily status updated successfully');
+        this.logger.log(`Updated daily status for user ${session.sub}`);
       }
 
       // Process active session if provided
       if (body.activeSession) {
-        console.log('🕐 [POST /me] Processing active session data...');
+        this.logger.log('🕐 [POST /me] Processing active session data...');
         const activeSession = body.activeSession;
-        console.log('🕐 [POST /me] Active session details:', {
+        this.logger.log('🕐 [POST /me] Active session details:', {
           sessionId: activeSession.sessionId,
           startTime: activeSession.startTime,
           expiresAt: activeSession.expiresAt,
@@ -533,24 +546,28 @@ export class AuthController {
           updatedAt: new Date(),
         };
 
-        console.log('💾 [POST /me] Session update data:', sessionUpdateData);
+        this.logger.log(
+          '💾 [POST /me] Session update data:',
+          sessionUpdateData,
+        );
         await this.userService.update(session.sub, sessionUpdateData);
 
         // Update local user object
         Object.assign(user, sessionUpdateData);
 
-        console.log('✅ [POST /me] Session data updated successfully');
-        logger.log(`Updated session info for user ${session.sub}`);
+        this.logger.log('✅ [POST /me] Session data updated successfully');
+        this.logger.log(`Updated session info for user ${session.sub}`);
       }
 
       // Process JBM balance if provided
       if (body.jbmBalance) {
-        console.log('💰 [POST /me] Processing JBM balance data...');
-        console.log('💰 [POST /me] JBM balance value:', body.jbmBalance);
-        console.log('💰 [POST /me] JBM balance type:', typeof body.jbmBalance);
-        console.log(
-          '💰 [POST /me] JBM balance length:',
-          body.jbmBalance.length,
+        this.logger.log('💰 [POST /me] Processing JBM balance data...');
+        this.logger.log('💰 [POST /me] JBM balance value:', body.jbmBalance);
+        this.logger.log(
+          `💰 [POST /me] JBM balance type: ${typeof body.jbmBalance}`,
+        );
+        this.logger.log(
+          `💰 [POST /me] JBM balance length: ${body.jbmBalance.length}`,
         );
 
         const jbmUpdateData: any = {
@@ -558,22 +575,22 @@ export class AuthController {
           updatedAt: new Date(),
         };
 
-        console.log('💾 [POST /me] JBM update data:', jbmUpdateData);
+        this.logger.log('💾 [POST /me] JBM update data:', jbmUpdateData);
         await this.userService.update(session.sub, jbmUpdateData);
 
         // Update local user object
         Object.assign(user, jbmUpdateData);
 
-        console.log('✅ [POST /me] JBM balance updated successfully');
-        logger.log(
+        this.logger.log('✅ [POST /me] JBM balance updated successfully');
+        this.logger.log(
           `Updated JBM balance for user ${session.sub}: ${body.jbmBalance}`,
         );
       }
 
       // Get updated user data
-      console.log('🔄 [POST /me] Fetching updated user data...');
+      this.logger.log('🔄 [POST /me] Fetching updated user data...');
       const updatedUser = await this.userService.getByFid(session.sub);
-      console.log('👤 [POST /me] Updated user data:', {
+      this.logger.log('👤 [POST /me] Updated user data:', {
         fid: updatedUser.fid,
         username: updatedUser.username,
         stateOnTheSystem: updatedUser.state_on_the_system,
@@ -581,20 +598,18 @@ export class AuthController {
       });
 
       // Get user feed data
-      console.log('📰 [POST /me] Fetching user feed data...');
+      this.logger.log('📰 [POST /me] Fetching user feed data...');
       const userFeedOfSignals = await this.signalService.getSignalsFeedForUser(
         session.sub,
       );
-      console.log(
-        '📰 [POST /me] User feed signals count:',
-        userFeedOfSignals.length,
+      this.logger.log(
+        `📰 [POST /me] User feed signals count: ${userFeedOfSignals.length}`,
       );
 
       const favoriteTwentySignalers =
         await this.signalService.getFavoriteTwentySignalersForFid(session.sub);
-      console.log(
-        '⭐ [POST /me] Favorite signalers count:',
-        favoriteTwentySignalers.length,
+      this.logger.log(
+        `⭐ [POST /me] Favorite signalers count: ${favoriteTwentySignalers.length}`,
       );
 
       // Fetch trending tokens from Zapper API
@@ -619,17 +634,17 @@ export class AuthController {
         },
       };
 
-      console.log(
+      this.logger.log(
         '📤 [POST /me] Response sync status:',
         responseData.syncStatus,
       );
-      console.log('✅ [POST /me] Request completed successfully!');
+      this.logger.log('✅ [POST /me] Request completed successfully!');
 
       return hasResponse(res, responseData);
     } catch (error) {
-      console.log('❌ [POST /me] Error occurred during sync:', error);
-      console.log('❌ [POST /me] Error stack:', error.stack);
-      logger.error('Failed to sync user data:', error);
+      this.logger.log('❌ [POST /me] Error occurred during sync:', error);
+      this.logger.log('❌ [POST /me] Error stack:', error.stack);
+      this.logger.error('Failed to sync user data:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -702,13 +717,13 @@ export class AuthController {
     try {
       const { fid, walletAddress } = body;
 
-      console.log(
+      this.logger.log(
         `🔍 [verifyWalletOwnership] Starting verification for FID: ${fid}, Wallet: ${walletAddress}`,
       );
 
       // Validate wallet address format
       if (!isAddress(walletAddress)) {
-        console.log(
+        this.logger.log(
           `❌ [verifyWalletOwnership] Invalid wallet address format: ${walletAddress}`,
         );
         return hasError(
@@ -719,25 +734,30 @@ export class AuthController {
         );
       }
 
-      console.log(`✅ [verifyWalletOwnership] Wallet address format validated`);
+      this.logger.log(
+        `✅ [verifyWalletOwnership] Wallet address format validated`,
+      );
 
       // Fetch user from Farcaster API (Neynar) directly without cache
       let user;
       try {
-        console.log(
+        this.logger.log(
           `📡 [verifyWalletOwnership] Fetching user data from Neynar API for FID: ${fid}`,
         );
         const neynarService = new NeynarService();
         user = await neynarService.getUserByFid(fid);
-        console.log(
+        this.logger.log(
           `✅ [verifyWalletOwnership] Successfully fetched user data from Neynar`,
         );
       } catch (error) {
-        console.log(
+        this.logger.log(
           `❌ [verifyWalletOwnership] Failed to fetch Farcaster user for FID ${fid}:`,
           error,
         );
-        logger.error(`Failed to fetch Farcaster user for FID ${fid}:`, error);
+        this.logger.error(
+          `Failed to fetch Farcaster user for FID ${fid}:`,
+          error,
+        );
         return hasError(
           res,
           HttpStatus.INTERNAL_SERVER_ERROR,
@@ -756,23 +776,25 @@ export class AuthController {
         userData.auth_addresses?.map((auth) => auth.address.toLowerCase()) ||
         [];
 
-      console.log(`🔍 [verifyWalletOwnership] Checking wallet authorization:`);
-      console.log(
+      this.logger.log(
+        `🔍 [verifyWalletOwnership] Checking wallet authorization:`,
+      );
+      this.logger.log(
         `   - Verified addresses: ${JSON.stringify(verifiedAddresses)}`,
       );
-      console.log(`   - Auth addresses: ${JSON.stringify(authAddresses)}`);
-      console.log(`   - Target wallet: ${walletAddress}`);
+      this.logger.log(`   - Auth addresses: ${JSON.stringify(authAddresses)}`);
+      this.logger.log(`   - Target wallet: ${walletAddress}`);
 
       const isValid =
         verifiedAddresses.includes(walletAddress.toLowerCase()) ||
         authAddresses.includes(walletAddress.toLowerCase());
 
-      console.log(
+      this.logger.log(
         `✅ [verifyWalletOwnership] Wallet authorization result: ${isValid}`,
       );
 
       if (!isValid) {
-        console.log(
+        this.logger.log(
           `❌ [verifyWalletOwnership] Wallet not authorized for FID ${fid}`,
         );
         return hasError(
@@ -785,7 +807,7 @@ export class AuthController {
 
       // Generate EIP-712 signature
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
-      console.log(
+      this.logger.log(
         `🔐 [verifyWalletOwnership] Generating EIP-712 signature with deadline: ${deadline}`,
       );
 
@@ -795,10 +817,10 @@ export class AuthController {
         deadline,
       );
 
-      console.log(
+      this.logger.log(
         `✅ [verifyWalletOwnership] Successfully generated auth signature`,
       );
-      console.log(
+      this.logger.log(
         `📤 [verifyWalletOwnership] Returning auth data and deadline: ${deadline}`,
       );
 
@@ -813,8 +835,8 @@ export class AuthController {
         message: 'Wallet ownership verified successfully',
       });
     } catch (error) {
-      console.log(`❌ [verifyWalletOwnership] Unexpected error:`, error);
-      logger.error('Failed to verify wallet ownership:', error);
+      this.logger.log(`❌ [verifyWalletOwnership] Unexpected error:`, error);
+      this.logger.error('Failed to verify wallet ownership:', error);
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -832,20 +854,20 @@ export class AuthController {
     walletAddress: string,
     deadline: number,
   ): Promise<string> {
-    console.log(
+    this.logger.log(
       `🔐 [generateAuthSignature] Starting signature generation for FID: ${fid}, Wallet: ${walletAddress}, Deadline: ${deadline}`,
     );
 
     const config = getConfig();
 
     if (!config.blockchain.backendPrivateKey) {
-      console.log(
+      this.logger.log(
         `❌ [generateAuthSignature] BACKEND_PRIVATE_KEY environment variable is not set`,
       );
       throw new Error('BACKEND_PRIVATE_KEY environment variable is not set');
     }
 
-    console.log(`✅ [generateAuthSignature] Backend private key found`);
+    this.logger.log(`✅ [generateAuthSignature] Backend private key found`);
 
     // Setup wallet client - ensure private key has 0x prefix
     const privateKey = config.blockchain.backendPrivateKey.startsWith('0x')
@@ -853,7 +875,7 @@ export class AuthController {
       : (`0x${config.blockchain.backendPrivateKey}` as `0x${string}`);
 
     const account = privateKeyToAccount(privateKey);
-    console.log(
+    this.logger.log(
       `🔐 [generateAuthSignature] Created account from private key: ${account.address}`,
     );
 
@@ -862,7 +884,7 @@ export class AuthController {
       chain: base,
       transport: http(),
     });
-    console.log(
+    this.logger.log(
       `🔐 [generateAuthSignature] Wallet client created for Base chain`,
     );
 
@@ -873,11 +895,11 @@ export class AuthController {
       verifyingContract: config.blockchain.contractAddress as `0x${string}`,
     } as const;
 
-    console.log(`🔐 [generateAuthSignature] EIP-712 domain configured:`);
-    console.log(`   - Name: ${domain.name}`);
-    console.log(`   - Version: ${domain.version}`);
-    console.log(`   - Chain ID: ${domain.chainId}`);
-    console.log(`   - Contract: ${domain.verifyingContract}`);
+    this.logger.log(`🔐 [generateAuthSignature] EIP-712 domain configured:`);
+    this.logger.log(`   - Name: ${domain.name}`);
+    this.logger.log(`   - Version: ${domain.version}`);
+    this.logger.log(`   - Chain ID: ${domain.chainId}`);
+    this.logger.log(`   - Contract: ${domain.verifyingContract}`);
 
     const types = {
       Authorization: [
@@ -887,13 +909,15 @@ export class AuthController {
       ],
     } as const;
 
-    console.log(
+    this.logger.log(
       `🔐 [generateAuthSignature] EIP-712 types configured for Authorization`,
     );
-    console.log(`🔐 [generateAuthSignature] Signing message with:`);
-    console.log(`   - FID: ${fid} (as number for uint256)`);
-    console.log(`   - Wallet: ${walletAddress}`);
-    console.log(`   - Deadline: ${deadline} (as BigInt: ${BigInt(deadline)})`);
+    this.logger.log(`🔐 [generateAuthSignature] Signing message with:`);
+    this.logger.log(`   - FID: ${fid} (as number for uint256)`);
+    this.logger.log(`   - Wallet: ${walletAddress}`);
+    this.logger.log(
+      `   - Deadline: ${deadline} (as BigInt: ${BigInt(deadline)})`,
+    );
 
     // Sign the message
     const signature = await walletClient.signTypedData({
@@ -908,7 +932,7 @@ export class AuthController {
       },
     });
 
-    console.log(
+    this.logger.log(
       `✅ [generateAuthSignature] EIP-712 signature generated: ${signature}`,
     );
 
@@ -922,10 +946,10 @@ export class AuthController {
       [BigInt(fid), BigInt(deadline), signature], // Convert fid to BigInt for uint256
     );
 
-    console.log(
+    this.logger.log(
       `✅ [generateAuthSignature] Auth data encoded for contract: ${authData}`,
     );
-    console.log(
+    this.logger.log(
       `✅ [generateAuthSignature] Auth data length: ${authData.length} characters`,
     );
 

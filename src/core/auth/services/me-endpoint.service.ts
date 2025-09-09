@@ -380,7 +380,7 @@ export class MeEndpointService {
         signal.timestamp = row.timestamp;
         signal.block_number = row.block_number;
         signal.resolved = row.resolved || false;
-        signal.mfs_delta = row.mfs_delta || '0';
+        signal.mfs_delta = row.mfs_delta;
         signal.entry_market_cap = row.entry_market_cap;
         signal.user = user;
         signal.token = token;

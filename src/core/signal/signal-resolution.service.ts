@@ -48,22 +48,13 @@ export class SignalResolutionService {
   ) {}
 
   /**
-   * Hourly batch processing cron - processes all expired signals
+   * Every 5 minutes batch processing cron - processes all expired signals
    */
-  @Cron('0 * * * *') // Every hour at minute 0 - COST-OPTIMIZED BATCHING
+  @Cron('*/5 * * * *') // Every 5 minutes - COST-OPTIMIZED BATCHING
   async processHourlyBatchResolution() {
-    this.logger.log('Starting hourly batch resolution cycle...');
+    this.logger.log('Starting 5-minute batch resolution cycle...');
 
     try {
-      // Check if we're authorized as the resolver
-      const isResolver = await this.blockchainService.isResolver();
-      if (!isResolver) {
-        this.logger.error(
-          'Backend wallet is not authorized as contract resolver',
-        );
-        return;
-      }
-
       const nowTimestamp = Math.floor(Date.now() / 1000); // Current timestamp in seconds
 
       // Query database directly for expired, unresolved signals
@@ -77,50 +68,101 @@ export class SignalResolutionService {
       });
 
       if (expiredSignals.length === 0) {
-        this.logger.log('No expired signals ready for batch resolution');
+        this.logger.log('No expired signals ready for resolution');
         return;
       }
 
       this.logger.log(
-        `Found ${expiredSignals.length} expired signals ready for batch resolution`,
+        `Found ${expiredSignals.length} expired signals ready for resolution`,
       );
 
-      // Process in batches of 90 (smart contract limit is 100, leaving buffer)
-      const batches = this.chunkArray(expiredSignals, this.BATCH_SIZE);
-
       let totalProcessed = 0;
-      for (const signalBatch of batches) {
+      for (const signal of expiredSignals) {
         try {
-          const batch = await this.prepareBatch(signalBatch);
-
-          if (batch.signalIds.length === 0) {
-            this.logger.log(
-              'No signals ready for blockchain resolution in this batch',
-            );
-            continue;
-          }
-
-          // // Execute blockchain resolution
-          // await this.executeBlockchainResolution(batch);
-          // totalProcessed += batch.signalIds.length;
+          // Get the end timestamp of the signal period (expires_at)
+          const signalEndTimestamp = Number(signal.expires_at);
+          const signalEndDate = new Date(signalEndTimestamp * 1000);
 
           this.logger.log(
-            `Successfully processed batch of ${batch.signalIds.length} signals`,
+            `Processing signal ${signal.signal_id} for token ${signal.ca}, expired at ${signalEndDate.toISOString()}`,
+          );
+
+          // Query token market cap at the end of the signal period
+          const tokenInfo = await this.tokenPriceService.getTokenInfo(
+            signal.ca,
+            signalEndDate,
+          );
+
+          let mfsDelta = 0;
+          let isCorrect = false;
+
+          if (tokenInfo && tokenInfo.marketCap > 0) {
+            const exitMarketCap = tokenInfo.marketCap;
+
+            // Calculate MFS delta using the MFS service
+            isCorrect = this.mfsService.isPredictionCorrect(
+              signal.entry_market_cap,
+              exitMarketCap,
+              signal.direction,
+            );
+
+            const mfsInput: MFSCalculationInput = {
+              entryMarketCap: signal.entry_market_cap,
+              exitMarketCap: exitMarketCap,
+              direction: signal.direction,
+              durationDays: signal.duration_days,
+              isCorrect,
+            };
+
+            const mfsResult = this.mfsService.calculateMFSDelta(mfsInput);
+            mfsDelta = mfsResult.mfsDelta;
+          } else {
+            this.logger.warn(
+              `No historical market cap found for ${signal.ca} at ${signalEndDate.toISOString()}, resolving with MFS delta 0`,
+            );
+          }
+
+          // Update signal in database
+          signal.resolved = true; // Mark as resolved regardless
+          signal.mfs_delta = mfsDelta;
+
+          await this.signalRepository.save(signal);
+
+          // Update user statistics
+          if (tokenInfo && tokenInfo.marketCap > 0) {
+            // With data: wins/losses based on correctness
+            const statsSignal = { ...signal, resolved: isCorrect } as Signal;
+            await this.updateUserStatistics([statsSignal]);
+          } else {
+            // Missing data: neutral update (no win/loss impact, keep win_rate)
+            await this.updateUserStatisticsNeutral([signal]);
+          }
+
+          totalProcessed++;
+
+          const outcomeLabel =
+            tokenInfo && tokenInfo.marketCap > 0
+              ? isCorrect
+                ? 'WON'
+                : 'LOST'
+              : 'PROCESSED';
+          this.logger.log(
+            `Successfully resolved signal ${signal.signal_id}: ${outcomeLabel} (MFS: ${mfsDelta})`,
           );
         } catch (error) {
           this.logger.error(
-            `Failed to process batch of ${signalBatch.length} signals:`,
+            `Failed to process signal ${signal.signal_id}:`,
             error,
           );
-          // Continue with next batch even if one fails
+          // Continue with next signal even if one fails
         }
       }
 
       this.logger.log(
-        `Hourly batch resolution complete: ${totalProcessed} signals processed in ${batches.length} batches`,
+        `5-minute batch resolution complete: ${totalProcessed} signals processed`,
       );
     } catch (error) {
-      this.logger.error('Error in hourly batch resolution cycle:', error);
+      this.logger.error('Error in 5-minute batch resolution cycle:', error);
     }
   }
 
@@ -375,7 +417,49 @@ export class SignalResolutionService {
   }
 
   /**
-   * Manual trigger for hourly batch processing
+   * Neutral stats update when outcome is unknown (e.g., missing historical data)
+   * - Decrements active_signals and increments settled_signals
+   * - Does NOT change wins, losses, or win_rate
+   */
+  private async updateUserStatisticsNeutral(signals: Signal[]): Promise<void> {
+    const userCounts = new Map<number, number>();
+
+    for (const signal of signals) {
+      const userId = signal.user.fid;
+      userCounts.set(userId, (userCounts.get(userId) || 0) + 1);
+    }
+
+    for (const [userId, count] of userCounts.entries()) {
+      try {
+        const user = await this.userRepository.findOne({
+          where: { fid: userId },
+        });
+        if (!user) {
+          this.logger.warn(`User ${userId} not found for neutral stats update`);
+          continue;
+        }
+
+        user.active_signals = Math.max(0, user.active_signals - count);
+        user.settled_signals += count;
+
+        // win_rate remains unchanged intentionally
+
+        await this.userRepository.save(user);
+
+        this.logger.log(
+          `Neutral stats update for user ${userId}: +${count} settled (unknown outcome). Win rate unchanged at ${user.win_rate.toFixed(2)}%`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Error applying neutral stats update for ${userId}:`,
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Manual trigger for 5-minute batch processing
    */
   async triggerSignalResolution(): Promise<void> {
     await this.processHourlyBatchResolution();
@@ -438,17 +522,25 @@ export class SignalResolutionService {
         },
       });
 
-      // Calculate next hourly batch time
+      // Calculate next 5-minute batch time
       const now = new Date();
-      const nextHour = new Date(now);
-      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      const nextBatch = new Date(now);
+      const currentMinutes = now.getMinutes();
+      const nextBatchMinutes = Math.ceil(currentMinutes / 5) * 5;
+      nextBatch.setMinutes(nextBatchMinutes, 0, 0);
+
+      // If we're at the top of the hour, go to next hour
+      if (nextBatchMinutes >= 60) {
+        nextBatch.setHours(nextBatch.getHours() + 1, 0, 0, 0);
+      }
+
       const minutesUntilBatch = Math.ceil(
-        (nextHour.getTime() - now.getTime()) / (1000 * 60),
+        (nextBatch.getTime() - now.getTime()) / (1000 * 60),
       );
 
       return {
         signalsReadyForBatch: readyCount,
-        nextBatchProcessing: `In ${minutesUntilBatch} minutes (top of next hour)`,
+        nextBatchProcessing: `In ${minutesUntilBatch} minutes (next 5-minute interval)`,
       };
     } catch (error) {
       this.logger.error('Failed to get batch stats:', error);

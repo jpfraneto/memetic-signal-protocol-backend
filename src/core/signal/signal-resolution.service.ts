@@ -100,9 +100,9 @@ export class SignalResolutionService {
             continue;
           }
 
-          // Execute blockchain resolution
-          await this.executeBlockchainResolution(batch);
-          totalProcessed += batch.signalIds.length;
+          // // Execute blockchain resolution
+          // await this.executeBlockchainResolution(batch);
+          // totalProcessed += batch.signalIds.length;
 
           this.logger.log(
             `Successfully processed batch of ${batch.signalIds.length} signals`,

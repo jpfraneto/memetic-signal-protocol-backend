@@ -306,7 +306,7 @@ export class MeEndpointService {
             WHERE LOWER(token_address) = LOWER(s.ca)
           )
         )
-        ORDER BY s.timestamp DESC
+        ORDER BY s.expires_at ASC
         LIMIT 50
       `;
 
@@ -428,7 +428,7 @@ export class MeEndpointService {
           'token.symbol',
           'token.image',
         ])
-        .orderBy('signal.timestamp', 'DESC')
+        .orderBy('signal.expires_at', 'ASC')
         .limit(50)
         .getMany();
 

@@ -56,7 +56,7 @@ export class ScoringService {
       .createQueryBuilder('ps')
       .where('ps.tokenAddress = :address', { address: signal.ca })
       .andWhere('ps.snapshotAt <= :timestamp', {
-        timestamp: new Date(signal.timestamp),
+        timestamp: new Date(Number(signal.timestamp) * 1000),
       })
       .orderBy('ps.snapshotAt', 'DESC')
       .getOne();

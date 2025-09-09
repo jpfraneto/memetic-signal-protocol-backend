@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Signal } from '../../models/Signal/Signal.model';
-import { PriceSnapshot } from '../../models/PriceSnapshot/PriceSnapshot.model';
+import { User } from '../../models/User/User.model';
 import { TokenPriceService } from '../signal/services/token-price.service';
-import { ScoringService } from '../scoring/scoring.service';
-import { SignalStatus } from '../../models/Signal/Signal.types';
 
 @Injectable()
 export class PriceTrackingService {
@@ -15,184 +13,171 @@ export class PriceTrackingService {
   constructor(
     @InjectRepository(Signal)
     private signalRepository: Repository<Signal>,
-    @InjectRepository(PriceSnapshot)
-    private priceSnapshotRepository: Repository<PriceSnapshot>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private tokenPriceService: TokenPriceService,
-    private scoringService: ScoringService,
     private dataSource: DataSource,
   ) {}
 
   /**
-   * Price tracking job - runs every 30 minutes
-   * 1. Query active signals for unique contract addresses
-   * 2. Fetch current market caps using TokenPriceService
-   * 3. Store PriceSnapshot records
-   * 4. Check expired signals and calculate final scores
-   * 5. Update user totalScore values
-   * 6. Refresh leaderboard cache
+   * Signal resolution job - runs every 30 minutes
+   * Find expired signals and resolve them with MFS calculation
    */
-  @Cron('0 */30 * * * *') // Every 30 minutes
-  async trackPrices(): Promise<void> {
-    this.logger.log('Starting price tracking job...');
+  @Cron('0 */30 * * * *')
+  async resolveExpiredSignals(): Promise<void> {
+    this.logger.log('Starting expired signal resolution...');
 
     try {
-      // 1. Get unique contract addresses from active signals
-      const activeContracts = await this.signalRepository
+      const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
+      
+      // Find signals that are expired but not resolved
+      const expiredSignals = await this.signalRepository
         .createQueryBuilder('signal')
-        .select('DISTINCT signal.ca', 'ca')
-        .where('signal.resolved = :status', { status: false })
-        .getRawMany();
+        .where('signal.resolved = :resolved', { resolved: false })
+        .andWhere('signal.expires_at < :currentTimestamp', { currentTimestamp: currentTimestamp.toString() })
+        .getMany();
 
-      this.logger.log(
-        `Found ${activeContracts.length} unique contracts with active signals`,
-      );
+      this.logger.log(`Found ${expiredSignals.length} expired signals to resolve`);
 
-      if (activeContracts.length === 0) {
-        this.logger.log('No active signals to track, skipping price job');
+      if (expiredSignals.length === 0) {
         return;
       }
 
-      // 2. Fetch current prices and market caps
-      const contractAddresses = activeContracts.map((row) => row.ca);
-      const priceSnapshots: PriceSnapshot[] = [];
-      const currentTime = new Date();
-
-      for (const contractAddress of contractAddresses) {
-        try {
-          const tokenInfo =
-            await this.tokenPriceService.getTokenInfo(contractAddress);
-
-          if (tokenInfo && tokenInfo.marketCap && tokenInfo.price) {
-            const snapshot = new PriceSnapshot();
-            snapshot.tokenAddress = contractAddress;
-            snapshot.marketCap = tokenInfo.marketCap;
-            snapshot.price = tokenInfo.price;
-            snapshot.volume24h = tokenInfo.volume24h || 0;
-            snapshot.snapshotAt = currentTime;
-
-            priceSnapshots.push(snapshot);
-          } else {
-            this.logger.warn(
-              `No price data available for contract ${contractAddress}`,
-            );
-          }
-        } catch (error) {
-          this.logger.error(
-            `Failed to fetch price data for ${contractAddress}:`,
-            error,
-          );
-        }
+      // Process each expired signal
+      for (const signal of expiredSignals) {
+        await this.resolveSignal(signal);
       }
 
-      // 3. Store price snapshots in batch
-      if (priceSnapshots.length > 0) {
-        await this.priceSnapshotRepository.save(priceSnapshots);
-        this.logger.log(`Saved ${priceSnapshots.length} price snapshots`);
-      }
-
-      // 4. Process expired signals and update scores
-      await this.scoringService.processExpiredSignals();
-
-      // 5. Update leaderboard rankings
-      await this.scoringService.updateLeaderboardRankings();
-
-      this.logger.log('Price tracking job completed successfully');
+      this.logger.log('Signal resolution completed successfully');
     } catch (error) {
-      this.logger.error('Price tracking job failed:', error);
+      this.logger.error('Signal resolution failed:', error);
     }
   }
 
   /**
-   * Manual trigger for price tracking (useful for testing)
+   * Resolve a single signal by fetching price at expiry and calculating MFS
    */
-  async triggerPriceTracking(): Promise<void> {
-    this.logger.log('Manually triggered price tracking...');
-    await this.trackPrices();
-  }
-
-  /**
-   * Get price history for a token
-   */
-  async getPriceHistory(
-    tokenAddress: string,
-    days: number = 7,
-  ): Promise<PriceSnapshot[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    return this.priceSnapshotRepository
-      .createQueryBuilder('snapshot')
-      .where('snapshot.tokenAddress = :address', { address: tokenAddress })
-      .andWhere('snapshot.snapshotAt >= :startDate', { startDate })
-      .orderBy('snapshot.snapshotAt', 'ASC')
-      .getMany();
-  }
-
-  /**
-   * Get latest price snapshot for a token
-   */
-  async getLatestPrice(tokenAddress: string): Promise<PriceSnapshot | null> {
-    return this.priceSnapshotRepository
-      .createQueryBuilder('snapshot')
-      .where('snapshot.tokenAddress = :address', { address: tokenAddress })
-      .orderBy('snapshot.snapshotAt', 'DESC')
-      .getOne();
-  }
-
-  /**
-   * Cleanup old price snapshots (older than 30 days)
-   */
-  @Cron('0 2 * * *') // Daily at 2 AM
-  async cleanupOldSnapshots(): Promise<void> {
-    this.logger.log('Starting price snapshot cleanup...');
-
+  private async resolveSignal(signal: Signal): Promise<void> {
     try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      // Double check expiry conditions
+      const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
+      const signalExpiryTime = BigInt(signal.timestamp) + BigInt(signal.duration_days * 86400);
+      
+      if (signal.expires_at >= currentTimestamp || signalExpiryTime >= currentTimestamp) {
+        this.logger.warn(`Signal ${signal.signal_id} not yet expired, skipping`);
+        return;
+      }
 
-      const result = await this.priceSnapshotRepository
-        .createQueryBuilder()
-        .delete()
-        .where('snapshotAt < :date', { date: thirtyDaysAgo })
-        .execute();
+      // Fetch token price at expiry moment
+      const expiryDate = new Date(Number(signal.expires_at) * 1000);
+      const tokenInfo = await this.tokenPriceService.getTokenInfo(signal.ca, expiryDate);
+      
+      // Handle case where no price data is available - set MFS to 0
+      if (!tokenInfo || tokenInfo.marketCap === 0) {
+        this.logger.warn(`No market cap data available for signal ${signal.signal_id} at expiry, setting MFS to 0`);
+        
+        // Update signal as resolved with 0 MFS delta
+        await this.dataSource.transaction(async (manager) => {
+          await manager.update(Signal, signal.signal_id, {
+            resolved: true,
+            mfs_delta: 0
+          });
+          // No need to update user MFS since delta is 0
+        });
+        
+        this.logger.log(`Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: 0 (no price data)`);
+        return;
+      }
 
-      this.logger.log(`Cleaned up ${result.affected} old price snapshots`);
+      const exitMarketCap = Number(tokenInfo.marketCap);
+      const entryMarketCap = signal.entry_market_cap;
+      
+      // Handle division by zero case
+      if (entryMarketCap === 0) {
+        this.logger.warn(`Entry market cap is 0 for signal ${signal.signal_id}, setting MFS to 0`);
+        
+        await this.dataSource.transaction(async (manager) => {
+          await manager.update(Signal, signal.signal_id, {
+            resolved: true,
+            mfs_delta: 0
+          });
+        });
+        
+        this.logger.log(`Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: 0 (entry market cap is 0)`);
+        return;
+      }
+      
+      // Calculate MFS using the smart contract formula
+      const percentageChange = Math.abs((exitMarketCap - entryMarketCap) / entryMarketCap);
+      const wasCorrect = (signal.direction && exitMarketCap > entryMarketCap) || (!signal.direction && exitMarketCap < entryMarketCap);
+      const correctnessMultiplier = wasCorrect ? 1 : -1;
+      const lambda = 0.088;
+      const timeDecay = Math.exp(-lambda * (signal.duration_days - 1));
+      
+      const mfsDelta = Math.floor(percentageChange * 1000 * correctnessMultiplier * timeDecay);
+
+      // Update signal and user in transaction
+      await this.dataSource.transaction(async (manager) => {
+        // Update signal
+        await manager.update(Signal, signal.signal_id, {
+          resolved: true,
+          mfs_delta: mfsDelta
+        });
+
+        // Update user's MFS score
+        await manager
+          .createQueryBuilder()
+          .update(User)
+          .set({ mfs_score: () => `mfs_score + ${mfsDelta}` })
+          .where('fid = :fid', { fid: signal.fid })
+          .execute();
+      });
+
+      this.logger.log(`Resolved signal ${signal.signal_id} for FID ${signal.fid} with MFS delta: ${mfsDelta}`);
     } catch (error) {
-      this.logger.error('Failed to cleanup old snapshots:', error);
+      this.logger.error(`Failed to resolve signal ${signal.signal_id}:`, error);
     }
   }
 
   /**
-   * Get statistics about price tracking
+   * Manual trigger for signal resolution (useful for testing)
    */
-  async getTrackingStats(): Promise<{
-    totalSnapshots: number;
-    uniqueTokens: number;
-    latestSnapshot: Date;
-    oldestSnapshot: Date;
+  async triggerSignalResolution(): Promise<void> {
+    this.logger.log('Manually triggered signal resolution...');
+    await this.resolveExpiredSignals();
+  }
+
+  /**
+   * Get resolution statistics
+   */
+  async getResolutionStats(): Promise<{
+    totalSignals: number;
+    resolvedSignals: number;
+    pendingSignals: number;
+    expiredButUnresolved: number;
   }> {
-    const [totalCount, uniqueTokensResult, latestResult, oldestResult] =
-      await Promise.all([
-        this.priceSnapshotRepository.count(),
-        this.priceSnapshotRepository
-          .createQueryBuilder()
-          .select('COUNT(DISTINCT tokenAddress)', 'count')
-          .getRawOne(),
-        this.priceSnapshotRepository
-          .createQueryBuilder()
-          .select('MAX(snapshotAt)', 'date')
-          .getRawOne(),
-        this.priceSnapshotRepository
-          .createQueryBuilder()
-          .select('MIN(snapshotAt)', 'date')
-          .getRawOne(),
-      ]);
+    const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
+    
+    const [totalSignals, resolvedSignals, pendingSignals, expiredButUnresolved] = await Promise.all([
+      this.signalRepository.count(),
+      this.signalRepository.count({ where: { resolved: true } }),
+      this.signalRepository
+        .createQueryBuilder('signal')
+        .where('signal.resolved = :resolved', { resolved: false })
+        .andWhere('signal.expires_at > :currentTimestamp', { currentTimestamp: currentTimestamp.toString() })
+        .getCount(),
+      this.signalRepository
+        .createQueryBuilder('signal')
+        .where('signal.resolved = :resolved', { resolved: false })
+        .andWhere('signal.expires_at < :currentTimestamp', { currentTimestamp: currentTimestamp.toString() })
+        .getCount()
+    ]);
 
     return {
-      totalSnapshots: totalCount,
-      uniqueTokens: parseInt(uniqueTokensResult.count) || 0,
-      latestSnapshot: latestResult.date,
-      oldestSnapshot: oldestResult.date,
+      totalSignals,
+      resolvedSignals,
+      pendingSignals,
+      expiredButUnresolved
     };
   }
 }

@@ -130,7 +130,8 @@ export class SessionDataService {
       // Sort by most recent activity
       recentSignalers.sort(
         (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+          new Date(Number(b.timestamp) * 1000).getTime() -
+          new Date(Number(a.timestamp) * 1000).getTime(),
       );
 
       return recentSignalers;

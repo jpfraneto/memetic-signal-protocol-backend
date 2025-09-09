@@ -408,7 +408,7 @@ export class SignalResolutionService {
       this.signalRepository.count({
         where: {
           resolved: true,
-          timestamp: MoreThan(new Date(todayStart * 1000)),
+          timestamp: BigInt(todayStart),
         },
       }),
     ]);

@@ -40,8 +40,8 @@ export class Signal {
   @Column({ type: 'bigint' })
   expires_at: bigint; // uint64 timestamp from contract
 
-  @Column({ type: 'date' })
-  timestamp: Date; // Block timestamp when signal was created
+  @Column({ type: 'bigint' })
+  timestamp: bigint; // Block timestamp when signal was created
 
   @Column({ type: 'bigint' })
   block_number: bigint;

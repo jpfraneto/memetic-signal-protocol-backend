@@ -115,7 +115,7 @@ export class FeedService {
         this.signalRepository.find({
           where: whereConditions,
           relations: ['token'],
-          order: { timestamp: 'DESC' },
+          order: { expires_at: 'DESC' },
           take: limit,
           skip: offset,
         }),
@@ -140,7 +140,7 @@ export class FeedService {
       const signals = await this.signalRepository.find({
         where: { ca: ca.toLowerCase() },
         relations: ['token'],
-        order: { timestamp: 'DESC' },
+        order: { expires_at: 'DESC' },
         take: limit,
       });
 
@@ -156,7 +156,7 @@ export class FeedService {
       const signals = await this.signalRepository.find({
         where: { fid: parseInt(fid) },
         relations: ['token'],
-        order: { timestamp: 'DESC' },
+        order: { expires_at: 'DESC' },
         take: limit,
       });
 
@@ -171,7 +171,7 @@ export class FeedService {
     try {
       const signals = await this.signalRepository.find({
         relations: ['token'],
-        order: { timestamp: 'DESC' },
+        order: { expires_at: 'DESC' },
         take: limit,
       });
 

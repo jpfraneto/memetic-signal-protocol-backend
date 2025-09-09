@@ -71,7 +71,7 @@ export class SignalService {
     fid: number,
   ): Promise<SignalResponseDto[]> {
     const signals = await this.signalRepository.find({
-      order: { timestamp: 'DESC' },
+      order: { expires_at: 'DESC' },
       take: 20,
       relations: ['user', 'token'],
     });
@@ -240,7 +240,7 @@ export class SignalService {
       ca: signal.ca,
       entry_market_cap: signal.entry_market_cap,
       direction: directionString === 'UP',
-      timestamp: signal.timestamp.toISOString(),
+      timestamp: signal.timestamp.toString(),
       block_number: Number(signal.block_number),
       expires_at: new Date(Number(signal.expires_at) * 1000),
       status:

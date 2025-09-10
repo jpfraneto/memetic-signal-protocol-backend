@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindManyOptions } from 'typeorm';
+import { Repository, FindManyOptions, Not } from 'typeorm';
 
 import { Signal } from '../../models/Signal/Signal.model';
 import {
@@ -84,6 +84,16 @@ export class SignalService {
     const { limit = 20, page = 1, status, fid, resolved, cursor } = query;
     const offset = (page - 1) * limit;
 
+    this.logger.log(`getSignalsFeed called with params: ${JSON.stringify(query)}`);
+
+    // Debug: Check total signal counts
+    const totalSignals = await this.signalRepository.count();
+    const resolvedSignalsCount = await this.signalRepository.count({ where: { resolved: true } });
+    const unresolvedSignalsCount = await this.signalRepository.count({ where: { resolved: false } });
+    const nullResolvedSignalsCount = await this.signalRepository.count({ where: { resolved: null } });
+    
+    this.logger.log(`Database stats - Total: ${totalSignals}, Resolved: ${resolvedSignalsCount}, Unresolved: ${unresolvedSignalsCount}, Null resolved: ${nullResolvedSignalsCount}`);
+
     const whereConditions: any = {};
     if (status) {
       whereConditions.status = status;
@@ -94,20 +104,42 @@ export class SignalService {
 
     // Handle resolved parameter
     if (resolved !== undefined) {
-      if (resolved === true) {
-        whereConditions.resolved = true;
+      this.logger.log(`Filtering by resolved: ${resolved} (type: ${typeof resolved})`);
+      
+      // Convert string to boolean if needed
+      let resolvedBool: boolean;
+      if (typeof resolved === 'string') {
+        resolvedBool = resolved === 'true';
       } else {
-        // For resolved=false or unspecified, show live signals
-        whereConditions.resolved = false;
+        resolvedBool = Boolean(resolved);
+      }
+      
+      this.logger.log(`Converted resolved to boolean: ${resolvedBool}`);
+      whereConditions.resolved = resolvedBool;
+      
+      // For resolved signals, only show those with non-zero mfs_delta
+      if (resolvedBool === true) {
+        whereConditions.mfs_delta = Not(0); // Not equal to 0
+        this.logger.log(`Added mfs_delta != 0 filter for resolved signals`);
       }
     }
 
+    this.logger.log(`Final whereConditions: ${JSON.stringify(whereConditions)}`);
+
     // Determine sort order based on signal resolution status
     let orderBy: any;
-    if (resolved === true) {
-      // For resolved signals, sort by timestamp DESC (most recent first)
-      // Since we don't have settled_at, we'll use timestamp as proxy
-      orderBy = { timestamp: 'DESC' };
+    let resolvedBool: boolean = false;
+    if (resolved !== undefined) {
+      if (typeof resolved === 'string') {
+        resolvedBool = resolved === 'true';
+      } else {
+        resolvedBool = Boolean(resolved);
+      }
+    }
+    
+    if (resolvedBool === true) {
+      // For resolved signals, sort by block_number DESC (most recent blocks first)
+      orderBy = { block_number: 'DESC' };
     } else {
       // For live signals, sort by expires_at ASC (closest to expiration first)
       orderBy = { expires_at: 'ASC' };
@@ -125,6 +157,9 @@ export class SignalService {
       this.signalRepository.find(findOptions),
       this.signalRepository.count({ where: whereConditions }),
     ]);
+
+    this.logger.log(`Found ${signals.length} signals, total: ${total}`);
+    this.logger.log(`First signal resolved status: ${signals[0]?.resolved}`);
 
     const enrichedSignals = signals.map((signal) =>
       this.mapToResponseDto(signal),

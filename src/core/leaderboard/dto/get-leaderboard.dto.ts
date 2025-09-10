@@ -17,14 +17,4 @@ export class GetLeaderboardDto {
   @Min(1)
   @Max(100)
   limit?: number = 20;
-
-  @ApiPropertyOptional({
-    description: 'Minimum settled calls to appear on leaderboard',
-    default: 5,
-  })
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value))
-  @IsNumber()
-  @Min(1)
-  minSettledCalls?: number = 5;
 }

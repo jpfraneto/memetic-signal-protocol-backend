@@ -18,9 +18,6 @@ export class LeaderboardService {
     try {
       const queryBuilder = this.userRepository
         .createQueryBuilder('user')
-        .where('user.settled_signals >= :minCalls', {
-          minCalls: query.minSettledCalls || 5,
-        })
         .orderBy('user.mfs_score', 'DESC')
         .addOrderBy('user.win_rate', 'DESC')
         .addOrderBy('user.settled_signals', 'DESC');
@@ -46,7 +43,9 @@ export class LeaderboardService {
         mfsScore: parseFloat(user.mfs_score.toString()),
         rank: skip + index + 1,
         // Calculate wins for fraction display
-        winCount: Math.round((user.settled_signals || 0) * (user.win_rate || 0) / 100),
+        winCount: Math.round(
+          ((user.settled_signals || 0) * (user.win_rate || 0)) / 100,
+        ),
         // Additional fields for frontend compatibility
         displayName: user.display_name,
         pfpUrl: user.pfp_url,

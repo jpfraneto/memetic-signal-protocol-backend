@@ -76,7 +76,11 @@ export class MeEndpointService {
             ? feedData.value
             : { signals: [], totalCount: 0 },
         featuredTokens:
-          featuredTokens.status === 'fulfilled' ? featuredTokens.value : [],
+          featuredTokens.status === 'fulfilled'
+            ? featuredTokens.value
+            : featuredTokens.status === 'rejected'
+              ? []
+              : featuredTokens,
         leaderboard:
           leaderboard.status === 'fulfilled' ? leaderboard.value : [],
         todaySignal:

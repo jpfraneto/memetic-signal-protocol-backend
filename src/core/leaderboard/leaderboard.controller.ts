@@ -52,16 +52,15 @@ export class LeaderboardController {
       // Validate query parameters
       const page = Math.max(1, Number(query.page) || 1);
       const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
-      const minSettledCalls = Math.max(0, Number(query.minSettledCalls) || 5);
 
       const validatedQuery = {
         ...query,
         page,
         limit,
-        minSettledCalls,
       };
 
-      const result = await this.leaderboardService.getLeaderboard(validatedQuery);
+      const result =
+        await this.leaderboardService.getLeaderboard(validatedQuery);
 
       return res.status(HttpStatus.OK).send({
         success: true,
@@ -74,7 +73,10 @@ export class LeaderboardController {
         error,
       );
 
-      if (error.message.includes('database') || error.message.includes('connection')) {
+      if (
+        error.message.includes('database') ||
+        error.message.includes('connection')
+      ) {
         return hasError(
           res,
           HttpStatus.SERVICE_UNAVAILABLE,

@@ -18,6 +18,7 @@ import { UserModule } from '../user/user.module';
 import { ZapperModule } from '../zapper/zapper.module';
 import { SignalModule } from '../signal/signal.module';
 import { BlockchainModule } from '../blockchain/blockchain.module';
+import { RedisCacheModule } from '../../cache/cache.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
     ZapperModule,
     SignalModule,
     BlockchainModule,
+    RedisCacheModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, MeEndpointService, AdminGuard],

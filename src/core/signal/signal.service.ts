@@ -332,4 +332,153 @@ export class SignalService {
       } : undefined,
     };
   }
+
+  /**
+   * Get user signals in chronological order (most recent first)
+   */
+  async getUserSignalsChronological(
+    fid: number,
+    options: { page?: number; limit?: number; status?: string } = {},
+  ): Promise<{
+    signals: any[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const { page = 1, limit = 20, status } = options;
+    const offset = (page - 1) * limit;
+
+    // Verify user exists
+    const user = await this.userRepository.findOne({ where: { fid } });
+    if (!user) {
+      throw new Error(`User with FID ${fid} not found`);
+    }
+
+    const queryBuilder = this.signalRepository
+      .createQueryBuilder('signal')
+      .leftJoinAndSelect('signal.token', 'token')
+      .where('signal.fid = :fid', { fid })
+      .orderBy('signal.timestamp', 'DESC')
+      .skip(offset)
+      .take(limit);
+
+    // Apply status filter
+    if (status) {
+      if (status === 'resolved') {
+        queryBuilder.andWhere('signal.resolved = :resolved', { resolved: true });
+      } else if (status === 'direction') {
+        queryBuilder.andWhere('signal.resolved = :resolved', { resolved: false });
+      }
+    }
+
+    const [signals, total] = await queryBuilder.getManyAndCount();
+
+    // Map signals to the expected format
+    const formattedSignals = signals.map(signal => ({
+      id: `signal-${signal.signal_id}`,
+      signalId: signal.signal_id,
+      fid: signal.fid,
+      tokenAddress: signal.ca,
+      ticker: signal.token?.symbol || 'UNKNOWN',
+      direction: signal.direction ? 'up' : 'down',
+      timestamp: Number(signal.timestamp) * 1000, // Convert to milliseconds
+      entryPrice: signal.entry_market_cap / 1000000, // Convert to millions for display
+      currentPrice: null, // Would need current market data
+      exitPrice: null, // Would need to be calculated if resolved
+      pnl: signal.mfs_delta || 0,
+      stake: 100, // Default stake amount
+      status: signal.resolved ? 'closed' : 'open',
+      transactionHash: signal.transaction_hash,
+      // Include token info
+      token: signal.token ? {
+        name: signal.token.name,
+        symbol: signal.token.symbol,
+        image: signal.token.image,
+        ca: signal.token.ca,
+      } : null,
+    }));
+
+    return {
+      signals: formattedSignals,
+      total,
+      hasMore: offset + limit < total,
+    };
+  }
+
+  /**
+   * Get all signals for a specific contract address (CA) in chronological order (most recent first)
+   */
+  async getSignalsByCA(
+    ca: string,
+    options: { page?: number; limit?: number; status?: string } = {},
+  ): Promise<{
+    signals: any[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const { page = 1, limit = 20, status } = options;
+    const offset = (page - 1) * limit;
+
+    const queryBuilder = this.signalRepository
+      .createQueryBuilder('signal')
+      .leftJoinAndSelect('signal.token', 'token')
+      .leftJoinAndSelect('signal.user', 'user')
+      .where('LOWER(signal.ca) = LOWER(:ca)', { ca })
+      .orderBy('signal.timestamp', 'DESC')
+      .skip(offset)
+      .take(limit);
+
+    // Apply status filter
+    if (status) {
+      if (status === 'resolved') {
+        queryBuilder.andWhere('signal.resolved = :resolved', { resolved: true });
+      } else if (status === 'direction') {
+        queryBuilder.andWhere('signal.resolved = :resolved', { resolved: false });
+      }
+    }
+
+    const [signals, total] = await queryBuilder.getManyAndCount();
+
+    if (total === 0) {
+      throw new Error(`No signals found for contract address ${ca}`);
+    }
+
+    // Map signals to the expected format
+    const formattedSignals = signals.map(signal => ({
+      id: `signal-${signal.signal_id}`,
+      signalId: signal.signal_id,
+      fid: signal.fid,
+      tokenAddress: signal.ca,
+      ticker: signal.token?.symbol || 'UNKNOWN',
+      direction: signal.direction ? 'up' : 'down',
+      timestamp: Number(signal.timestamp) * 1000, // Convert to milliseconds
+      entryPrice: signal.entry_market_cap / 1000000, // Convert to millions for display
+      currentPrice: null, // Would need current market data
+      exitPrice: null, // Would need to be calculated if resolved
+      pnl: signal.mfs_delta || 0,
+      stake: 100, // Default stake amount
+      status: signal.resolved ? 'closed' : 'open',
+      transactionHash: signal.transaction_hash,
+      // Include user info who made the signal
+      user: signal.user ? {
+        fid: signal.user.fid,
+        username: signal.user.username,
+        pfp_url: signal.user.pfp_url,
+        display_name: signal.user.display_name,
+        is_verified: signal.user.is_verified,
+      } : null,
+      // Include token info
+      token: signal.token ? {
+        name: signal.token.name,
+        symbol: signal.token.symbol,
+        image: signal.token.image,
+        ca: signal.token.ca,
+      } : null,
+    }));
+
+    return {
+      signals: formattedSignals,
+      total,
+      hasMore: offset + limit < total,
+    };
+  }
 }

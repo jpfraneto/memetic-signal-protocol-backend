@@ -5,6 +5,7 @@ import { User } from '../../models/User/User.model';
 import { Signal } from '../../models/Signal/Signal.model';
 import { PriceSnapshot } from '../../models/PriceSnapshot/PriceSnapshot.model';
 import { SignalStatus } from '../../models/Signal/Signal.types';
+import { CacheService } from '../../cache/cache.service';
 
 export interface ScoreCalculationResult {
   transaction_hash: string;
@@ -31,6 +32,7 @@ export class ScoringService {
     @InjectRepository(PriceSnapshot)
     private priceSnapshotRepository: Repository<PriceSnapshot>,
     private dataSource: DataSource,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -239,25 +241,123 @@ export class ScoringService {
   }
 
   /**
-   * Recalculate leaderboard rankings
+   * Update comprehensive user statistics after signal resolution
+   */
+  async updateUserStats(fid: number, isWin: boolean): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const user = await queryRunner.manager.findOne(User, { where: { fid } });
+      if (!user) {
+        throw new Error(`User with FID ${fid} not found`);
+      }
+
+      // Update signal counts
+      user.settled_signals = (user.settled_signals || 0) + 1;
+      user.active_signals = Math.max(0, (user.active_signals || 0) - 1);
+
+      // Recalculate win rate
+      const totalSettled = user.settled_signals;
+      const currentWins = Math.round(((user.win_rate || 0) / 100) * (totalSettled - 1));
+      const newWins = isWin ? currentWins + 1 : currentWins;
+      user.win_rate = totalSettled > 0 ? (newWins / totalSettled) * 100 : 0;
+
+      // Update MFS score based on total_score
+      user.mfs_score = user.total_score || 0;
+
+      await queryRunner.manager.save(user);
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Updated user ${fid} stats: settled=${user.settled_signals}, winRate=${user.win_rate.toFixed(2)}%, mfsScore=${user.mfs_score}`
+      );
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Recalculate leaderboard rankings based on MFS score
    */
   async updateLeaderboardRankings(): Promise<void> {
-    this.logger.log('Updating leaderboard rankings');
+    this.logger.log('Updating leaderboard rankings based on MFS score');
 
+    // Get users with minimum signal requirement, ordered by MFS score
     const users = await this.userRepository
       .createQueryBuilder('user')
-      .orderBy('user.totalScore', 'DESC')
+      .where('user.settled_signals >= :minSignals', { minSignals: 5 })
+      .orderBy('user.mfs_score', 'DESC')
+      .addOrderBy('user.win_rate', 'DESC')
+      .addOrderBy('user.settled_signals', 'DESC')
       .getMany();
 
-    for (let i = 0; i < users.length; i++) {
-      const user = users[i];
-      const newRank = i + 1;
-
+    // Update ranks for qualified users
+    const updatePromises = users.map(async (user, index) => {
+      const newRank = index + 1;
       if (user.rank !== newRank) {
         await this.userRepository.update(user.fid, { rank: newRank });
       }
-    }
+    });
 
-    this.logger.log(`Updated rankings for ${users.length} users`);
+    await Promise.all(updatePromises);
+
+    // Clear ranks for unqualified users
+    await this.userRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({ rank: null })
+      .where('settled_signals < :minSignals', { minSignals: 5 })
+      .execute();
+
+    this.logger.log(`Updated rankings for ${users.length} qualified users`);
+  }
+
+  /**
+   * Comprehensive stats update after signal resolution
+   */
+  async processSignalResolution(signalHash: string, isWin: boolean, finalScore: number): Promise<void> {
+    try {
+      // Get the signal with user information
+      const signal = await this.signalRepository.findOne({
+        where: { transaction_hash: signalHash },
+        relations: ['user']
+      });
+
+      if (!signal || !signal.user) {
+        throw new Error(`Signal ${signalHash} or user not found`);
+      }
+
+      // Update signal as resolved
+      signal.resolved = true;
+      signal.mfs_delta = finalScore;
+      await this.signalRepository.save(signal);
+
+      // Update user score if it's a win
+      if (isWin) {
+        await this.updateUserScore(signal.fid, finalScore);
+      }
+
+      // Update user statistics
+      await this.updateUserStats(signal.fid, isWin);
+
+      // Update rankings
+      await this.updateLeaderboardRankings();
+
+      // Invalidate relevant caches
+      await this.cacheService.onSignalResolved(signal.fid);
+
+      this.logger.log(
+        `Completed signal resolution for ${signalHash}: ${isWin ? 'WIN' : 'LOSS'}, score: ${finalScore}`
+      );
+
+    } catch (error) {
+      this.logger.error(`Failed to process signal resolution for ${signalHash}:`, error);
+      throw error;
+    }
   }
 }

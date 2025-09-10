@@ -1,44 +1,61 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { User } from 'src/models';
 
-export class CallDto {
+export class UserSignalDto {
   @ApiProperty()
   id: string;
 
   @ApiProperty()
-  signalId: string;
+  signalId: number;
 
   @ApiProperty()
   fid: number;
 
   @ApiProperty()
-  ca: string;
+  tokenAddress: string;
 
   @ApiProperty()
   ticker: string;
 
   @ApiProperty()
-  direction: string;
+  direction: 'up' | 'down';
 
   @ApiProperty()
   timestamp: number;
 
   @ApiProperty()
-  callPrice: number;
+  entryPrice: number;
+
+  @ApiProperty({ nullable: true })
+  currentPrice?: number;
+
+  @ApiProperty({ nullable: true })
+  exitPrice?: number;
+
+  @ApiProperty({ nullable: true })
+  pnl?: number;
+
+  @ApiProperty()
+  stake: number;
+
+  @ApiProperty()
+  status: string;
 
   @ApiProperty()
   transactionHash: string;
 }
 
+export class CallDto extends UserSignalDto {}
+
 export class UserStatsDto {
   @ApiProperty()
   totalPnl: number;
 
-  @ApiProperty()
-  bestCall: CallDto;
+  @ApiProperty({ nullable: true })
+  bestCall?: UserSignalDto;
 
-  @ApiProperty()
-  worstCall: CallDto;
+  @ApiProperty({ nullable: true })
+  worstCall?: UserSignalDto;
 
   @ApiProperty()
   averageStake: number;
@@ -81,6 +98,44 @@ export class DetailedUserStatsDto {
   topTokens: TopTokenDto[];
 }
 
+export class EnhancedUserDto {
+  @ApiProperty()
+  fid: number;
+
+  @ApiProperty()
+  username: string;
+
+  @ApiProperty({ nullable: true })
+  displayName?: string;
+
+  @ApiProperty({ nullable: true })
+  avatar?: string;
+
+  @ApiProperty({ nullable: true })
+  pfpUrl?: string;
+
+  @ApiProperty()
+  isVerified: boolean;
+
+  @ApiProperty()
+  mfsScore: number;
+
+  @ApiProperty()
+  winRate: number;
+
+  @ApiProperty()
+  totalCalls: number;
+
+  @ApiProperty()
+  rank: number;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
 export class UsersListResponseDto {
   @ApiProperty()
   success: boolean;
@@ -107,17 +162,17 @@ export class UserDetailResponseDto {
   @ApiProperty({
     type: 'object',
     properties: {
-      user: { $ref: '#/components/schemas/User' },
+      user: { $ref: '#/components/schemas/EnhancedUserDto' },
       recentCalls: {
         type: 'array',
-        items: { $ref: '#/components/schemas/CallDto' },
+        items: { $ref: '#/components/schemas/UserSignalDto' },
       },
       stats: { $ref: '#/components/schemas/UserStatsDto' },
     },
   })
   data: {
-    user: User;
-    recentCalls: CallDto[];
+    user: EnhancedUserDto;
+    recentCalls: UserSignalDto[];
     stats: UserStatsDto;
   };
 }

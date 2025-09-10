@@ -60,7 +60,7 @@ export class UserController {
     }
   }
 
-  @Get('users/:fid')
+  @Get(':fid')
   @ApiOperation({
     summary: 'Get user details by FID with recent calls and stats',
   })
@@ -103,7 +103,7 @@ export class UserController {
     }
   }
 
-  @Get('users/:fid/calls')
+  @Get(':fid/calls')
   @ApiOperation({ summary: 'Get user calls with pagination and filtering' })
   @ApiResponse({
     status: 200,
@@ -136,7 +136,7 @@ export class UserController {
     }
   }
 
-  @Get('users/:fid/recalculate-calls')
+  @Get(':fid/recalculate-calls')
   @ApiOperation({ summary: 'Recalculate total calls for a specific user' })
   @ApiResponse({
     status: 200,

@@ -15,20 +15,44 @@ export class UserProfileDto {
   @ApiProperty({ description: 'Profile picture URL', nullable: true })
   pfpUrl: string | null;
 
+  @ApiProperty({ description: 'Profile picture URL (alias for compatibility)', nullable: true })
+  pfp_url: string | null;
+
+  @ApiProperty({ description: 'MFS Score' })
+  mfsScore: number;
+
+  @ApiProperty({ description: 'MFS Score (alias for compatibility)' })
+  mfs_score: number;
+
   @ApiProperty({ description: 'Total accumulated score' })
   totalScore: number;
 
   @ApiProperty({ description: 'Total number of signals made' })
   totalSignals: number;
 
+  @ApiProperty({ description: 'Total signals (alias for compatibility)' })
+  total_signals: number;
+
   @ApiProperty({ description: 'Number of active signals' })
   activeSignals: number;
+
+  @ApiProperty({ description: 'Active signals (alias for compatibility)' })
+  active_signals: number;
+
+  @ApiProperty({ description: 'Number of settled signals' })
+  settledSignals: number;
+
+  @ApiProperty({ description: 'Settled signals (alias for compatibility)' })
+  settled_signals: number;
 
   @ApiProperty({ description: 'User rank on leaderboard', nullable: true })
   rank: number | null;
 
   @ApiProperty({ description: 'Win rate percentage' })
   winRate: number;
+
+  @ApiProperty({ description: 'Win rate (alias for compatibility)' })
+  win_rate: number;
 
   @ApiProperty({ description: 'Whether user is verified on Farcaster' })
   isVerified: boolean;

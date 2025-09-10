@@ -10,11 +10,13 @@ import { Token } from '../../models/Token/Token.model';
 import { ScoringService } from '../scoring/scoring.service';
 import { TokenPriceService } from '../signal/services/token-price.service';
 import { SimpleTokenService } from '../tokens/services/simple-token.service';
+import { RedisCacheModule } from '../../cache/cache.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Signal, PriceSnapshot, User, Token]),
     ScheduleModule.forRoot(),
+    RedisCacheModule,
   ],
   providers: [
     PriceTrackingService,

@@ -237,8 +237,9 @@ export class UserService {
   }
 
   async getUserWithDetails(fid: number): Promise<{
-    user: User;
-    recentSignals: Signal[];
+    user: any;
+    recentCalls: any[];
+    stats: any;
   }> {
     const user = await this.userRepository.findOne({
       where: { fid },
@@ -249,20 +250,92 @@ export class UserService {
       throw new Error(`User with FID ${fid} not found`);
     }
 
+    // Get recent signals with token information
     const recentSignals = await this.signalRepository
       .createQueryBuilder('signal')
-      .leftJoin('signal.user', 'user')
-      .where('user.fid = :fid', { fid })
+      .leftJoinAndSelect('signal.token', 'token')
+      .where('signal.fid = :fid', { fid })
       .orderBy('signal.timestamp', 'DESC')
       .limit(10)
       .getMany();
 
-    const result = {
-      user,
-      recentSignals,
+    // Calculate user statistics
+    const totalSignals = await this.signalRepository.count({ where: { fid } });
+    const resolvedSignals = await this.signalRepository.count({
+      where: { fid, resolved: true },
+    });
+
+    // Map signals to UserSignalDto format
+    const recentCalls = recentSignals.map((signal) => ({
+      id: signal.transaction_hash,
+      signalId: signal.signal_id,
+      fid: signal.fid,
+      tokenAddress: signal.ca,
+      ticker: signal.token?.symbol || 'UNKNOWN',
+      direction: signal.direction ? 'up' : 'down',
+      timestamp: Number(signal.timestamp) * 1000, // Convert to milliseconds
+      entry_market_cap: signal.entry_market_cap,
+      expires_at: signal.expires_at,
+      block_number: signal.block_number,
+      resolved: signal.resolved,
+      manually_updated: signal.manually_updated,
+      duration: signal.duration_days,
+      current_price: null, // Would need to be calculated from current price
+      exit_price: null, // Would need to be calculated if resolved
+      mfs_delta: signal.mfs_delta,
+      stake: 100, // Default stake amount
+      status: signal.resolved ? 'closed' : 'open',
+      transactionHash: signal.transaction_hash,
+    }));
+
+    // Calculate basic stats
+    const stats = {
+      total_score: user.total_score,
+      bestCall:
+        recentCalls.length > 0
+          ? recentCalls.reduce((best, call) =>
+              call.mfs_delta > best.mfs_delta ? call : best,
+            )
+          : null,
+      worstCall:
+        recentCalls.length > 0
+          ? recentCalls.reduce((worst, call) =>
+              call.mfs_delta < worst.mfs_delta ? call : worst,
+            )
+          : null,
+      averageStake: 100, // Default average stake
+      total_signals: totalSignals,
+      active_signals: totalSignals - resolvedSignals,
+      resolved_signals: resolvedSignals,
+      win_rate: user.win_rate,
+      mfs_score: user.mfs_score,
     };
 
-    return result;
+    // Map user to enhanced format
+    const enhancedUser = {
+      fid: user.fid,
+      username: user.username,
+      displayName: user.display_name,
+      avatar: user.pfp_url,
+      pfpUrl: user.pfp_url,
+      isVerified: user.is_verified || false,
+      mfsScore: user.mfs_score,
+      winRate: user.win_rate || 0,
+      total_signals: totalSignals,
+      rank: user.rank,
+      createdAt: user.created_at
+        ? user.created_at.toISOString()
+        : new Date().toISOString(),
+      updatedAt: user.updated_at
+        ? user.updated_at.toISOString()
+        : new Date().toISOString(),
+    };
+
+    return {
+      user: enhancedUser,
+      recentCalls,
+      stats,
+    };
   }
 
   async getUserSignals(
@@ -335,5 +408,96 @@ export class UserService {
     }
 
     this.logger.log(`Recalculated total signals for ${users.length} users`);
+  }
+
+  /**
+   * Comprehensive data consistency check and repair for a user
+   */
+  async ensureUserDataConsistency(fid: number): Promise<void> {
+    this.logger.log(`Ensuring data consistency for user ${fid}`);
+
+    const user = await this.userRepository.findOne({ where: { fid } });
+    if (!user) {
+      throw new Error(`User with FID ${fid} not found`);
+    }
+
+    // Get accurate counts from database
+    const totalSignals = await this.signalRepository.count({ where: { fid } });
+    const settledSignals = await this.signalRepository.count({
+      where: { fid, resolved: true },
+    });
+    const activeSignals = await this.signalRepository.count({
+      where: { fid, resolved: false },
+    });
+
+    // Calculate win count and win rate
+    const wonSignals = await this.signalRepository
+      .createQueryBuilder('signal')
+      .where(
+        'signal.fid = :fid AND signal.resolved = true AND signal.mfs_delta > 0',
+        { fid },
+      )
+      .getCount();
+
+    const winRate =
+      settledSignals > 0 ? (wonSignals / settledSignals) * 100 : 0;
+
+    // Calculate total score
+    const scoreResult = await this.signalRepository
+      .createQueryBuilder('signal')
+      .select('SUM(signal.mfs_delta)', 'totalScore')
+      .where('signal.fid = :fid AND signal.resolved = true', { fid })
+      .getRawOne();
+
+    const totalScore = parseFloat(scoreResult?.totalScore || '0') || 0;
+    const mfsScore = totalScore; // MFS score is based on total score
+
+    // Update user with consistent data
+    user.total_signals = totalSignals;
+    user.active_signals = activeSignals;
+    user.settled_signals = settledSignals;
+    user.win_rate = winRate;
+    user.total_score = totalScore;
+    user.mfs_score = mfsScore;
+
+    await this.userRepository.save(user);
+
+    this.logger.log(
+      `Data consistency updated for user ${fid}: total=${totalSignals}, active=${activeSignals}, settled=${settledSignals}, winRate=${winRate.toFixed(2)}%, score=${totalScore.toFixed(4)}`,
+    );
+  }
+
+  /**
+   * Run data consistency check for all users
+   */
+  async ensureAllUsersDataConsistency(): Promise<void> {
+    this.logger.log(
+      'Starting comprehensive data consistency check for all users',
+    );
+
+    const users = await this.userRepository.find();
+    let processedCount = 0;
+
+    for (const user of users) {
+      try {
+        await this.ensureUserDataConsistency(user.fid);
+        processedCount++;
+
+        if (processedCount % 10 === 0) {
+          this.logger.log(
+            `Data consistency progress: ${processedCount}/${users.length} users processed`,
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to ensure data consistency for user ${user.fid}:`,
+          error,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Data consistency check completed. Processed ${processedCount}/${users.length} users`,
+    );
   }
 }

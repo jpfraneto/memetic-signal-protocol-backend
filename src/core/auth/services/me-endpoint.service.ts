@@ -669,11 +669,19 @@ export class MeEndpointService {
       username: user.username,
       displayName: user.display_name,
       pfpUrl: user.pfp_url,
+      pfp_url: user.pfp_url, // alias for compatibility
+      mfsScore: user.mfs_score || 0,
+      mfs_score: user.mfs_score || 0, // alias for compatibility
       totalScore: user.total_score || 0,
       totalSignals: user.total_signals || 0,
+      total_signals: user.total_signals || 0, // alias for compatibility
       activeSignals: user.active_signals || 0,
+      active_signals: user.active_signals || 0, // alias for compatibility
+      settledSignals: user.settled_signals || 0,
+      settled_signals: user.settled_signals || 0, // alias for compatibility
       rank: user.rank,
       winRate: user.win_rate || 0,
+      win_rate: user.win_rate || 0, // alias for compatibility
       isVerified: user.is_verified || false,
       followerCount: user.follower_count || 0,
       followingCount: user.following_count || 0,

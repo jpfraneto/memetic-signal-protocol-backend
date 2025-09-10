@@ -49,11 +49,24 @@ export class LeaderboardController {
     @Res() res: FastifyReply,
   ) {
     try {
-      const result = await this.leaderboardService.getLeaderboard(query);
+      // Validate query parameters
+      const page = Math.max(1, Number(query.page) || 1);
+      const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+      const minSettledCalls = Math.max(0, Number(query.minSettledCalls) || 5);
+
+      const validatedQuery = {
+        ...query,
+        page,
+        limit,
+        minSettledCalls,
+      };
+
+      const result = await this.leaderboardService.getLeaderboard(validatedQuery);
 
       return res.status(HttpStatus.OK).send({
         success: true,
         data: result,
+        timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error(
@@ -61,11 +74,29 @@ export class LeaderboardController {
         error,
       );
 
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        return hasError(
+          res,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'getLeaderboard',
+          'Database connection error. Please try again later.',
+        );
+      }
+
+      if (error.message.includes('timeout')) {
+        return hasError(
+          res,
+          HttpStatus.REQUEST_TIMEOUT,
+          'getLeaderboard',
+          'Request timed out. Please try again.',
+        );
+      }
+
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
         'getLeaderboard',
-        'Failed to fetch leaderboard',
+        'An unexpected error occurred while fetching the leaderboard',
       );
     }
   }

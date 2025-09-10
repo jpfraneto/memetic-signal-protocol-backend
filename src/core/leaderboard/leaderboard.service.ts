@@ -33,7 +33,7 @@ export class LeaderboardService {
 
       const [users, total] = await queryBuilder.getManyAndCount();
 
-      // Calculate ranks
+      // Calculate ranks and format data
       const usersWithRanks = users.map((user, index) => ({
         fid: user.fid,
         username: user.username,
@@ -45,6 +45,13 @@ export class LeaderboardService {
         winRate: parseFloat(user.win_rate.toString()),
         mfsScore: parseFloat(user.mfs_score.toString()),
         rank: skip + index + 1,
+        // Calculate wins for fraction display
+        winCount: Math.round((user.settled_signals || 0) * (user.win_rate || 0) / 100),
+        // Additional fields for frontend compatibility
+        displayName: user.display_name,
+        pfpUrl: user.pfp_url,
+        followerCount: user.follower_count,
+        followingCount: user.following_count,
       }));
 
       return {

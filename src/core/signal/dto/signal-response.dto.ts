@@ -1,25 +1,34 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SignalResponseDto {
+  @ApiProperty({ description: 'Signal ID (primary key)' })
+  signal_id: number;
+
   @ApiProperty({ description: 'Transaction hash' })
   transaction_hash: string;
 
-  @ApiProperty({ description: 'User Farcaster ID' })
-  fid: number;
-
   @ApiProperty({ description: 'Token contract address' })
   ca: string;
+
+  @ApiProperty({ description: 'User Farcaster ID' })
+  fid: number;
 
   @ApiProperty({
     description: 'Signal direction - true for UP, false for DOWN',
   })
   direction: boolean;
 
+  @ApiProperty({ description: 'Signal duration in days' })
+  duration_days: number;
+
   @ApiProperty({ description: 'Market cap when signal was created' })
   entry_market_cap: number;
 
-  @ApiProperty({ description: 'Signal duration in days' })
-  duration: number;
+  @ApiProperty({ description: 'Signal created at timestamp' })
+  created_at: string;
+
+  @ApiProperty({ description: 'Signal expiration date' })
+  expires_at: Date;
 
   @ApiProperty({ description: 'Block timestamp' })
   timestamp: string;
@@ -27,11 +36,20 @@ export class SignalResponseDto {
   @ApiProperty({ description: 'Block number' })
   block_number: number;
 
+  @ApiProperty({ description: 'Whether signal has been resolved' })
+  resolved: boolean;
+
+  @ApiProperty({ description: 'MFS delta value' })
+  mfs_delta: number;
+
+  @ApiProperty({ description: 'Whether signal was manually updated' })
+  manually_updated: boolean;
+
+  @ApiProperty({ description: 'Signal duration in days (computed)' })
+  duration: number;
+
   @ApiProperty({ description: 'Signal status (0=ACTIVE, 1=WON, 2=LOST)' })
   status: number;
-
-  @ApiProperty({ description: 'Signal expiration date' })
-  expires_at: Date;
 
   @ApiProperty({ description: 'User information', required: false })
   user?: {

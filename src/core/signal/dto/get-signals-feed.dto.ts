@@ -3,6 +3,7 @@ import {
   IsNumber,
   IsEnum,
   IsString,
+  IsBoolean,
   Min,
   Max,
 } from 'class-validator';
@@ -61,4 +62,15 @@ export class GetSignalsFeedDto {
   @IsOptional()
   @IsEnum(['ASC', 'DESC'])
   sortOrder?: 'ASC' | 'DESC' = 'DESC';
+
+  @ApiPropertyOptional({ description: 'Filter by resolved status' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  resolved?: boolean;
+
+  @ApiPropertyOptional({ description: 'Cursor for pagination (signal ID)' })
+  @IsOptional()
+  @IsString()
+  cursor?: string;
 }

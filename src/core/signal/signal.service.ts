@@ -81,7 +81,7 @@ export class SignalService {
   async getSignalsFeed(
     query: GetSignalsFeedDto,
   ): Promise<SignalsFeedResponseDto> {
-    const { limit = 20, page = 1, status, fid } = query;
+    const { limit = 20, page = 1, status, fid, resolved, cursor } = query;
     const offset = (page - 1) * limit;
 
     const whereConditions: any = {};
@@ -92,9 +92,30 @@ export class SignalService {
       whereConditions.fid = fid;
     }
 
+    // Handle resolved parameter
+    if (resolved !== undefined) {
+      if (resolved === true) {
+        whereConditions.resolved = true;
+      } else {
+        // For resolved=false or unspecified, show live signals
+        whereConditions.resolved = false;
+      }
+    }
+
+    // Determine sort order based on signal resolution status
+    let orderBy: any;
+    if (resolved === true) {
+      // For resolved signals, sort by timestamp DESC (most recent first)
+      // Since we don't have settled_at, we'll use timestamp as proxy
+      orderBy = { timestamp: 'DESC' };
+    } else {
+      // For live signals, sort by expires_at ASC (closest to expiration first)
+      orderBy = { expires_at: 'ASC' };
+    }
+
     const findOptions: FindManyOptions<Signal> = {
       where: whereConditions,
-      order: { timestamp: 'DESC' },
+      order: orderBy,
       take: limit,
       skip: offset,
       relations: ['user', 'token'],
@@ -224,33 +245,41 @@ export class SignalService {
   }
 
   private mapToResponseDto(signal: Signal): SignalResponseDto {
-    // Convert boolean direction to uppercase string for API response
-    const directionString = signal.direction ? 'UP' : 'DOWN';
-
-    // Convert numeric status to string
-    const statusString = signal.resolved
-      ? 'ACTIVE'
-      : signal.resolved
-        ? 'WON'
-        : 'LOST';
+    // Convert resolved status to signal status enum
+    let status: SignalStatus;
+    if (signal.resolved === false) {
+      status = SignalStatus.ACTIVE;
+    } else if (signal.resolved === true) {
+      // For resolved signals, we'd need additional logic to determine WON vs LOST
+      // For now, treating all resolved as WON - this might need adjustment based on other fields
+      status = SignalStatus.WON;
+    } else {
+      status = SignalStatus.ACTIVE;
+    }
 
     return {
+      // All Signal model properties
+      signal_id: signal.signal_id,
       transaction_hash: signal.transaction_hash,
-      fid: signal.fid,
       ca: signal.ca,
+      fid: signal.fid,
+      direction: signal.direction,
+      duration_days: signal.duration_days,
       entry_market_cap: signal.entry_market_cap,
-      direction: directionString === 'UP',
+      created_at: signal.created_at.toString(),
+      expires_at: new Date(Number(signal.expires_at) * 1000),
       timestamp: signal.timestamp.toString(),
       block_number: Number(signal.block_number),
-      expires_at: new Date(Number(signal.expires_at) * 1000),
-      status:
-        statusString === 'ACTIVE'
-          ? SignalStatus.ACTIVE
-          : statusString === 'WON'
-            ? SignalStatus.WON
-            : SignalStatus.LOST,
+      resolved: signal.resolved,
+      mfs_delta: signal.mfs_delta,
+      manually_updated: signal.manually_updated,
+      
+      // Computed/helper properties
       duration: signal.duration,
-      user: {
+      status: status,
+      
+      // Related data
+      user: signal.user ? {
         fid: signal.user.fid,
         username: signal.user.username,
         pfp_url: signal.user.pfp_url,
@@ -258,15 +287,14 @@ export class SignalService {
         win_rate: signal.user.win_rate,
         mfs_score: signal.user.mfs_score,
         display_name: signal.user.display_name,
-      },
-      token: signal.token
-        ? {
-            ca: signal.token.ca,
-            name: signal.token.name,
-            symbol: signal.token.symbol,
-            image: signal.token.image,
-          }
-        : undefined,
+      } : undefined,
+      
+      token: signal.token ? {
+        ca: signal.token.ca,
+        name: signal.token.name,
+        symbol: signal.token.symbol,
+        image: signal.token.image,
+      } : undefined,
     };
   }
 }

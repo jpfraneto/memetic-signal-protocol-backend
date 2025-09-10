@@ -242,6 +242,7 @@ export class MeEndpointService {
           s.resolved,
           s.expires_at,
           s.block_number,
+          s.mfs_delta,
           u.username,
           u.display_name,
           u.pfp_url,
@@ -305,13 +306,14 @@ export class MeEndpointService {
             WHERE LOWER(token_address) = LOWER(s.ca)
           )
         )
-        ORDER BY s.expires_at ASC
+        WHERE s.resolved = false OR s.resolved IS NULL
+        ORDER BY s.block_number DESC
         LIMIT 50
       `;
 
       const results = await queryRunner.query(query);
       const totalCountQuery = await queryRunner.query(
-        'SELECT COUNT(*) as count FROM signals',
+        'SELECT COUNT(*) as count FROM signals WHERE resolved = false OR resolved IS NULL',
       );
       const totalCount = parseInt(totalCountQuery[0].count);
 
@@ -427,11 +429,14 @@ export class MeEndpointService {
           'token.symbol',
           'token.image',
         ])
-        .orderBy('signal.expires_at', 'ASC')
+        .where('signal.resolved = false OR signal.resolved IS NULL')
+        .orderBy('signal.block_number', 'DESC')
         .limit(50)
         .getMany();
 
-      const totalCount = await this.signalRepository.count();
+      const totalCount = await this.signalRepository.count({
+        where: [{ resolved: false }, { resolved: null }],
+      });
 
       return { signals, totalCount };
     } catch (error) {

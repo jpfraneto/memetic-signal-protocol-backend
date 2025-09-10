@@ -44,12 +44,8 @@ export class SignalController {
         success: true,
         data: {
           signals: [],
-          pagination: {
-            page: 1,
-            limit: 20,
-            total: 100,
-            pages: 5,
-          },
+          total: 0,
+          hasMore: false,
         },
       },
     },
@@ -62,14 +58,14 @@ export class SignalController {
   ) {
     try {
       const result = await this.signalService.getSignalsFeed(query);
-      this.logger.log('THE RESULT HEREEEE', result);
-      this.logger.log(
-        'TOKENSSS',
-        result.signals.map((signal) =>
-          this.logger.log('TOKEN NNN', signal.token),
-        ),
-      );
-      return hasResponse(res, result);
+      return hasResponse(res, {
+        success: true,
+        data: {
+          signals: result.signals,
+          total: result.total,
+          hasMore: result.hasMore,
+        },
+      });
     } catch (error) {
       return hasError(
         res,

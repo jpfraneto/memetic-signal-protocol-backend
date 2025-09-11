@@ -8,20 +8,29 @@ import {
 
 @Entity({ name: 'tokens' })
 export class Token {
-  @PrimaryColumn({ type: 'varchar', length: 42 })
+  @PrimaryColumn({ type: 'varchar', length: 66 }) // hex format
   ca: string;
 
-  @Column()
+  @Column({ type: 'text', nullable: true })
+  coingecko_id: string;
+
+  @Column({ type: 'text', nullable: true })
+  platform_id: string;
+
+  @Column({ type: 'text', nullable: true })
+  fetched_from: string;
+
+  @Column({ type: 'text', nullable: true })
   name: string;
 
-  @Column()
+  @Column({ type: 'text', nullable: true })
   symbol: string;
 
-  @Column({ type: 'int', default: 18 })
+  @Column({ type: 'integer', nullable: true })
   decimals: number;
 
-  @Column({ type: 'simple-array', nullable: true })
-  categories: string[];
+  @Column({ type: 'text', nullable: true })
+  categories: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
@@ -35,25 +44,15 @@ export class Token {
   @Column({ type: 'text', nullable: true })
   image_thumb: string;
 
-  @Column({ type: 'int', nullable: true })
-  market_cap_rank: number;
+  @Column({ type: 'bigint', nullable: true })
+  market_cap_rank: bigint;
 
-  @Column({ type: 'json', nullable: true })
-  market_data: {
-    current_price: number;
-    ath: number;
-    ath_change_percentage: number;
-    ath_date: string;
-    market_cap: number;
-    price_change_24h: number;
-  };
+  @Column({ type: 'text', nullable: true })
+  market_data: string; // JSON string
 
-  @CreateDateColumn()
+  @Column({ type: 'date' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @Column({ type: 'date' })
   updated_at: Date;
-
-  @Column({ type: 'varchar', nullable: false })
-  coingecko_id: string;
 }

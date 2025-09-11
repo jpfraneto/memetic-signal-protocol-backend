@@ -79,14 +79,14 @@ export class SimpleTokenService {
           `Failed to parse market_data for token ${token.ca}:`,
           error,
         );
-        token.market_data = {
+        token.market_data = JSON.stringify({
           current_price: 0,
           ath: 0,
           ath_change_percentage: 0,
           ath_date: '',
           market_cap: 0,
           price_change_24h: 0,
-        };
+        });
       }
     }
 
@@ -189,7 +189,7 @@ export class SimpleTokenService {
         image_small: coinData?.image?.small,
         image_thumb: coinData?.image?.thumb,
         market_cap_rank: coinData?.market_cap_rank,
-        market_data: {
+        market_data: JSON.stringify({
           current_price: coinData?.market_data?.current_price?.usd,
           ath: coinData?.market_data?.ath?.usd,
           ath_change_percentage:
@@ -197,7 +197,7 @@ export class SimpleTokenService {
           ath_date: coinData?.market_data?.ath_date?.usd,
           market_cap: coinData?.market_data?.market_cap?.usd,
           price_change_24h: coinData?.market_data?.price_change_24h,
-        },
+        }),
       };
       this.logger.debug('Token data processed', {
         ca,

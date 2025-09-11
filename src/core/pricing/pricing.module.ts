@@ -11,6 +11,10 @@ import { ScoringService } from '../scoring/scoring.service';
 import { TokenPriceService } from '../signal/services/token-price.service';
 import { SimpleTokenService } from '../tokens/services/simple-token.service';
 import { RedisCacheModule } from '../../cache/cache.module';
+import { HistoricalDataManagerService } from '../signal/services/historical-data-manager.service';
+import { CoinMarketCapService } from '../signal/services/providers/coinmarketcap.service';
+import { CryptoCompareService } from '../signal/services/providers/cryptocompare.service';
+import { CoinAPIService } from '../signal/services/providers/coinapi.service';
 
 @Module({
   imports: [
@@ -23,6 +27,10 @@ import { RedisCacheModule } from '../../cache/cache.module';
     ScoringService,
     TokenPriceService,
     SimpleTokenService,
+    HistoricalDataManagerService,
+    CoinMarketCapService,
+    CryptoCompareService,
+    CoinAPIService,
   ],
   exports: [PriceTrackingService, ScoringService],
 })

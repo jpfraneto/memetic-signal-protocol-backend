@@ -31,8 +31,8 @@ export class Signal {
   @Column({ type: 'int' })
   duration_days: number; // Duration in days (uint32)
 
-  @Column({ type: 'int' })
-  entry_market_cap: number; // Market cap in USD when signal created (uint256)
+  @Column({ type: 'bigint' })
+  entry_market_cap: bigint; // Market cap in USD when signal created (uint256)
 
   @Column({ type: 'bigint' })
   created_at: bigint; // uint64 timestamp from contract
@@ -40,8 +40,8 @@ export class Signal {
   @Column({ type: 'bigint' })
   expires_at: bigint; // uint64 timestamp from contract
 
-  @Column({ type: 'bigint' })
-  timestamp: bigint; // Block timestamp when signal was created
+  @Column({ type: 'date' })
+  timestamp: Date; // Block timestamp when signal was created
 
   @Column({ type: 'bigint' })
   block_number: bigint;
@@ -54,6 +54,15 @@ export class Signal {
 
   @Column({ type: 'boolean', default: false })
   manually_updated: boolean; // Whether owner has manually updated this signal
+
+  @Column({ type: 'bigint', nullable: true })
+  exit_market_cap: bigint; // Market cap at signal resolution time
+
+  @Column({ type: 'text', nullable: true })
+  exit_market_cap_source: string; // Source of exit market cap data (CoinGecko, CoinMarketCap, etc.)
+
+  @Column({ type: 'text', nullable: true })
+  resolution_attempts: string; // JSON array of attempted data sources during resolution
 
   // Optional relations for backend convenience (not part of Ponder schema)
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

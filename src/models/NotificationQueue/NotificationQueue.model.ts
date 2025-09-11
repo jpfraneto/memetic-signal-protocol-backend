@@ -17,69 +17,46 @@ import {
 } from './NotificationQueue.types';
 
 @Entity({ name: 'notification_queue' })
-@Index(['status', 'scheduledFor'])
-@Index(['userId', 'type'])
 export class NotificationQueue {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @Column({ type: 'text', primary: true })
+  id: string;
 
-  @ManyToOne('User', { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId', referencedColumnName: 'fid' })
-  user: any;
+  @Column({ name: 'user_id', type: 'integer' })
+  user_id: number;
 
-  @Column()
-  userId: number;
+  @Column({ type: 'text' })
+  type: string;
 
-  @Column({
-    type: 'enum',
-    enum: NotificationTypeEnum,
-    default: NotificationTypeEnum.DAILY_REMINDER,
-  })
-  type: NotificationTypeEnum;
+  @Column({ name: 'notification_id', type: 'text', nullable: true })
+  notification_id: string;
 
-  @Column()
-  notificationId: string; // For idempotency with Farcaster
-
-  @Column()
+  @Column({ type: 'text' })
   title: string;
 
   @Column({ type: 'text' })
   body: string;
 
-  @Column()
-  targetUrl: string;
+  @Column({ name: 'target_url', type: 'text', nullable: true })
+  target_url: string;
 
-  @Column({
-    type: 'enum',
-    enum: NotificationStatusEnum,
-    default: NotificationStatusEnum.PENDING,
-  })
-  status: NotificationStatusEnum;
+  @Column({ type: 'text', default: 'PENDING' })
+  status: string;
 
-  @Column({
-    default: 0,
-  })
-  retryCount: number;
+  @Column({ name: 'retry_count', type: 'integer', default: 0 })
+  retry_count: number;
 
-  @Column()
-  scheduledFor: Date; // When to send this notification
+  @Column({ name: 'scheduled_for', type: 'date' })
+  scheduled_for: Date;
 
-  @Column({
-    default: null,
-    nullable: true,
-  })
-  sentAt: Date;
+  @Column({ name: 'sent_at', type: 'date', nullable: true })
+  sent_at: Date;
 
-  @Column({
-    default: null,
-    nullable: true,
-    type: 'text',
-  })
-  errorMessage: string;
+  @Column({ name: 'error_message', type: 'text', nullable: true })
+  error_message: string;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @Column({ name: 'created_at', type: 'date' })
+  created_at: Date;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @Column({ name: 'updated_at', type: 'date' })
+  updated_at: Date;
 }

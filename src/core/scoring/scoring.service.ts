@@ -73,25 +73,25 @@ export class ScoringService {
     }
 
     // Calculate components
-    const marketCapChange = (finalMarketCap - mc) / mc;
+    const marketCapChange = (finalMarketCap - Number(mc)) / Number(mc);
     const direction = signal.direction ? 1 : -1; // UP = +1, DOWN = -1
     const decayMultiplier = this.calculateDecayMultiplier(signal.duration);
 
     // Calculate raw score (before decay)
-    const rawScore = marketCapChange * direction;
+    const rawScore = Number(marketCapChange) * direction;
 
     // Apply exponential decay
     const finalScore = rawScore * decayMultiplier;
 
     this.logger.log(
-      `Signal ${signal.transaction_hash}: ${marketCapChange.toFixed(4)} × ${direction} × ${decayMultiplier.toFixed(4)} = ${finalScore.toFixed(4)}`,
+      `Signal ${signal.transaction_hash}: ${Number(marketCapChange).toFixed(4)} × ${direction} × ${decayMultiplier.toFixed(4)} = ${finalScore.toFixed(4)}`,
     );
 
     return {
       transaction_hash: signal.transaction_hash,
-      mc,
+      mc: Number(mc),
       finalMarketCap,
-      marketCapChange,
+      marketCapChange: Number(marketCapChange),
       direction,
       days: signal.duration,
       decayMultiplier,
@@ -136,7 +136,7 @@ export class ScoringService {
         .orderBy('ps.snapshotAt', 'DESC')
         .getOne();
 
-      const currentMarketCap = currentSnapshot?.marketCap || 0;
+      const currentMarketCap = Number(currentSnapshot?.market_cap) || 0;
 
       if (currentMarketCap === 0) {
         this.logger.warn(

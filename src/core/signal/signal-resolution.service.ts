@@ -95,13 +95,22 @@ export class SignalResolutionService {
 
           let mfsDelta = 0;
           let isCorrect = false;
+          let exitMarketCapSource = 'unknown';
+          let resolutionAttempts: string[] = [];
 
           if (tokenInfo && tokenInfo.marketCap > 0) {
             const exitMarketCap = tokenInfo.marketCap;
+            
+            // Get source information from the historical data manager
+            const fallbackResult = await this.tokenPriceService.getLastResolutionResult();
+            if (fallbackResult) {
+              exitMarketCapSource = fallbackResult.source;
+              resolutionAttempts = fallbackResult.attempts;
+            }
 
             // Calculate MFS delta using the MFS service
             isCorrect = this.mfsService.isPredictionCorrect(
-              signal.entry_market_cap,
+              Number(signal.entry_market_cap),
               exitMarketCap,
               signal.direction,
             );
@@ -127,6 +136,22 @@ export class SignalResolutionService {
           // Update signal in database
           signal.resolved = true; // Mark as resolved regardless
           signal.mfs_delta = mfsDelta;
+          
+          // Store resolution tracking data
+          if (tokenInfo && tokenInfo.marketCap > 0) {
+            signal.exit_market_cap = BigInt(Math.floor(tokenInfo.marketCap));
+            
+            // Get source information from the token price service
+            const resolutionResult = this.tokenPriceService.getLastResolutionResult();
+            if (resolutionResult) {
+              signal.exit_market_cap_source = resolutionResult.source;
+              signal.resolution_attempts = JSON.stringify(resolutionResult.attempts);
+            }
+          } else {
+            signal.exit_market_cap = BigInt(0);
+            signal.exit_market_cap_source = 'failed';
+            signal.resolution_attempts = JSON.stringify(['CoinGecko', 'CoinMarketCap', 'CryptoCompare', 'CoinAPI']);
+          }
 
           await this.signalRepository.save(signal);
 
@@ -405,7 +430,7 @@ export class SignalResolutionService {
       this.signalRepository.count({
         where: {
           resolved: true,
-          timestamp: BigInt(todayStart),
+          timestamp: new Date(todayStart * 1000),
         },
       }),
     ]);

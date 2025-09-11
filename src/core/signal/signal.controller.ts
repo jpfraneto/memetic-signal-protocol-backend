@@ -340,6 +340,68 @@ export class SignalController {
     }
   }
 
+  @Get('merkle-proof')
+  @UseGuards(AuthorizationGuard)
+  @ApiOperation({ summary: 'Get merkle proof for $TESTING token claim' })
+  @ApiResponse({
+    status: 200,
+    description: 'Merkle proof data for token claim',
+    schema: {
+      example: {
+        amount: "1000000000000000000",
+        merkleProof: [
+          "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        ],
+        hasAllocation: true
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No allocation found',
+    schema: {
+      example: {
+        error: "no_allocation",
+        message: "No tokens allocated for your FID today"
+      },
+    },
+  })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getMerkleProof(
+    @Session() session: QuickAuthPayload,
+    @Res() res: FastifyReply,
+  ) {
+    try {
+      const fid = session.sub;
+      
+      this.logger.log(`[getMerkleProof] Request for FID: ${fid}`);
+
+      // For now, always return hardcoded successful response
+      const response = {
+        amount: "1000000000000000000",
+        merkleProof: [
+          "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+          "0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
+        ],
+        hasAllocation: true
+      };
+
+      this.logger.log(`[getMerkleProof] Returning merkle proof for FID: ${fid}`);
+      
+      return hasResponse(res, response);
+    } catch (error) {
+      this.logger.error('Error generating merkle proof:', error);
+      return hasError(
+        res,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'getMerkleProof',
+        'Failed to generate merkle proof',
+      );
+    }
+  }
+
   @Get(':signalId')
   @ApiOperation({ summary: 'Get specific signal by ID' })
   @ApiResponse({

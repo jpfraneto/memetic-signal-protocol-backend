@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { HistoricalDataManagerService } from './historical-data-manager.service';
 
 interface TokenPrice {
   [address: string]: number;
@@ -14,6 +15,8 @@ interface TokenInfo {
   price: number;
   marketCap: number;
   volume24h?: number;
+  source?: string;
+  attempts?: string[];
 }
 
 @Injectable()
@@ -28,8 +31,11 @@ export class TokenPriceService {
   private readonly COINGECKO_API_URL = 'https://pro-api.coingecko.com/api/v3';
   private readonly REQUEST_DELAY = 1200;
   private lastRequestTime = 0;
+  private lastFallbackResult: any = null;
 
-  constructor() {}
+  constructor(
+    private historicalDataManager: HistoricalDataManagerService,
+  ) {}
 
   private async rateLimit(): Promise<void> {
     const now = Date.now();
@@ -150,6 +156,7 @@ export class TokenPriceService {
       return { price: 0, marketCap: 0 };
     }
   }
+
 
   private async fetchFromDexScreener(ca: string): Promise<any> {
     try {
@@ -273,18 +280,49 @@ export class TokenPriceService {
         }
       }
 
-      // Step 3: Get historical market data if timestamp provided and we have coin ID
+      // Step 3: Get historical market data if timestamp provided
       let price = 0;
       let marketCap = 0;
       let volume24h = 0;
 
-      if (timestamp && coinData?.id) {
-        const historicalData = await this.fetchHistoricalMarketData(
-          coinData.id,
-          timestamp,
-        );
-        price = historicalData.price;
-        marketCap = historicalData.marketCap;
+      if (timestamp) {
+        // First try CoinGecko if we have coin ID
+        if (coinData?.id) {
+          const historicalData = await this.fetchHistoricalMarketData(
+            coinData.id,
+            timestamp,
+          );
+          price = historicalData.price;
+          marketCap = historicalData.marketCap;
+        }
+
+        // If CoinGecko failed or no coin ID, try fallback providers
+        if (marketCap === 0 && price === 0) {
+          this.logger.log(
+            `CoinGecko historical data failed for ${normalizedAddress}, trying fallback providers...`,
+          );
+          const fallbackResult = await this.historicalDataManager.fetchHistoricalDataWithFallbacks(
+            normalizedAddress,
+            timestamp,
+          );
+          
+          price = fallbackResult.price;
+          marketCap = fallbackResult.marketCap;
+          volume24h = 0; // Fallback providers don't provide volume
+          
+          // Store the fallback result for the resolution service to access
+          this.lastFallbackResult = fallbackResult;
+        } else {
+          // CoinGecko succeeded, create a result object
+          this.lastFallbackResult = {
+            price,
+            marketCap,
+            timestamp: timestamp.getTime(),
+            source: 'CoinGecko',
+            attempts: ['CoinGecko'],
+            success: true,
+          };
+        }
       } else if (coinData?.market_data) {
         // Use current price data
         price = coinData.market_data.current_price?.usd || 0;
@@ -354,5 +392,13 @@ export class TokenPriceService {
       misses: this.cacheStats.misses,
       size: this.priceCache.size,
     };
+  }
+
+  /**
+   * Get the result of the last historical data resolution attempt
+   * Used by SignalResolutionService to track data sources
+   */
+  getLastResolutionResult(): any {
+    return this.lastFallbackResult;
   }
 }

@@ -29,7 +29,7 @@ export class User {
   // FARCASTER IDENTITY
   // ================================
 
-  @Column()
+  @Column({ type: 'text', nullable: true })
   username: string;
 
   @Column({
@@ -117,10 +117,10 @@ export class User {
 
   @Column({
     name: 'last_score_update',
-    type: 'int',
+    type: 'bigint',
     nullable: true,
   })
-  last_score_update: number;
+  last_score_update: bigint;
 
   // ================================
   // USER ROLE & PERMISSIONS
@@ -140,7 +140,7 @@ export class User {
 
   @Column({
     name: 'banned_at',
-    type: 'timestamp',
+    type: 'date',
     nullable: true,
   })
   banned_at: Date; // When the ban started
@@ -186,7 +186,7 @@ export class User {
   @Column({
     name: 'wallet_address',
     type: 'varchar',
-    length: 42,
+    length: 66, // hex format
     nullable: true,
     unique: true,
   })
@@ -207,25 +207,45 @@ export class User {
   // SUBSCRIPTION STATUS
   // ================================
 
+  @Column({
+    name: 'is_subscriber',
+    default: false,
+  })
+  is_subscriber: boolean;
+
+  @Column({
+    name: 'subscription_expires_at',
+    type: 'date',
+    nullable: true,
+  })
+  subscription_expires_at: Date;
+
+  @Column({
+    name: 'subscribed_at',
+    type: 'date',
+    nullable: true,
+  })
+  subscribed_at: Date;
+
   // ================================
   // TIMESTAMPS
   // ================================
 
   @Column({
     name: 'created_at',
-    type: 'timestamp',
+    type: 'date',
   })
   created_at: Date;
 
   @Column({
     name: 'updated_at',
-    type: 'timestamp',
+    type: 'date',
   })
   updated_at: Date;
 
   @Column({
     name: 'last_active_at',
-    type: 'timestamp',
+    type: 'date',
     nullable: true,
   })
   last_active_at: Date;

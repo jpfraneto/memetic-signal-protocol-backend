@@ -7,27 +7,25 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'price_snapshots' })
-@Index('idx_price_snapshot_token_time', ['tokenAddress', 'snapshotAt'])
-@Index('idx_price_snapshot_token', ['tokenAddress'])
 export class PriceSnapshot {
-  @PrimaryGeneratedColumn('uuid')
+  @Column({ type: 'text', primary: true })
   id: string;
 
-  @Column({ type: 'varchar', length: 42 })
-  tokenAddress: string;
+  @Column({ name: 'token_address', type: 'varchar', length: 66 })
+  token_address: string;
 
-  @Column({ type: 'decimal', precision: 20, scale: 8 })
-  marketCap: number;
+  @Column({ name: 'market_cap', type: 'text' })
+  market_cap: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 8 })
-  price: number;
+  @Column({ type: 'text' })
+  price: string;
 
-  @Column({ type: 'decimal', precision: 20, scale: 8, nullable: true })
-  volume24h: number;
+  @Column({ name: 'volume_24h', type: 'text', nullable: true })
+  volume_24h: string;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @Column({ name: 'created_at', type: 'date' })
+  created_at: Date;
 
-  @Column({ type: 'timestamp' })
-  snapshotAt: Date;
+  @Column({ name: 'snapshot_at', type: 'date' })
+  snapshot_at: Date;
 }

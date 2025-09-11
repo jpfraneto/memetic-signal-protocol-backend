@@ -349,6 +349,9 @@ export class MeEndpointService {
           state_on_the_system: row.state_on_the_system || 'ACTIVE',
           wallet_address: row.wallet_address,
           jbm_balance: row.jbm_balance || '0',
+          is_subscriber: row.is_subscriber || false,
+          subscription_expires_at: row.subscription_expires_at,
+          subscribed_at: row.subscribed_at,
           created_at: row.user_created_at,
           updated_at: row.user_updated_at,
           last_active_at: row.last_active_at,
@@ -358,10 +361,13 @@ export class MeEndpointService {
         // Create Token object
         const token: Token = {
           ca: row.ca,
+          coingecko_id: row.coingecko_id,
+          platform_id: row.platform_id,
+          fetched_from: row.fetched_from,
           name: row.token_name || 'Unknown Token',
           symbol: row.token_symbol || 'UNKNOWN',
           decimals: row.decimals || 18,
-          categories: row.categories || [],
+          categories: row.categories || '',
           description: row.description,
           image: row.token_image || '',
           image_small: row.image_small,
@@ -370,7 +376,6 @@ export class MeEndpointService {
           market_data: row.market_data,
           created_at: row.token_created_at,
           updated_at: row.token_updated_at,
-          coingecko_id: row.coingecko_id,
         };
 
         // Create Signal object with proper structure
@@ -636,7 +641,7 @@ export class MeEndpointService {
         direction: signal.direction ? 'up' : 'down',
         timeframe: signal.duration_days, // Keep for backwards compatibility
         duration: signal.duration_days,
-        entry_market_cap: signal.entry_market_cap,
+        entry_market_cap: Number(signal.entry_market_cap),
         resolved: signal.resolved,
         createdAt: Number(signal.created_at),
         expiresAt: Number(signal.expires_at),

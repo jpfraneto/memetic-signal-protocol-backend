@@ -300,7 +300,7 @@ export class SignalService {
       fid: signal.fid,
       direction: signal.direction,
       duration_days: signal.duration_days,
-      entry_market_cap: signal.entry_market_cap,
+      entry_market_cap: Number(signal.entry_market_cap),
       created_at: signal.created_at.toString(),
       expires_at: new Date(Number(signal.expires_at) * 1000),
       timestamp: signal.timestamp.toString(),
@@ -381,7 +381,7 @@ export class SignalService {
       ticker: signal.token?.symbol || 'UNKNOWN',
       direction: signal.direction ? 'up' : 'down',
       timestamp: Number(signal.timestamp) * 1000, // Convert to milliseconds
-      entryPrice: signal.entry_market_cap / 1000000, // Convert to millions for display
+      entryPrice: Number(signal.entry_market_cap) / 1000000, // Convert to millions for display
       currentPrice: null, // Would need current market data
       exitPrice: null, // Would need to be calculated if resolved
       pnl: signal.mfs_delta || 0,
@@ -451,7 +451,7 @@ export class SignalService {
       ticker: signal.token?.symbol || 'UNKNOWN',
       direction: signal.direction ? 'up' : 'down',
       timestamp: Number(signal.timestamp) * 1000, // Convert to milliseconds
-      entryPrice: signal.entry_market_cap / 1000000, // Convert to millions for display
+      entryPrice: Number(signal.entry_market_cap) / 1000000, // Convert to millions for display
       currentPrice: null, // Would need current market data
       exitPrice: null, // Would need to be calculated if resolved
       pnl: signal.mfs_delta || 0,

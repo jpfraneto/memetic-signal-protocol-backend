@@ -66,7 +66,7 @@ export class PriceTrackingService {
       // Double check expiry conditions
       const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
       const signalExpiryTime =
-        BigInt(signal.timestamp) + BigInt(signal.duration_days * 86400);
+        BigInt(Math.floor(signal.timestamp.getTime() / 1000)) + BigInt(signal.duration_days * 86400);
 
       if (
         signal.expires_at >= currentTimestamp ||
@@ -110,7 +110,7 @@ export class PriceTrackingService {
       const entryMarketCap = signal.entry_market_cap;
 
       // Handle division by zero case
-      if (entryMarketCap === 0) {
+      if (entryMarketCap === BigInt(0)) {
         this.logger.warn(
           `Entry market cap is 0 for signal ${signal.signal_id}, setting MFS to 0`,
         );
@@ -130,11 +130,11 @@ export class PriceTrackingService {
 
       // Calculate MFS using the smart contract formula
       const percentageChange = Math.abs(
-        (exitMarketCap - entryMarketCap) / entryMarketCap,
+        (exitMarketCap - Number(entryMarketCap)) / Number(entryMarketCap),
       );
       const wasCorrect =
-        (signal.direction && exitMarketCap > entryMarketCap) ||
-        (!signal.direction && exitMarketCap < entryMarketCap);
+        (signal.direction && exitMarketCap > Number(entryMarketCap)) ||
+        (!signal.direction && exitMarketCap < Number(entryMarketCap));
       const correctnessMultiplier = wasCorrect ? 1 : -1;
       const lambda = 0.088;
       const timeDecay = Math.exp(-lambda * (signal.duration_days - 1));

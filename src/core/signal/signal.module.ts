@@ -16,6 +16,10 @@ import { DailySignalCount } from '../../models/DailySignalCount/DailySignalCount
 import { FidBan } from '../../models/FidBan/FidBan.model';
 import { WalletBan } from '../../models/WalletBan/WalletBan.model';
 import { TokenPriceService } from '../signal/services/token-price.service';
+import { CoinMarketCapService } from './services/providers/coinmarketcap.service';
+import { CryptoCompareService } from './services/providers/cryptocompare.service';
+import { CoinAPIService } from './services/providers/coinapi.service';
+import { HistoricalDataManagerService } from './services/historical-data-manager.service';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { TokensModule } from '../tokens/tokens.module';
 import { UserModule } from '../user/user.module';
@@ -51,6 +55,10 @@ import { MFSModule } from '../mfs/mfs.module';
     SignalResolutionService,
     SessionDataService,
     TokenPriceService,
+    HistoricalDataManagerService,
+    CoinMarketCapService,
+    CryptoCompareService,
+    CoinAPIService,
     LeaderboardService,
     ZapperService,
   ],

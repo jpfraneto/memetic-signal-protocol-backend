@@ -88,7 +88,7 @@ export class SignalSchedulerService {
 
           const entryPrice = signal.entry_market_cap;
           const pnlPercentage = this.tokenPriceService.calculatePnL(
-            entryPrice,
+            Number(entryPrice),
             currentPrice,
           );
 
@@ -102,7 +102,7 @@ export class SignalSchedulerService {
           }
 
           // Calculate MFS Signal Score: Market Cap Change (in $) × Direction × e^(-λ×(days-1))
-          const marketCapChangeDollars = currentPrice - entryPrice; // Absolute dollar difference
+          const marketCapChangeDollars = currentPrice - Number(entryPrice); // Absolute dollar difference
           const direction = isCorrect ? 1 : -1; // +1 if correct prediction, -1 if incorrect
           const decayMultiplier = Math.exp(
             -0.075 * Math.max(0, signal.duration - 1),

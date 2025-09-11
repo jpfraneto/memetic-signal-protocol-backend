@@ -324,10 +324,10 @@ export class UserService {
       total_signals: totalSignals,
       rank: user.rank,
       createdAt: user.created_at
-        ? user.created_at.toISOString()
+        ? new Date(user.created_at).toISOString()
         : new Date().toISOString(),
       updatedAt: user.updated_at
-        ? user.updated_at.toISOString()
+        ? new Date(user.updated_at).toISOString()
         : new Date().toISOString(),
     };
 

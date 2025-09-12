@@ -13,11 +13,13 @@ import { User, Signal } from '../../models';
 
 // Modules
 import { AuthModule } from '../auth/auth.module';
+import { RedisCacheModule } from '../../cache/cache.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Signal]),
     forwardRef(() => AuthModule),
+    RedisCacheModule,
   ],
   controllers: [UserController],
   providers: [UserService],

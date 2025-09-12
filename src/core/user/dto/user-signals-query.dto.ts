@@ -2,9 +2,9 @@ import { IsOptional, IsNumber, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-export class UserCallsQueryDto {
+export class UserSignalsQueryDto {
   @ApiPropertyOptional({
-    description: 'Number of calls to return',
+    description: 'Number of signals to return',
     minimum: 1,
     maximum: 100,
     default: 20,
@@ -28,7 +28,7 @@ export class UserCallsQueryDto {
   offset?: number = 0;
 
   @ApiPropertyOptional({
-    description: 'Filter by call status',
+    description: 'Filter by signal status',
     enum: ['open', 'closed', 'expired'],
   })
   @IsOptional()

@@ -107,13 +107,13 @@ export class CacheService {
     await this.invalidatePattern(pattern);
   }
 
-  async getLeaderboard(page: number = 1, limit: number = 20, minSettledCalls: number = 5) {
-    const key = this.generateKey(CACHE_KEYS.LEADERBOARD, page, limit, minSettledCalls);
+  async getLeaderboard(page: number = 1, limit: number = 20, minSettledSignals: number = 5) {
+    const key = this.generateKey(CACHE_KEYS.LEADERBOARD, page, limit, minSettledSignals);
     return await this.get(key);
   }
 
-  async setLeaderboard(data: any, page: number = 1, limit: number = 20, minSettledCalls: number = 5) {
-    const key = this.generateKey(CACHE_KEYS.LEADERBOARD, page, limit, minSettledCalls);
+  async setLeaderboard(data: any, page: number = 1, limit: number = 20, minSettledSignals: number = 5) {
+    const key = this.generateKey(CACHE_KEYS.LEADERBOARD, page, limit, minSettledSignals);
     await this.set(key, data, CACHE_TTL.LEADERBOARD);
   }
 

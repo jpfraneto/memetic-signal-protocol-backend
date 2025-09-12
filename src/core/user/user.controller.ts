@@ -16,11 +16,11 @@ import { UserService } from './services';
 
 // DTOs
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
-import { UserCallsQueryDto } from './dto/user-calls-query.dto';
+import { UserSignalsQueryDto } from './dto/user-signals-query.dto';
 import {
   UsersListResponseDto,
   UserDetailResponseDto,
-  UserCallsResponseDto,
+  UserSignalsResponseDto,
 } from './dto/user-response.dto';
 
 // Utils
@@ -62,11 +62,11 @@ export class UserController {
 
   @Get(':fid')
   @ApiOperation({
-    summary: 'Get user details by FID with recent calls and stats',
+    summary: 'Get user details by FID with recent signals and stats',
   })
   @ApiResponse({
     status: 200,
-    description: 'User details with recent calls and statistics',
+    description: 'User details with recent signals and statistics',
     type: UserDetailResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -76,7 +76,7 @@ export class UserController {
     @Res() res: FastifyReply,
   ) {
     try {
-      const result = await this.userService.getUserWithDetails(fid);
+      const result = await this.userService.getUserWithDetailsEnhanced(fid);
 
       return res.status(HttpStatus.OK).send({
         success: true,
@@ -103,18 +103,18 @@ export class UserController {
     }
   }
 
-  @Get(':fid/calls')
-  @ApiOperation({ summary: 'Get user calls with pagination and filtering' })
+  @Get(':fid/signals')
+  @ApiOperation({ summary: 'Get user signals with pagination and filtering' })
   @ApiResponse({
     status: 200,
-    description: 'Paginated list of user calls',
-    type: UserCallsResponseDto,
+    description: 'Paginated list of user signals',
+    type: UserSignalsResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getUserCalls(
+  async getUserSignals(
     @Param('fid', ParseIntPipe) fid: number,
-    @Query() query: UserCallsQueryDto,
+    @Query() query: UserSignalsQueryDto,
     @Res() res: FastifyReply,
   ) {
     try {
@@ -125,26 +125,26 @@ export class UserController {
         data: result,
       });
     } catch (error) {
-      console.error('❌ [UserController] Error fetching user calls:', error);
+      console.error('❌ [UserController] Error fetching user signals:', error);
 
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'getUserCalls',
-        'Failed to fetch user calls',
+        'getUserSignals',
+        'Failed to fetch user signals',
       );
     }
   }
 
-  @Get(':fid/recalculate-calls')
-  @ApiOperation({ summary: 'Recalculate total calls for a specific user' })
+  @Get(':fid/recalculate-signals')
+  @ApiOperation({ summary: 'Recalculate total signals for a specific user' })
   @ApiResponse({
     status: 200,
-    description: 'Total calls recalculated successfully',
+    description: 'Total signals recalculated successfully',
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async recalculateUserCalls(
+  async recalculateUserSignals(
     @Param('fid', ParseIntPipe) fid: number,
     @Res() res: FastifyReply,
   ) {
@@ -153,11 +153,11 @@ export class UserController {
 
       return res.status(HttpStatus.OK).send({
         success: true,
-        message: `Total calls recalculated for user ${fid}`,
+        message: `Total signals recalculated for user ${fid}`,
       });
     } catch (error) {
       console.error(
-        '❌ [UserController] Error recalculating user calls:',
+        '❌ [UserController] Error recalculating user signals:',
         error,
       );
 
@@ -165,7 +165,7 @@ export class UserController {
         return hasError(
           res,
           HttpStatus.NOT_FOUND,
-          'recalculateUserCalls',
+          'recalculateUserSignals',
           error.message,
         );
       }
@@ -173,8 +173,8 @@ export class UserController {
       return hasError(
         res,
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'recalculateUserCalls',
-        'Failed to recalculate user calls',
+        'recalculateUserSignals',
+        'Failed to recalculate user signals',
       );
     }
   }

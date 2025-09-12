@@ -8,11 +8,12 @@ import { User, UserRoleEnum, Signal } from 'src/models';
 
 // Utils
 import NeynarService from '../../../utils/neynar';
+import { CacheService } from 'src/cache/cache.service';
 
 // DTOs
 import { GetUsersQueryDto } from '../dto/get-users-query.dto';
-import { UserCallsQueryDto } from '../dto/user-calls-query.dto';
-import { CallDto } from '../dto/user-response.dto';
+import { UserSignalsQueryDto } from '../dto/user-signals-query.dto';
+import { SignalDto } from '../dto/user-response.dto';
 import { SignalService } from 'src/core/signal/signal.service';
 import { SignalResponseDto } from 'src/core/signal/dto/signal-response.dto';
 
@@ -25,6 +26,7 @@ export class UserService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Signal)
     private readonly signalRepository: Repository<Signal>,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -238,7 +240,7 @@ export class UserService {
 
   async getUserWithDetails(fid: number): Promise<{
     user: any;
-    recentCalls: any[];
+    recentSignals: any[];
     stats: any;
   }> {
     const user = await this.userRepository.findOne({
@@ -266,7 +268,7 @@ export class UserService {
     });
 
     // Map signals to UserSignalDto format
-    const recentCalls = recentSignals.map((signal) => ({
+    const recentSignals_mapped = recentSignals.map((signal) => ({
       id: signal.transaction_hash,
       signalId: signal.signal_id,
       fid: signal.fid,
@@ -291,16 +293,16 @@ export class UserService {
     // Calculate basic stats
     const stats = {
       total_score: user.total_score,
-      bestCall:
-        recentCalls.length > 0
-          ? recentCalls.reduce((best, call) =>
-              call.mfs_delta > best.mfs_delta ? call : best,
+      bestSignal:
+        recentSignals_mapped.length > 0
+          ? recentSignals_mapped.reduce((best, signal) =>
+              signal.mfs_delta > best.mfs_delta ? signal : best,
             )
           : null,
-      worstCall:
-        recentCalls.length > 0
-          ? recentCalls.reduce((worst, call) =>
-              call.mfs_delta < worst.mfs_delta ? call : worst,
+      worstSignal:
+        recentSignals_mapped.length > 0
+          ? recentSignals_mapped.reduce((worst, signal) =>
+              signal.mfs_delta < worst.mfs_delta ? signal : worst,
             )
           : null,
       averageStake: 100, // Default average stake
@@ -333,14 +335,14 @@ export class UserService {
 
     return {
       user: enhancedUser,
-      recentCalls,
+      recentSignals: recentSignals_mapped,
       stats,
     };
   }
 
   async getUserSignals(
     fid: number,
-    query: UserCallsQueryDto,
+    query: UserSignalsQueryDto,
   ): Promise<{
     signals: Signal[];
     total: number;
@@ -389,6 +391,9 @@ export class UserService {
     user.total_signals = totalSignals;
     await this.userRepository.save(user);
 
+    // Invalidate cache for this user
+    await this.cacheService.invalidateUserProfile(fid);
+    
     this.logger.log(`Updated total signals for user ${fid}: ${totalSignals}`);
   }
 
@@ -405,9 +410,206 @@ export class UserService {
 
       user.total_signals = totalSignals;
       await this.userRepository.save(user);
+
+      // Invalidate cache for this user
+      await this.cacheService.invalidateUserProfile(user.fid);
     }
 
     this.logger.log(`Recalculated total signals for ${users.length} users`);
+  }
+
+  /**
+   * Get enhanced user statistics with caching
+   */
+  async getUserStatistics(fid: number): Promise<{
+    totalSignals: number;
+    resolvedSignals: number;
+    successfulSignals: number;
+    activeSignals: number;
+    winRate: number;
+    totalScore: number;
+    mfsScore: number;
+    latestSignalsCount: number;
+  }> {
+    const cacheKey = `user_stats:${fid}`;
+    
+    // Try to get from cache first
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      this.logger.debug(`User statistics cache hit for FID: ${fid}`);
+      return cached as any;
+    }
+
+    // Calculate from database
+    const totalSignals = await this.signalRepository.count({ where: { fid } });
+    const resolvedSignals = await this.signalRepository.count({
+      where: { fid, resolved: true },
+    });
+    const activeSignals = totalSignals - resolvedSignals;
+
+    // Get successful signals (resolved with positive MFS delta)
+    const successfulSignals = await this.signalRepository
+      .createQueryBuilder('signal')
+      .where(
+        'signal.fid = :fid AND signal.resolved = true AND signal.mfs_delta > 0',
+        { fid },
+      )
+      .getCount();
+
+    // Calculate win rate
+    const winRate =
+      resolvedSignals > 0 ? (successfulSignals / resolvedSignals) * 100 : 0;
+
+    // Calculate total score
+    const scoreResult = await this.signalRepository
+      .createQueryBuilder('signal')
+      .select('SUM(signal.mfs_delta)', 'totalScore')
+      .where('signal.fid = :fid AND signal.resolved = true', { fid })
+      .getRawOne();
+
+    const totalScore = parseFloat(scoreResult?.totalScore || '0') || 0;
+    const mfsScore = totalScore;
+
+    // Get latest 50 signals for the user
+    const latestSignals = await this.signalRepository
+      .createQueryBuilder('signal')
+      .where('signal.fid = :fid', { fid })
+      .orderBy('signal.timestamp', 'DESC')
+      .limit(50)
+      .getMany();
+
+    const stats = {
+      totalSignals,
+      resolvedSignals,
+      successfulSignals,
+      activeSignals,
+      winRate,
+      totalScore,
+      mfsScore,
+      latestSignalsCount: latestSignals.length,
+    };
+
+    // Cache the result for 3 minutes
+    await this.cacheService.set(cacheKey, stats, 3 * 60 * 1000);
+    
+    this.logger.debug(`User statistics calculated and cached for FID: ${fid}`);
+    return stats;
+  }
+
+  /**
+   * Enhanced getUserWithDetails with caching and updated return format
+   */
+  async getUserWithDetailsEnhanced(fid: number): Promise<{
+    user: any;
+    recentSignals: any[];
+    stats: any;
+  }> {
+    // Try to get user profile from cache
+    const cached = await this.cacheService.getUserProfile(fid);
+    if (cached) {
+      this.logger.debug(`User profile cache hit for FID: ${fid}`);
+      return cached as any;
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { fid },
+      relations: ['signals'],
+    });
+
+    if (!user) {
+      throw new Error(`User with FID ${fid} not found`);
+    }
+
+    // Get recent signals with token information
+    const recentSignals = await this.signalRepository
+      .createQueryBuilder('signal')
+      .leftJoinAndSelect('signal.token', 'token')
+      .where('signal.fid = :fid', { fid })
+      .orderBy('signal.timestamp', 'DESC')
+      .limit(10)
+      .getMany();
+
+    // Get enhanced statistics using the new method
+    const statistics = await this.getUserStatistics(fid);
+
+    // Map signals to UserSignalDto format
+    const recentSignals_mapped = recentSignals.map((signal) => ({
+      id: signal.transaction_hash,
+      signalId: signal.signal_id,
+      fid: signal.fid,
+      tokenAddress: signal.ca,
+      ticker: signal.token?.symbol || 'UNKNOWN',
+      direction: signal.direction ? 'up' : 'down',
+      timestamp: Number(signal.timestamp) * 1000, // Convert to milliseconds
+      entry_market_cap: signal.entry_market_cap,
+      expires_at: signal.expires_at,
+      block_number: signal.block_number,
+      resolved: signal.resolved,
+      manually_updated: signal.manually_updated,
+      duration: signal.duration_days,
+      current_price: null, // Would need to be calculated from current price
+      exit_price: null, // Would need to be calculated if resolved
+      mfs_delta: signal.mfs_delta,
+      stake: 100, // Default stake amount
+      status: signal.resolved ? 'closed' : 'open',
+      transactionHash: signal.transaction_hash,
+    }));
+
+    // Enhanced stats with all required fields
+    const stats = {
+      totalPnl: statistics.totalScore,
+      totalSignals: statistics.totalSignals,
+      resolvedSignals: statistics.resolvedSignals,
+      successfulSignals: statistics.successfulSignals,
+      activeSignals: statistics.activeSignals,
+      winRate: statistics.winRate,
+      mfsScore: statistics.mfsScore,
+      latestSignalsCount: statistics.latestSignalsCount,
+      bestSignal:
+        recentSignals_mapped.length > 0
+          ? recentSignals_mapped.reduce((best, signal) =>
+              signal.mfs_delta > best.mfs_delta ? signal : best,
+            )
+          : null,
+      worstSignal:
+        recentSignals_mapped.length > 0
+          ? recentSignals_mapped.reduce((worst, signal) =>
+              signal.mfs_delta < worst.mfs_delta ? signal : worst,
+            )
+          : null,
+      averageStake: 100, // Default average stake
+    };
+
+    // Map user to enhanced format
+    const enhancedUser = {
+      fid: user.fid,
+      username: user.username,
+      displayName: user.display_name,
+      avatar: user.pfp_url,
+      pfpUrl: user.pfp_url,
+      isVerified: user.is_verified || false,
+      mfsScore: user.mfs_score,
+      winRate: user.win_rate || 0,
+      totalSignals: statistics.totalSignals,
+      rank: user.rank,
+      createdAt: user.created_at
+        ? new Date(user.created_at).toISOString()
+        : new Date().toISOString(),
+      updatedAt: user.updated_at
+        ? new Date(user.updated_at).toISOString()
+        : new Date().toISOString(),
+    };
+
+    const result = {
+      user: enhancedUser,
+      recentSignals: recentSignals_mapped,
+      stats,
+    };
+
+    // Cache the result for 2 minutes
+    await this.cacheService.setUserProfile(fid, result);
+
+    return result;
   }
 
   /**
@@ -462,6 +664,9 @@ export class UserService {
 
     await this.userRepository.save(user);
 
+    // Invalidate cache for this user after updating
+    await this.cacheService.invalidateUserProfile(fid);
+    
     this.logger.log(
       `Data consistency updated for user ${fid}: total=${totalSignals}, active=${activeSignals}, settled=${settledSignals}, winRate=${winRate.toFixed(2)}%, score=${totalScore.toFixed(4)}`,
     );

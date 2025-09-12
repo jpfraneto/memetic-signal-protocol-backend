@@ -73,7 +73,7 @@ export class LeaderboardService {
       // Get total users
       const totalUsers = await this.userRepository.count();
 
-      // Get qualified users (minimum settled calls)
+      // Get qualified users (minimum settled signals)
       const qualifiedUsers = await this.userRepository
         .createQueryBuilder('user')
         .where('user.settled_signals >= 5')

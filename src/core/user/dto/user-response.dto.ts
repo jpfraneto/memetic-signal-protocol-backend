@@ -45,23 +45,23 @@ export class UserSignalDto {
   transactionHash: string;
 }
 
-export class CallDto extends UserSignalDto {}
+export class SignalDto extends UserSignalDto {}
 
 export class UserStatsDto {
   @ApiProperty()
   totalPnl: number;
 
   @ApiProperty({ nullable: true })
-  bestCall?: UserSignalDto;
+  bestSignal?: UserSignalDto;
 
   @ApiProperty({ nullable: true })
-  worstCall?: UserSignalDto;
+  worstSignal?: UserSignalDto;
 
   @ApiProperty()
   averageStake: number;
 
   @ApiProperty()
-  callsThisWeek: number;
+  latestSignalsCount: number;
 }
 
 export class TopTokenDto {
@@ -72,7 +72,7 @@ export class TopTokenDto {
   winRate: number;
 
   @ApiProperty()
-  totalCalls: number;
+  totalSignals: number;
 
   @ApiProperty()
   pnl: number;
@@ -124,7 +124,7 @@ export class EnhancedUserDto {
   winRate: number;
 
   @ApiProperty()
-  totalCalls: number;
+  totalSignals: number;
 
   @ApiProperty()
   rank: number;
@@ -163,7 +163,7 @@ export class UserDetailResponseDto {
     type: 'object',
     properties: {
       user: { $ref: '#/components/schemas/EnhancedUserDto' },
-      recentCalls: {
+      recentSignals: {
         type: 'array',
         items: { $ref: '#/components/schemas/UserSignalDto' },
       },
@@ -172,25 +172,25 @@ export class UserDetailResponseDto {
   })
   data: {
     user: EnhancedUserDto;
-    recentCalls: UserSignalDto[];
+    recentSignals: UserSignalDto[];
     stats: UserStatsDto;
   };
 }
 
-export class UserCallsResponseDto {
+export class UserSignalsResponseDto {
   @ApiProperty()
   success: boolean;
 
   @ApiProperty({
     type: 'object',
     properties: {
-      calls: { type: 'array', items: { $ref: '#/components/schemas/CallDto' } },
+      signals: { type: 'array', items: { $ref: '#/components/schemas/SignalDto' } },
       total: { type: 'number' },
       hasMore: { type: 'boolean' },
     },
   })
   data: {
-    calls: CallDto[];
+    signals: SignalDto[];
     total: number;
     hasMore: boolean;
   };

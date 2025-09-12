@@ -24,9 +24,9 @@ export class LeaderboardController {
             {
               fid: 12345,
               username: 'trader1',
-              totalCalls: 25,
-              activeCalls: 3,
-              settledCalls: 22,
+              totalSignals: 25,
+              activeSignals: 3,
+              settledSignals: 22,
               winRate: 68.2,
               mfsScore: 0.756,
               rank: 1,
@@ -114,7 +114,7 @@ export class LeaderboardController {
         data: {
           totalUsers: 150,
           qualifiedUsers: 45,
-          totalCalls: 1250,
+          totalSignals: 1250,
           avgWinRate: 52.3,
           topMfsScore: 0.892,
         },

@@ -7,7 +7,7 @@ export const CACHE_TTL = {
   USER_PROFILE: 2 * 60 * 1000,    // 2 minutes
   LEADERBOARD: 5 * 60 * 1000,     // 5 minutes
   USER_SIGNALS: 3 * 60 * 1000,    // 3 minutes
-  TRENDING_TOKENS: 5 * 60 * 1000, // 5 minutes
+  TRENDING_TOKENS: 30 * 60 * 1000, // 30 minutes
   SIGNAL_FEED: 2 * 60 * 1000,     // 2 minutes
 } as const;
 
@@ -25,19 +25,30 @@ export const CACHE_KEYS = {
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
+  private cacheStats = {
+    hits: 0,
+    misses: 0,
+    lastReset: Date.now()
+  };
 
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {
+    // Start periodic monitoring
+    this.startCacheMonitoring();
+  }
 
   async get<T>(key: string): Promise<T | undefined> {
     try {
       const result = await this.cacheManager.get<T>(key);
       if (result) {
+        this.cacheStats.hits++;
         this.logger.debug(`Cache HIT for key: ${key}`);
       } else {
+        this.cacheStats.misses++;
         this.logger.debug(`Cache MISS for key: ${key}`);
       }
       return result;
     } catch (error) {
+      this.cacheStats.misses++;
       this.logger.error(`Cache GET error for key ${key}:`, error);
       return undefined;
     }
@@ -130,13 +141,13 @@ export class CacheService {
     await this.set(CACHE_KEYS.LEADERBOARD_STATS, data, CACHE_TTL.LEADERBOARD);
   }
 
-  async getTrendingTokens(fid: number) {
-    const key = this.generateKey(CACHE_KEYS.TRENDING_TOKENS, fid);
+  async getTrendingTokens() {
+    const key = CACHE_KEYS.TRENDING_TOKENS;
     return await this.get(key);
   }
 
-  async setTrendingTokens(fid: number, data: any) {
-    const key = this.generateKey(CACHE_KEYS.TRENDING_TOKENS, fid);
+  async setTrendingTokens(data: any) {
+    const key = CACHE_KEYS.TRENDING_TOKENS;
     await this.set(key, data, CACHE_TTL.TRENDING_TOKENS);
   }
 
@@ -214,5 +225,25 @@ export class CacheService {
     } catch (error) {
       return { status: 'unhealthy', message: error.message };
     }
+  }
+
+  // Start cache monitoring - logs every 1 minute
+  private startCacheMonitoring(): void {
+    setInterval(async () => {
+      const uptime = Math.floor((Date.now() - this.cacheStats.lastReset) / 1000);
+      const totalRequests = this.cacheStats.hits + this.cacheStats.misses;
+      const hitRate = totalRequests > 0 ? ((this.cacheStats.hits / totalRequests) * 100).toFixed(2) : '0.00';
+      
+      // Check health
+      const health = await this.healthCheck();
+      
+      // Special check for trending tokens cache
+      const trendingTokensStatus = await this.getTrendingTokens();
+      const hasTrendingTokens = trendingTokensStatus && Array.isArray(trendingTokensStatus);
+      
+      this.logger.log(
+        `[REDIS MONITOR] Uptime: ${uptime}s | Hits: ${this.cacheStats.hits} | Misses: ${this.cacheStats.misses} | Hit Rate: ${hitRate}% | Health: ${health.status} | Trending Tokens Cached: ${hasTrendingTokens ? 'YES' : 'NO'}${hasTrendingTokens ? ` (${trendingTokensStatus.length} tokens)` : ''}`
+      );
+    }, 60000); // Every 1 minute
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CacheService } from '../../../cache/cache.service';
 
 export interface ZapperTokenTrend {
   tokenAddress: string;
@@ -49,32 +50,22 @@ export interface ZapperTokenTrendsResponse {
 export class ZapperService {
   private readonly logger = new Logger(ZapperService.name);
   private readonly ZAPPER_API_URL = 'https://public.zapper.xyz/graphql';
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
-  private tokenTrendsCache: {
-    data: ZapperTokenTrend[];
-    timestamp: number;
-    fid: number;
-  } | null = null;
+  constructor(private readonly cacheService: CacheService) {}
 
   async getTrendingTokens(
-    fid: number,
+    fid?: number,
     count: number = 8,
   ): Promise<ZapperTokenTrend[]> {
     try {
-      // Check cache first
-      if (
-        this.tokenTrendsCache &&
-        this.tokenTrendsCache.fid === fid &&
-        Date.now() - this.tokenTrendsCache.timestamp < this.CACHE_TTL
-      ) {
-        this.logger.log(`Returning cached trending tokens for FID ${fid}`);
-        return this.tokenTrendsCache.data.slice(0, count);
+      // Check Redis cache first
+      const cachedTokens = await this.cacheService.getTrendingTokens();
+      if (cachedTokens && Array.isArray(cachedTokens)) {
+        this.logger.log(`[REDIS CACHE HIT] Returning ${cachedTokens.length} cached trending tokens from Redis (requested: ${count})`);
+        return cachedTokens.slice(0, count);
       }
 
-      this.logger.log(
-        `Fetching trending tokens for FID ${fid} from Zapper API`,
-      );
+      this.logger.log('[REDIS CACHE MISS] Fetching trending tokens from Zapper API (cache expired or empty)');
 
       const query = `
         query TokenTrends($fid: Int!, $first: Int) {
@@ -120,8 +111,8 @@ export class ZapperService {
       `;
 
       const variables = {
-        fid,
-        first: Math.max(count, 30), // Always fetch at least 16 to have a good selection
+        fid: fid || 1, // Use provided fid or fallback to 1
+        first: 50, // Fetch 50 tokens as requested
       };
 
       const response = await fetch(this.ZAPPER_API_URL, {
@@ -146,41 +137,38 @@ export class ZapperService {
       const data: ZapperTokenTrendsResponse = await response.json();
 
       if (!data.data?.tokenTrends?.edges) {
-        this.logger.warn(`No trending tokens found for FID ${fid}`);
+        this.logger.warn('No trending tokens found');
         return [];
       }
 
       const tokens = data.data.tokenTrends.edges.map((edge) => edge.node);
 
-      // Cache the results
-      this.tokenTrendsCache = {
-        data: tokens,
-        timestamp: Date.now(),
-        fid,
-      };
+      // Cache the results in Redis for 30 minutes
+      await this.cacheService.setTrendingTokens(tokens);
 
       this.logger.log(
-        `Successfully fetched ${tokens.length} trending tokens for FID ${fid}`,
+        `[REDIS CACHE SET] Successfully fetched and cached ${tokens.length} trending tokens for 30 minutes`,
       );
       return tokens.slice(0, count);
     } catch (error) {
       this.logger.error(
-        `Failed to fetch trending tokens for FID ${fid}:`,
+        'Failed to fetch trending tokens:',
         error,
       );
 
-      // Return cached data if available, even if expired, as fallback
-      if (this.tokenTrendsCache && this.tokenTrendsCache.fid === fid) {
-        this.logger.warn('Returning expired cache data as fallback');
-        return this.tokenTrendsCache.data.slice(0, count);
+      // Return cached data if available as fallback
+      const cachedTokens = await this.cacheService.getTrendingTokens();
+      if (cachedTokens && Array.isArray(cachedTokens)) {
+        this.logger.warn(`[REDIS CACHE FALLBACK] Returning ${cachedTokens.length} cached tokens after API failure`);
+        return cachedTokens.slice(0, count);
       }
 
       return [];
     }
   }
 
-  clearCache(): void {
-    this.tokenTrendsCache = null;
+  async clearCache(): Promise<void> {
+    await this.cacheService.del('tokens:trending');
     this.logger.log('Zapper service cache cleared');
   }
 }

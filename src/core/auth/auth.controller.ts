@@ -612,7 +612,7 @@ export class AuthController {
         `⭐ [POST /me] Favorite signalers count: ${favoriteTwentySignalers.length}`,
       );
 
-      // Fetch trending tokens from Zapper API
+      // Fetch trending tokens from Zapper API (cached for 30 minutes)
       const trendingTokens = await this.zapperService.getTrendingTokens(
         session.sub,
         8,

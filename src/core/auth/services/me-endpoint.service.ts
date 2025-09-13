@@ -458,15 +458,8 @@ export class MeEndpointService {
    * Get featured tokens with fallback to cache
    */
   async getFeaturedTokensWithFallback(fid: number): Promise<any[]> {
-    const cacheKey = `tokens:trending:${fid}`;
-    const cachedTokens = await this.cacheManager.get<any[]>(cacheKey);
-
-    if (cachedTokens) {
-      this.logger.log('[/me] Using cached trending tokens');
-      return cachedTokens;
-    }
-
     try {
+      // Use the cached trending tokens from ZapperService (30 min cache)
       const zapperTokens = await this.zapperService.getTrendingTokens(fid, 30);
 
       // Format Zapper tokens to match frontend Token interface expectations
@@ -487,22 +480,12 @@ export class MeEndpointService {
         },
       }));
 
-      // Cache for 5 minutes
-      await this.cacheManager.set(cacheKey, formattedTokens, 5 * 60 * 1000);
       return formattedTokens;
     } catch (error) {
       this.logger.error(
-        '[/me] Zapper API failed, trying cached fallback:',
+        '[/me] Zapper API failed:',
         error,
       );
-
-      // Try global cache as fallback
-      const globalCacheKey = 'tokens:trending:global';
-      const globalCached = await this.cacheManager.get<any[]>(globalCacheKey);
-
-      if (globalCached) {
-        return globalCached;
-      }
 
       // Return empty array if all fails
       return [];

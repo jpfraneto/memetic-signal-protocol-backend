@@ -24,7 +24,7 @@ import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { TokensModule } from '../tokens/tokens.module';
 import { UserModule } from '../user/user.module';
 import { AuthModule } from '../auth/auth.module';
-import { ZapperService } from '../zapper/services/zapper.service';
+import { ZapperModule } from '../zapper/zapper.module';
 import { NotificationModule } from '../notification/notification.module';
 import { BlockchainModule } from '../blockchain/blockchain.module';
 import { MFSModule } from '../mfs/mfs.module';
@@ -47,6 +47,7 @@ import { MFSModule } from '../mfs/mfs.module';
     NotificationModule,
     BlockchainModule,
     MFSModule,
+    ZapperModule,
   ],
   controllers: [SignalController],
   providers: [
@@ -60,7 +61,6 @@ import { MFSModule } from '../mfs/mfs.module';
     CryptoCompareService,
     CoinAPIService,
     LeaderboardService,
-    ZapperService,
   ],
   exports: [
     SignalService,

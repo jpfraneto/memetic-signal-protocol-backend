@@ -77,10 +77,13 @@ export class SignalController {
   }
 
   @Get('ca/:ca')
-  @ApiOperation({ summary: 'Get all signals for a specific contract address (token)' })
+  @ApiOperation({
+    summary: 'Get all signals for a specific contract address (token)',
+  })
   @ApiResponse({
     status: 200,
-    description: 'All signals for the given contract address in chronological order (most recent first)',
+    description:
+      'All signals for the given contract address in chronological order (most recent first)',
     schema: {
       example: {
         success: true,
@@ -92,8 +95,14 @@ export class SignalController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid contract address parameter' })
-  @ApiResponse({ status: 404, description: 'No signals found for this contract address' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid contract address parameter',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No signals found for this contract address',
+  })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getSignalsByCA(
     @Param('ca') ca: string,
@@ -130,10 +139,11 @@ export class SignalController {
         );
       }
 
-      const result = await this.signalService.getSignalsByCA(
-        ca,
-        { page: parsedPage, limit: parsedLimit, status },
-      );
+      const result = await this.signalService.getSignalsByCA(ca, {
+        page: parsedPage,
+        limit: parsedLimit,
+        status,
+      });
 
       return hasResponse(res, {
         success: true,
@@ -153,7 +163,10 @@ export class SignalController {
     } catch (error) {
       this.logger.error(`Error fetching signals for CA ${ca}:`, error);
 
-      if (error.message.includes('not found') || error.message.includes('No signals found')) {
+      if (
+        error.message.includes('not found') ||
+        error.message.includes('No signals found')
+      ) {
         return hasError(
           res,
           HttpStatus.NOT_FOUND,
@@ -348,12 +361,12 @@ export class SignalController {
     description: 'Merkle proof data for token claim',
     schema: {
       example: {
-        amount: "1000000000000000000",
+        amount: '1000000000000000000',
         merkleProof: [
-          "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-          "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+          '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+          '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         ],
-        hasAllocation: true
+        hasAllocation: true,
       },
     },
   })
@@ -362,8 +375,8 @@ export class SignalController {
     description: 'No allocation found',
     schema: {
       example: {
-        error: "no_allocation",
-        message: "No tokens allocated for your FID today"
+        error: 'no_allocation',
+        message: 'No tokens allocated for your FID today',
       },
     },
   })
@@ -374,22 +387,24 @@ export class SignalController {
   ) {
     try {
       const fid = session.sub;
-      
+
       this.logger.log(`[getMerkleProof] Request for FID: ${fid}`);
 
       // For now, always return hardcoded successful response
       const response = {
-        amount: "1000000000000000000",
+        amount: '1000000000000000000',
         merkleProof: [
-          "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-          "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-          "0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
+          '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+          '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          '0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321',
         ],
-        hasAllocation: true
+        hasAllocation: true,
       };
 
-      this.logger.log(`[getMerkleProof] Returning merkle proof for FID: ${fid}`);
-      
+      this.logger.log(
+        `[getMerkleProof] Returning merkle proof for FID: ${fid}`,
+      );
+
       return hasResponse(res, response);
     } catch (error) {
       this.logger.error('Error generating merkle proof:', error);

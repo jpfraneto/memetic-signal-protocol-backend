@@ -101,9 +101,10 @@ export class SignalResolutionService {
 
           if (tokenInfo && tokenInfo.marketCap > 0) {
             const exitMarketCap = tokenInfo.marketCap;
-            
+
             // Get source information from the historical data manager
-            const fallbackResult = await this.tokenPriceService.getLastResolutionResult();
+            const fallbackResult =
+              await this.tokenPriceService.getLastResolutionResult();
             if (fallbackResult) {
               exitMarketCapSource = fallbackResult.source;
               resolutionAttempts = fallbackResult.attempts;
@@ -137,27 +138,38 @@ export class SignalResolutionService {
           // Update signal in database
           signal.resolved = true; // Mark as resolved regardless
           signal.mfs_delta = mfsDelta;
-          
+
           // Store resolution tracking data
           if (tokenInfo && tokenInfo.marketCap > 0) {
             signal.exit_market_cap = BigInt(Math.floor(tokenInfo.marketCap));
-            
+
             // Get source information from the token price service
-            const resolutionResult = this.tokenPriceService.getLastResolutionResult();
+            const resolutionResult =
+              this.tokenPriceService.getLastResolutionResult();
             if (resolutionResult) {
               signal.data_sources = JSON.stringify([resolutionResult.source]);
-              signal.resolution_attempts = JSON.stringify(resolutionResult.attempts);
+              signal.resolution_attempts = JSON.stringify(
+                resolutionResult.attempts,
+              );
             }
           } else {
             signal.exit_market_cap = BigInt(0);
             signal.resolution_error = true;
-            const resolutionResult = this.tokenPriceService.getLastResolutionResult();
+            const resolutionResult =
+              this.tokenPriceService.getLastResolutionResult();
             if (resolutionResult) {
               signal.data_sources = JSON.stringify(['failed']);
-              signal.resolution_attempts = JSON.stringify(resolutionResult.attempts);
+              signal.resolution_attempts = JSON.stringify(
+                resolutionResult.attempts,
+              );
             } else {
               signal.data_sources = JSON.stringify(['failed']);
-              signal.resolution_attempts = JSON.stringify(['Zapper', 'CoinMarketCap', 'CryptoCompare', 'CoinAPI']);
+              signal.resolution_attempts = JSON.stringify([
+                'Zapper',
+                'CoinMarketCap',
+                'CryptoCompare',
+                'CoinAPI',
+              ]);
             }
           }
 

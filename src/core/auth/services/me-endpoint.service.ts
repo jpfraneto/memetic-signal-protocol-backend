@@ -277,16 +277,9 @@ export class MeEndpointService {
           t.name as token_name,
           t.symbol as token_symbol,
           t.decimals,
-          t.categories,
-          t.description,
           t.image as token_image,
-          t.image_small,
-          t.image_thumb,
-          t.market_cap_rank,
-          t.market_data,
           t.created_at as token_created_at,
           t.updated_at as token_updated_at,
-          t.coingecko_id,
           ps_initial.market_cap as initial_market_cap,
           ps_current.market_cap as current_market_cap
         FROM signals s
@@ -473,10 +466,7 @@ export class MeEndpointService {
 
       return formattedTokens;
     } catch (error) {
-      this.logger.error(
-        '[/me] Zapper API failed:',
-        error,
-      );
+      this.logger.error('[/me] Zapper API failed:', error);
 
       // Return empty array if all fails
       return [];

@@ -56,19 +56,9 @@ export class SimpleTokenService {
     const normalizedAddress = contractAddress.toLowerCase();
 
     // Check database first
-    let token = await this.tokenRepository.findOne({
-      where: { ca: normalizedAddress },
-    });
+    let token = await this.fetchAndSaveTokenMetadata(normalizedAddress);
 
-    // If token doesn't exist or metadata is outdated, fetch from blockchain
-    if (!token || this.isMetadataOutdated(token)) {
-      token = await this.fetchAndSaveTokenMetadata(normalizedAddress, token);
-    }
-
-    // If price is outdated, fetch from CoinGecko
-    if (this.isPriceOutdated(token)) {
-      await this.updateTokenPrice(token);
-    }
+    await this.updateTokenPrice(token);
 
     // Market data removed from simplified schema
 

@@ -61,11 +61,15 @@ export class ZapperService {
       // Check Redis cache first
       const cachedTokens = await this.cacheService.getTrendingTokens();
       if (cachedTokens && Array.isArray(cachedTokens)) {
-        this.logger.log(`[REDIS CACHE HIT] Returning ${cachedTokens.length} cached trending tokens from Redis (requested: ${count})`);
+        this.logger.log(
+          `[REDIS CACHE HIT] Returning ${cachedTokens.length} cached trending tokens from Redis (requested: ${count})`,
+        );
         return cachedTokens.slice(0, count);
       }
 
-      this.logger.log('[REDIS CACHE MISS] Fetching trending tokens from Zapper API (cache expired or empty)');
+      this.logger.log(
+        '[REDIS CACHE MISS] Fetching trending tokens from Zapper API (cache expired or empty)',
+      );
 
       const query = `
         query TokenTrends($fid: Int!, $first: Int) {
@@ -84,24 +88,6 @@ export class ZapperService {
                     priceChange24h
                     volume24h
                     marketCap
-                    latestRelevantFarcasterSwaps(fid: $fid, first: 1) {
-                      edges {
-                        node {
-                          timestamp
-                          volumeUsd
-                          amount
-                          isBuy
-                          profile {
-                            username
-                            fid
-                            metadata {
-                              displayName
-                              imageUrl
-                            }
-                          }
-                        }
-                      }
-                    }
                   }
                 }
               }
@@ -111,7 +97,7 @@ export class ZapperService {
       `;
 
       const variables = {
-        fid: fid || 1, // Use provided fid or fallback to 1
+        fid: 16098, // Use provided fid or fallback to 1
         first: 50, // Fetch 50 tokens as requested
       };
 
@@ -151,15 +137,14 @@ export class ZapperService {
       );
       return tokens.slice(0, count);
     } catch (error) {
-      this.logger.error(
-        'Failed to fetch trending tokens:',
-        error,
-      );
+      this.logger.error('Failed to fetch trending tokens:', error);
 
       // Return cached data if available as fallback
       const cachedTokens = await this.cacheService.getTrendingTokens();
       if (cachedTokens && Array.isArray(cachedTokens)) {
-        this.logger.warn(`[REDIS CACHE FALLBACK] Returning ${cachedTokens.length} cached tokens after API failure`);
+        this.logger.warn(
+          `[REDIS CACHE FALLBACK] Returning ${cachedTokens.length} cached tokens after API failure`,
+        );
         return cachedTokens.slice(0, count);
       }
 

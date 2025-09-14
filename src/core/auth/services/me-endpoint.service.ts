@@ -361,19 +361,10 @@ export class MeEndpointService {
         // Create Token object
         const token: Token = {
           ca: row.ca,
-          coingecko_id: row.coingecko_id,
-          platform_id: row.platform_id,
-          fetched_from: row.fetched_from,
           name: row.token_name || 'Unknown Token',
           symbol: row.token_symbol || 'UNKNOWN',
           decimals: row.decimals || 18,
-          categories: row.categories || '',
-          description: row.description,
           image: row.token_image || '',
-          image_small: row.image_small,
-          image_thumb: row.image_thumb,
-          market_cap_rank: row.market_cap_rank,
-          market_data: row.market_data,
           created_at: row.token_created_at,
           updated_at: row.token_updated_at,
         };

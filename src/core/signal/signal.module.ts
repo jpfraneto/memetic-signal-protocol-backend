@@ -16,6 +16,7 @@ import { DailySignalCount } from '../../models/DailySignalCount/DailySignalCount
 import { FidBan } from '../../models/FidBan/FidBan.model';
 import { WalletBan } from '../../models/WalletBan/WalletBan.model';
 import { TokenPriceService } from '../signal/services/token-price.service';
+import { ZapperProvider } from './services/providers/zapper.service';
 import { CoinMarketCapService } from './services/providers/coinmarketcap.service';
 import { CryptoCompareService } from './services/providers/cryptocompare.service';
 import { CoinAPIService } from './services/providers/coinapi.service';
@@ -57,6 +58,7 @@ import { MFSModule } from '../mfs/mfs.module';
     SessionDataService,
     TokenPriceService,
     HistoricalDataManagerService,
+    ZapperProvider,
     CoinMarketCapService,
     CryptoCompareService,
     CoinAPIService,

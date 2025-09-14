@@ -286,43 +286,21 @@ export class TokenPriceService {
       let volume24h = 0;
 
       if (timestamp) {
-        // First try CoinGecko if we have coin ID
-        if (coinData?.id) {
-          const historicalData = await this.fetchHistoricalMarketData(
-            coinData.id,
-            timestamp,
-          );
-          price = historicalData.price;
-          marketCap = historicalData.marketCap;
-        }
-
-        // If CoinGecko failed or no coin ID, try fallback providers
-        if (marketCap === 0 && price === 0) {
-          this.logger.log(
-            `CoinGecko historical data failed for ${normalizedAddress}, trying fallback providers...`,
-          );
-          const fallbackResult = await this.historicalDataManager.fetchHistoricalDataWithFallbacks(
-            normalizedAddress,
-            timestamp,
-          );
-          
-          price = fallbackResult.price;
-          marketCap = fallbackResult.marketCap;
-          volume24h = 0; // Fallback providers don't provide volume
-          
-          // Store the fallback result for the resolution service to access
-          this.lastFallbackResult = fallbackResult;
-        } else {
-          // CoinGecko succeeded, create a result object
-          this.lastFallbackResult = {
-            price,
-            marketCap,
-            timestamp: timestamp.getTime(),
-            source: 'CoinGecko',
-            attempts: ['CoinGecko'],
-            success: true,
-          };
-        }
+        // Use the historical data manager with Zapper as primary
+        this.logger.log(
+          `Fetching historical data for ${normalizedAddress} at ${timestamp} using Zapper-first fallback chain...`,
+        );
+        const fallbackResult = await this.historicalDataManager.fetchHistoricalDataWithFallbacks(
+          normalizedAddress,
+          timestamp,
+        );
+        
+        price = fallbackResult.price;
+        marketCap = fallbackResult.marketCap;
+        volume24h = 0;
+        
+        // Store the fallback result for the resolution service to access
+        this.lastFallbackResult = fallbackResult;
       } else if (coinData?.market_data) {
         // Use current price data
         price = coinData.market_data.current_price?.usd || 0;

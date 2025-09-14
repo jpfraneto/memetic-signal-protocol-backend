@@ -82,19 +82,8 @@ export class SessionDataService {
             where: { ca: signal.ca },
           });
 
-          // Parse market_data if it's a string
+          // Market data no longer available in simplified schema
           let marketData: any = {};
-          if (tokenData?.market_data) {
-            if (typeof tokenData.market_data === 'string') {
-              try {
-                marketData = JSON.parse(tokenData.market_data);
-              } catch {
-                marketData = {};
-              }
-            } else {
-              marketData = tokenData.market_data;
-            }
-          }
 
           uniqueTokens.set(signal.ca, {
             ca: signal.ca,

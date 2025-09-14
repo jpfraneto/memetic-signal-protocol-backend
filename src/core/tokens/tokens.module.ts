@@ -6,6 +6,7 @@ import { SimpleTokenService } from './services/simple-token.service';
 import { ZapperModule } from '../zapper/zapper.module';
 import { Token } from '../../models/Token/Token.model';
 import { HistoricalDataManagerService } from '../signal/services/historical-data-manager.service';
+import { ZapperProvider } from '../signal/services/providers/zapper.service';
 import { CoinMarketCapService } from '../signal/services/providers/coinmarketcap.service';
 import { CryptoCompareService } from '../signal/services/providers/cryptocompare.service';
 import { CoinAPIService } from '../signal/services/providers/coinapi.service';
@@ -20,6 +21,7 @@ import { CoinAPIService } from '../signal/services/providers/coinapi.service';
     TokenPriceService,
     SimpleTokenService,
     HistoricalDataManagerService,
+    ZapperProvider,
     CoinMarketCapService,
     CryptoCompareService,
     CoinAPIService,

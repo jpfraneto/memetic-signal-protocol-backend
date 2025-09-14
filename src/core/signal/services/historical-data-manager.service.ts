@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ZapperProvider } from './providers/zapper.service';
 import { CoinMarketCapService } from './providers/coinmarketcap.service';
 import { CryptoCompareService } from './providers/cryptocompare.service';
 import { CoinAPIService } from './providers/coinapi.service';
@@ -19,11 +20,13 @@ export class HistoricalDataManagerService {
   private readonly providers: HistoricalDataProvider[];
   
   constructor(
+    private zapperProvider: ZapperProvider,
     private coinMarketCapService: CoinMarketCapService,
     private cryptoCompareService: CryptoCompareService,
     private coinAPIService: CoinAPIService,
   ) {
     this.providers = [
+      this.zapperProvider,
       this.coinMarketCapService,
       this.cryptoCompareService,
       this.coinAPIService,
@@ -176,6 +179,8 @@ export class HistoricalDataManagerService {
 
   private checkApiKeyForProvider(providerName: string): boolean {
     switch (providerName) {
+      case 'Zapper':
+        return !!process.env.ZAPPER_API_KEY;
       case 'CoinMarketCap':
         return !!process.env.COINMARKETCAP_API_KEY;
       case 'CryptoCompare':

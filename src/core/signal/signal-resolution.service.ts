@@ -61,6 +61,7 @@ export class SignalResolutionService {
       const expiredSignals = await this.signalRepository.find({
         where: {
           resolved: false, // Only unresolved signals
+          resolution_error: false, // Skip signals that already failed resolution
           expires_at: LessThan(BigInt(nowTimestamp)), // Expired signals (bigint comparison)
         },
         relations: ['user'],
@@ -144,13 +145,20 @@ export class SignalResolutionService {
             // Get source information from the token price service
             const resolutionResult = this.tokenPriceService.getLastResolutionResult();
             if (resolutionResult) {
-              signal.exit_market_cap_source = resolutionResult.source;
+              signal.data_sources = JSON.stringify([resolutionResult.source]);
               signal.resolution_attempts = JSON.stringify(resolutionResult.attempts);
             }
           } else {
             signal.exit_market_cap = BigInt(0);
-            signal.exit_market_cap_source = 'failed';
-            signal.resolution_attempts = JSON.stringify(['CoinGecko', 'CoinMarketCap', 'CryptoCompare', 'CoinAPI']);
+            signal.resolution_error = true;
+            const resolutionResult = this.tokenPriceService.getLastResolutionResult();
+            if (resolutionResult) {
+              signal.data_sources = JSON.stringify(['failed']);
+              signal.resolution_attempts = JSON.stringify(resolutionResult.attempts);
+            } else {
+              signal.data_sources = JSON.stringify(['failed']);
+              signal.resolution_attempts = JSON.stringify(['Zapper', 'CoinMarketCap', 'CryptoCompare', 'CoinAPI']);
+            }
           }
 
           await this.signalRepository.save(signal);

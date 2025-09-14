@@ -1,12 +1,4 @@
-import {
-  Entity,
-  Column,
-  PrimaryColumn,
-  ManyToOne,
-  JoinColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn } from 'typeorm';
 
 import { User } from '../User/User.model';
 import { Token } from '../Token/Token.model';
@@ -14,57 +6,59 @@ import { Token } from '../Token/Token.model';
 @Entity({ name: 'signals' })
 export class Signal {
   @PrimaryColumn({ type: 'int' })
-  signal_id: number; // Primary key from contract
+  signal_id: number;
 
   @Column({ type: 'varchar', length: 66 })
   transaction_hash: string;
 
-  @Column({ type: 'varchar', length: 66 })
-  ca: string;
-
   @Column({ type: 'int' })
   fid: number;
 
+  @Column({ type: 'varchar', length: 66 })
+  ca: string;
+
   @Column({ type: 'boolean' })
-  direction: boolean; // false = DOWN, true = UP
+  direction: boolean;
 
   @Column({ type: 'int' })
-  duration_days: number; // Duration in days (uint32)
+  duration_days: number;
 
   @Column({ type: 'bigint' })
-  entry_market_cap: bigint; // Market cap in USD when signal created (uint256)
+  entry_market_cap: bigint;
 
   @Column({ type: 'bigint' })
-  created_at: bigint; // uint64 timestamp from contract
+  created_at: bigint;
 
   @Column({ type: 'bigint' })
-  expires_at: bigint; // uint64 timestamp from contract
+  expires_at: bigint;
 
   @Column({ type: 'date' })
-  timestamp: Date; // Block timestamp when signal was created
+  timestamp: Date;
 
   @Column({ type: 'bigint' })
   block_number: bigint;
 
   @Column({ type: 'boolean', default: false })
-  resolved: boolean; // Whether signal has been resolved on-chain
+  resolved: boolean;
 
   @Column({ type: 'int', default: 0 })
-  mfs_delta: number; // int256 MFS delta applied (as string for precision)
+  mfs_delta: number;
 
   @Column({ type: 'boolean', default: false })
-  manually_updated: boolean; // Whether owner has manually updated this signal
+  manually_updated: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  resolution_error: boolean;
 
   @Column({ type: 'bigint', nullable: true })
-  exit_market_cap: bigint; // Market cap at signal resolution time
+  exit_market_cap: bigint;
 
   @Column({ type: 'text', nullable: true })
-  exit_market_cap_source: string; // Source of exit market cap data (CoinGecko, CoinMarketCap, etc.)
+  resolution_attempts: string;
 
   @Column({ type: 'text', nullable: true })
-  resolution_attempts: string; // JSON array of attempted data sources during resolution
+  data_sources: string;
 
-  // Optional relations for backend convenience (not part of Ponder schema)
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'fid', referencedColumnName: 'fid' })
   user?: User;
@@ -73,17 +67,14 @@ export class Signal {
   @JoinColumn({ name: 'ca', referencedColumnName: 'ca' })
   token?: Token;
 
-  // Helper property to get expires_at as Date (computed from bigint timestamp)
   get expiresAtDate(): Date {
     return new Date(Number(this.expires_at) * 1000);
   }
 
-  // Helper property to get created_at as Date (computed from bigint timestamp)
   get createdAtDate(): Date {
     return new Date(Number(this.created_at) * 1000);
   }
 
-  // Helper property to get duration in days (alias for duration_days)
   get duration(): number {
     return this.duration_days;
   }

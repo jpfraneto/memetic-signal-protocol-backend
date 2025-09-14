@@ -70,25 +70,7 @@ export class SimpleTokenService {
       await this.updateTokenPrice(token);
     }
 
-    // Ensure market_data is properly parsed
-    if (token && token.market_data && typeof token.market_data === 'string') {
-      try {
-        token.market_data = JSON.parse(token.market_data);
-      } catch (error) {
-        this.logger.warn(
-          `Failed to parse market_data for token ${token.ca}:`,
-          error,
-        );
-        token.market_data = JSON.stringify({
-          current_price: 0,
-          ath: 0,
-          ath_change_percentage: 0,
-          ath_date: '',
-          market_cap: 0,
-          price_change_24h: 0,
-        });
-      }
-    }
+    // Market data removed from simplified schema
 
     return token;
   }
@@ -183,21 +165,7 @@ export class SimpleTokenService {
         decimals: parseInt(
           coinData?.detail_platforms?.base?.decimal_place.toString(),
         ),
-        categories: coinData?.categories,
-        description: coinData?.description?.en,
         image: coinData?.image?.large,
-        image_small: coinData?.image?.small,
-        image_thumb: coinData?.image?.thumb,
-        market_cap_rank: coinData?.market_cap_rank,
-        market_data: JSON.stringify({
-          current_price: coinData?.market_data?.current_price?.usd,
-          ath: coinData?.market_data?.ath?.usd,
-          ath_change_percentage:
-            coinData?.market_data?.ath_change_percentage?.usd,
-          ath_date: coinData?.market_data?.ath_date?.usd,
-          market_cap: coinData?.market_data?.market_cap?.usd,
-          price_change_24h: coinData?.market_data?.price_change_24h,
-        }),
       };
       this.logger.debug('Token data processed', {
         ca,
@@ -256,15 +224,6 @@ export class SimpleTokenService {
           large: tokenData.info?.imageUrl,
           small: tokenData.info?.imageUrl,
           thumb: tokenData.info?.imageUrl,
-        },
-        market_data: {
-          current_price: {
-            usd: parseFloat(tokenData.priceUsd) || 0,
-          },
-          market_cap: {
-            usd: tokenData.marketCap || 0,
-          },
-          price_change_24h: tokenData.priceChange?.h24 || 0,
         },
         detail_platforms: {
           base: {
@@ -331,27 +290,15 @@ export class SimpleTokenService {
 
       let priceUpdated = false;
 
-      // Ensure market_data is an object, not a string
-      let marketData: any;
-      if (typeof token.market_data === 'string') {
-        try {
-          marketData = JSON.parse(token.market_data);
-        } catch {
-          marketData = {};
-        }
-      } else {
-        marketData = token.market_data || {};
-      }
+      // Market data removed from simplified schema
+      let marketData: any = {};
 
       if (response.ok) {
         const data = await response.json();
         const tokenData = data[token.ca];
 
         if (tokenData) {
-          marketData.current_price = tokenData.usd || 0;
-          marketData.price_change_24h = tokenData.usd_24h_change;
-          marketData.market_cap = tokenData.usd_market_cap;
-          token.market_data = marketData;
+          // Market data no longer stored in token
           priceUpdated = true;
         }
       } else if (response.status === 429) {
@@ -373,7 +320,7 @@ export class SimpleTokenService {
             marketData.price_change_24h =
               dexScreenerPriceData.price_change_24h || 0;
             marketData.market_cap = dexScreenerPriceData.market_cap || 0;
-            token.market_data = marketData;
+            // Market data no longer stored in token
             priceUpdated = true;
             this.logger.log(
               `Updated price for ${token.ca} using DexScreener fallback`,

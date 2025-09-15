@@ -449,7 +449,7 @@ export class MeEndpointService {
 
       // Format Zapper tokens to match frontend Token interface expectations
       const formattedTokens = zapperTokens.map((zapperToken) => ({
-        ca: zapperToken.tokenAddress.toLowerCase(),
+        ca: zapperToken.token.address.toLowerCase(),
         name: zapperToken.token.name,
         symbol: zapperToken.token.symbol,
         image: zapperToken.token.imageUrlV2 || '',

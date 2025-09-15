@@ -16,6 +16,7 @@ import { AdminGuard } from 'src/security/guards';
 // Modules
 import { UserModule } from '../user/user.module';
 import { ZapperModule } from '../zapper/zapper.module';
+import { BankrModule } from '../bankr/bankr.module';
 import { SignalModule } from '../signal/signal.module';
 import { BlockchainModule } from '../blockchain/blockchain.module';
 import { RedisCacheModule } from '../../cache/cache.module';
@@ -25,6 +26,7 @@ import { RedisCacheModule } from '../../cache/cache.module';
     TypeOrmModule.forFeature([User, Signal, Token, PriceSnapshot]),
     forwardRef(() => UserModule),
     ZapperModule,
+    BankrModule,
     SignalModule,
     BlockchainModule,
     RedisCacheModule,

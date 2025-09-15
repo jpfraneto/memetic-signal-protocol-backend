@@ -51,7 +51,7 @@ export class SignalResolutionService {
    * Every 5 minutes batch processing cron - processes all expired signals
    */
   @Cron('*/5 * * * *') // Every 5 minutes - COST-OPTIMIZED BATCHING
-  async processHourlyBatchResolution() {
+  async process5MinuteBatchResolution() {
     this.logger.log('Starting 5-minute batch resolution cycle...');
 
     try {
@@ -126,9 +126,7 @@ export class SignalResolutionService {
             };
 
             const mfsResult = this.mfsService.calculateMFSDelta(mfsInput);
-            console.log('IN HERE, THE MFS RESULT IS', mfsResult);
             mfsDelta = mfsResult.mfsDelta;
-            console.log('IN HERE THE MFS DELTA IS', mfsDelta);
           } else {
             this.logger.warn(
               `No historical market cap found for ${signal.ca} at ${signalEndDate.toISOString()}, resolving with MFS delta 0`,
@@ -210,93 +208,6 @@ export class SignalResolutionService {
       );
     } catch (error) {
       this.logger.error('Error in 5-minute batch resolution cycle:', error);
-    }
-  }
-
-  /**
-   * Split array into chunks of specified size
-   */
-  private chunkArray<T>(array: T[], size: number): T[][] {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  }
-
-  /**
-   * Execute blockchain resolution with retries
-   */
-  private async executeBlockchainResolution(
-    batch: SignalResolutionBatch,
-  ): Promise<void> {
-    let attempt = 0;
-    let success = false;
-
-    while (attempt < this.MAX_RETRIES && !success) {
-      try {
-        attempt++;
-
-        this.logger.log(
-          `Attempting blockchain resolution (attempt ${attempt}/${this.MAX_RETRIES})`,
-        );
-
-        // Execute batch resolution on smart contract
-        const txHash = await this.blockchainService.batchResolveSignals(
-          batch.signalIds,
-          batch.mfsDeltas.map((delta) => BigInt(delta)),
-        );
-
-        // Mark signals as resolved in database (Ponder indexer will update the resolved flag)
-        for (const signal of batch.signals) {
-          signal.resolved = true;
-        }
-
-        await this.signalRepository.save(batch.signals);
-
-        // Update user statistics
-        await this.updateUserStatistics(batch.signals);
-
-        // Send notifications
-        if (batch.notifications.length > 0) {
-          try {
-            const { sent, failed } =
-              await this.notificationService.sendBatchSignalNotifications(
-                batch.notifications,
-              );
-            this.logger.log(
-              `Notifications sent: ${sent} successful, ${failed} failed`,
-            );
-          } catch (error) {
-            this.logger.error('Error sending batch notifications:', error);
-          }
-        }
-
-        this.logger.log(`Blockchain resolution successful. Tx: ${txHash}`);
-        success = true;
-      } catch (error) {
-        this.logger.error(
-          `Blockchain resolution attempt ${attempt} failed:`,
-          error,
-        );
-
-        if (attempt === this.MAX_RETRIES) {
-          // On final failure, mark signals as lost but don't send to blockchain
-          for (const signal of batch.signals) {
-            signal.resolved = false;
-          }
-          await this.signalRepository.save(batch.signals);
-
-          this.logger.error(
-            `Failed to resolve signals on blockchain after ${this.MAX_RETRIES} attempts. Marked as lost in database.`,
-          );
-          throw error;
-        }
-
-        // Wait before retry (exponential backoff)
-        const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-      }
     }
   }
 
@@ -420,7 +331,7 @@ export class SignalResolutionService {
    * Manual trigger for 5-minute batch processing
    */
   async triggerSignalResolution(): Promise<void> {
-    await this.processHourlyBatchResolution();
+    await this.process5MinuteBatchResolution();
   }
 
   /**

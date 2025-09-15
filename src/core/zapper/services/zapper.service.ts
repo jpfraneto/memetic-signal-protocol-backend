@@ -79,8 +79,10 @@ export class ZapperService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-zapper-api-key': process.env.ZAPPER_API_KEY ? '[PRESENT]' : '[MISSING]'
-        }
+          'x-zapper-api-key': process.env.ZAPPER_API_KEY
+            ? '[PRESENT]'
+            : '[MISSING]',
+        },
       });
 
       const query = `
@@ -129,27 +131,35 @@ export class ZapperService {
       });
 
       this.logger.log('[DEBUG] Response status:', response.status);
-      this.logger.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
+      this.logger.log(
+        '[DEBUG] Response headers:',
+        Object.fromEntries(response.headers.entries()),
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
         this.logger.error(
           `[DEBUG] Zapper API request failed: ${response.status} ${response.statusText}`,
-          { 
+          {
             responseBody: errorText,
             url: this.ZAPPER_API_URL,
             requestHeaders: {
               'Content-Type': 'application/json',
-              'x-zapper-api-key': process.env.ZAPPER_API_KEY ? '[PRESENT]' : '[MISSING]'
-            }
-          }
+              'x-zapper-api-key': process.env.ZAPPER_API_KEY
+                ? '[PRESENT]'
+                : '[MISSING]',
+            },
+          },
         );
         throw new Error(`Zapper API request failed: ${response.status}`);
       }
 
       const data: ZapperTokenTrendsResponse = await response.json();
-      
-      this.logger.log('[DEBUG] Raw Zapper API Response:', JSON.stringify(data, null, 2));
+
+      this.logger.log(
+        '[DEBUG] Raw Zapper API Response:',
+        JSON.stringify(data, null, 2),
+      );
 
       if (!data.data?.tokenTrends?.edges) {
         this.logger.warn('[DEBUG] No trending tokens found in response:', {
@@ -162,17 +172,19 @@ export class ZapperService {
       }
 
       const tokens = data.data.tokenTrends.edges.map((edge) => edge.node);
-      
+
       this.logger.log('[DEBUG] Processed trending tokens:', {
         totalTokens: tokens.length,
-        sampleToken: tokens[0] ? {
-          name: tokens[0].token?.name,
-          symbol: tokens[0].token?.symbol,
-          address: tokens[0].token?.address,
-          chainId: tokens[0].token?.chainId,
-          price: tokens[0].token?.priceData?.price
-        } : null,
-        allTokenNames: tokens.map(t => t.token?.name).filter(Boolean)
+        sampleToken: tokens[0]
+          ? {
+              name: tokens[0].token?.name,
+              symbol: tokens[0].token?.symbol,
+              address: tokens[0].token?.address,
+              chainId: tokens[0].token?.chainId,
+              price: tokens[0].token?.priceData?.price,
+            }
+          : null,
+        allTokenNames: tokens.map((t) => t.token?.name).filter(Boolean),
       });
 
       // Cache the results in Redis for 5 minutes
@@ -206,7 +218,7 @@ export class ZapperService {
   async getTokenByAddress(contractAddress: string): Promise<any> {
     try {
       this.logger.log(`Fetching token data from Zapper for ${contractAddress}`);
-      
+
       const query = `
         query TokenPriceData($address: Address!, $chainId: Int!) {
           fungibleTokenV2(address: $address, chainId: $chainId) {
@@ -224,7 +236,7 @@ export class ZapperService {
 
       const variables = {
         address: contractAddress,
-        chainId: 8453 // Base mainnet chain ID
+        chainId: 8453, // Base mainnet chain ID
       };
 
       const response = await fetch(this.ZAPPER_API_URL, {
@@ -245,14 +257,16 @@ export class ZapperService {
       }
 
       const data = await response.json();
-      
+
       if (!data.data?.fungibleTokenV2) {
-        this.logger.warn(`No token data found in Zapper response for ${contractAddress}`);
+        this.logger.warn(
+          `No token data found in Zapper response for ${contractAddress}`,
+        );
         return null;
       }
 
       const token = data.data.fungibleTokenV2;
-      
+
       // Transform to match expected format
       return {
         name: token.name,
@@ -271,7 +285,10 @@ export class ZapperService {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch token from Zapper for ${contractAddress}:`, error);
+      this.logger.error(
+        `Failed to fetch token from Zapper for ${contractAddress}:`,
+        error,
+      );
       return null;
     }
   }

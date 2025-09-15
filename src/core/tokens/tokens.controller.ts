@@ -20,6 +20,20 @@ import { hasError, hasResponse } from '../../utils';
 export class TokensController {
   private readonly logger = new Logger(TokensController.name);
 
+  // Convert BigInt values to strings recursively for JSON safety
+  private toJsonSafe(value: any): any {
+    if (typeof value === 'bigint') return value.toString();
+    if (Array.isArray(value)) return value.map((v) => this.toJsonSafe(v));
+    if (value && typeof value === 'object') {
+      const out: any = {};
+      for (const [k, v] of Object.entries(value)) {
+        out[k] = this.toJsonSafe(v);
+      }
+      return out;
+    }
+    return value;
+  }
+
   constructor(
     private readonly tokenPriceService: TokenPriceService,
     private readonly simpleTokenService: SimpleTokenService,
@@ -123,7 +137,7 @@ export class TokensController {
 
       return res.status(HttpStatus.OK).send({
         success: true,
-        data: tokenInfo,
+        data: this.toJsonSafe(tokenInfo),
       });
     } catch (error) {
       this.logger.error(
@@ -236,7 +250,7 @@ export class TokensController {
 
       return res.status(HttpStatus.OK).send({
         success: true,
-        data: { token: tokenInfo },
+        data: { token: this.toJsonSafe(tokenInfo) },
       });
     } catch (error) {
       this.logger.error(

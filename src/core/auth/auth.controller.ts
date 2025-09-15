@@ -18,6 +18,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 // Services
 import { UserService } from '../user/services';
 import { ZapperService } from '../zapper/services';
+import { BankrService } from '../bankr/bankr.service';
 import { MeEndpointService } from './services/me-endpoint.service';
 import { UserStateOnTheSystemEnum } from '../../models/User/User.types';
 
@@ -70,6 +71,7 @@ export class AuthController {
   constructor(
     private readonly userService: UserService,
     private readonly zapperService: ZapperService,
+    private readonly bankrService: BankrService,
     private readonly signalService: SignalService,
     private readonly meEndpointService: MeEndpointService,
   ) {}
@@ -612,11 +614,11 @@ export class AuthController {
         `⭐ [POST /me] Favorite signalers count: ${favoriteTwentySignalers.length}`,
       );
 
-      // Fetch trending tokens from Zapper API (cached for 30 minutes)
-      const trendingTokens = await this.zapperService.getTrendingTokens(
-        session.sub,
-        8,
-      );
+      // Fetch featured tokens using Bankr system (cached or defaults via /bankr)
+      const trendingTokens =
+        await this.meEndpointService.getBankrFeaturedTokensWithFallback(
+          session.sub,
+        );
 
       const responseData = {
         ...updatedUser,
@@ -954,6 +956,36 @@ export class AuthController {
     );
 
     return authData;
+  }
+
+  /**
+   * Health check for Bankr service - shows BNKR balance and allowance
+   */
+  @Get('/bankr/health')
+  @ApiOperation({ summary: 'Check Bankr service health and wallet status' })
+  @ApiResponse({ status: 200, description: 'Bankr health check results' })
+  async getBankrHealth(@Res() res: FastifyReply) {
+    try {
+      this.logger.log('[BANKR HEALTH] Checking Bankr service health...');
+
+      const healthStatus = await this.bankrService.healthCheck();
+
+      this.logger.log('[BANKR HEALTH] Health check completed:', healthStatus);
+
+      return hasResponse(res, {
+        success: true,
+        bankr: healthStatus,
+        message: 'Bankr health check completed',
+      });
+    } catch (error) {
+      this.logger.error('[BANKR HEALTH] Health check failed:', error.message);
+      return hasError(
+        res,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'bankrHealth',
+        `Bankr service health check failed: ${error.message}`,
+      );
+    }
   }
 
   /**

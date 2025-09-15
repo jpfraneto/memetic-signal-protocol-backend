@@ -15,7 +15,10 @@ export class UserProfileDto {
   @ApiProperty({ description: 'Profile picture URL', nullable: true })
   pfpUrl: string | null;
 
-  @ApiProperty({ description: 'Profile picture URL (alias for compatibility)', nullable: true })
+  @ApiProperty({
+    description: 'Profile picture URL (alias for compatibility)',
+    nullable: true,
+  })
   pfp_url: string | null;
 
   @ApiProperty({ description: 'MFS Score' })
@@ -89,9 +92,9 @@ export class FeaturedTokenDto {
   token: {
     name: string;
     symbol: string;
-    imageUrlV2: string;
+    image: string;
     decimals: number;
-    priceData: TokenPriceDataDto;
+    market_cap: number;
   };
 }
 

@@ -67,7 +67,8 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.26",
-    "viem": "^2.14.2"
+    "viem": "^2.14.2",
+    "x402-fetch": "^0.6.0"
   },
   "devDependencies": {
     "@nestjs/schematics": "^10.0.0",

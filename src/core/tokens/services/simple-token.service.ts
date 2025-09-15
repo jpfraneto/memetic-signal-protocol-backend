@@ -174,14 +174,16 @@ export class SimpleTokenService {
         updated_at: now,
         symbol: coinData?.symbol,
         decimals: parseInt(
-          coinData?.detail_platforms?.base?.decimal_place?.toString() || 
-          coinData?.decimals?.toString() || 
-          '18'
+          coinData?.detail_platforms?.base?.decimal_place?.toString() ||
+            coinData?.decimals?.toString() ||
+            '18',
         ),
         image: coinData?.image?.large,
-        market_cap: coinData?.market_cap ? BigInt(Math.floor(coinData.market_cap)) : null,
+        market_cap: coinData?.market_cap
+          ? BigInt(Math.floor(coinData.market_cap))
+          : null,
       };
-      
+
       this.logger.debug('Token data processed', {
         ca,
         name: tokenData.name,
@@ -296,63 +298,7 @@ export class SimpleTokenService {
 
   private async updateTokenPrice(token: Token): Promise<void> {
     try {
-      await this.rateLimit();
-
-      const url = `${this.COINGECKO_API_URL}/simple/token_price/${this.BASE_NETWORK_PLATFORM_ID}?contract_addresses=${token.ca}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`;
-
-      const response = await fetch(url, {
-        headers: {
-          'x-cg-demo-api-key': process.env.COINGECKO_API_KEY || '',
-        },
-      });
-
-      let priceUpdated = false;
-
-      // Market data removed from simplified schema
-      let marketData: any = {};
-
-      if (response.ok) {
-        const data = await response.json();
-        const tokenData = data[token.ca];
-
-        if (tokenData) {
-          // Market data no longer stored in token
-          priceUpdated = true;
-        }
-      } else if (response.status === 429) {
-        this.logger.warn('CoinGecko rate limit hit');
-      } else {
-        this.logger.warn(
-          `CoinGecko price update failed for ${token.ca}, trying DexScreener`,
-        );
-      }
-
-      // If CoinGecko failed, try DexScreener as fallback
-      if (!priceUpdated) {
-        try {
-          const dexScreenerPriceData = await this.fetchPriceFromDexScreener(
-            token.ca,
-          );
-          if (dexScreenerPriceData) {
-            marketData.current_price = dexScreenerPriceData.price || 0;
-            marketData.price_change_24h =
-              dexScreenerPriceData.price_change_24h || 0;
-            marketData.market_cap = dexScreenerPriceData.market_cap || 0;
-            // Market data no longer stored in token
-            priceUpdated = true;
-            this.logger.log(
-              `Updated price for ${token.ca} using DexScreener fallback`,
-            );
-          }
-        } catch (error) {
-          this.logger.warn(
-            `DexScreener fallback also failed for ${token.ca}:`,
-            error,
-          );
-        }
-      }
-
-      if (priceUpdated) {
+      if (token) {
         await this.tokenRepository.save(token);
       }
     } catch (error) {

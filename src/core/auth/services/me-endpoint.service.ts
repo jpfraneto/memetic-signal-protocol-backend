@@ -11,6 +11,8 @@ import { User, Signal, Token, PriceSnapshot } from '../../../models';
 import { UserService } from '../../user/services/user.service';
 import { ZapperService } from '../../zapper/services/zapper.service';
 import { BlockchainService } from '../../blockchain/blockchain.service';
+import { BankrService } from '../../bankr/bankr.service';
+import { DEFAULT_TRENDING_ADDRESSES } from '../../bankr/default-trending';
 import NeynarService from '../../../utils/neynar';
 
 // DTOs
@@ -42,6 +44,7 @@ export class MeEndpointService {
     private readonly priceSnapshotRepository: Repository<PriceSnapshot>,
     private readonly userService: UserService,
     private readonly zapperService: ZapperService,
+    private readonly bankrService: BankrService,
     private readonly blockchainService: BlockchainService,
     private readonly dataSource: DataSource,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -63,7 +66,7 @@ export class MeEndpointService {
       const [feedData, featuredTokens, leaderboard, todaySignal] =
         await Promise.allSettled([
           this.getFeedDataWithFallback(),
-          this.getFeaturedTokensWithFallback(fid),
+          this.getBankrFeaturedTokensWithFallback(fid),
           this.getLeaderboardsWithFallback(),
           this.getTodaySignalWithFallback(fid),
         ]);
@@ -442,30 +445,126 @@ export class MeEndpointService {
   /**
    * Get featured tokens with fallback to cache
    */
-  async getFeaturedTokensWithFallback(fid: number): Promise<any[]> {
+  async getBankrFeaturedTokensWithFallback(fid: number): Promise<any[]> {
+    // Always load from cache; if missing, fall back to hardcoded list (8)
     try {
-      // Use the cached trending tokens from ZapperService (30 min cache)
-      const zapperTokens = await this.zapperService.getTrendingTokens(fid, 30);
+      const cachedAddresses =
+        await this.cacheManager.get<string[]>('tokens:trending');
+      const addresses =
+        cachedAddresses && Array.isArray(cachedAddresses)
+          ? cachedAddresses
+          : this.getDefaultTrending();
 
-      // Format Zapper tokens to match frontend Token interface expectations
-      const formattedTokens = zapperTokens.map((zapperToken) => ({
-        ca: zapperToken.token.address.toLowerCase(),
-        name: zapperToken.token.name,
-        symbol: zapperToken.token.symbol,
-        image: zapperToken.token.imageUrlV2 || '',
-        created_at: new Date(),
-        updated_at: new Date(),
-        market_cap: zapperToken.token.priceData.marketCap || 0,
-        decimals: zapperToken.token.decimals || 18,
-      }));
+      const regex = /^0x[a-f0-9]{40}$/;
+      const filtered = Array.from(
+        new Set(addresses.map((a) => a.toLowerCase())),
+      )
+        .filter((a) => regex.test(a))
+        .slice(0, 8);
 
-      return formattedTokens;
+      return await this.getFeaturedTokensData(filtered);
     } catch (error) {
-      this.logger.error('[/me] Zapper API failed:', error);
+      this.logger.error(
+        '[/me] Featured tokens load failed, using defaults:',
+        error,
+      );
+      return await this.getFeaturedTokensData(this.getDefaultTrending());
+    }
+  }
 
-      // Return empty array if all fails
+  private getDefaultTrending(): string[] {
+    // Return 8 default addresses (distinct)
+    return DEFAULT_TRENDING_ADDRESSES.slice(0, 8).map((a) => a.toLowerCase());
+  }
+
+  private async getFeaturedTokensData(
+    addresses: string[],
+  ): Promise<FeaturedTokenDto[]> {
+    try {
+      const results = await Promise.all(
+        addresses.map(async (address) => {
+          const ca = address.toLowerCase();
+
+          // 1) Try DB first
+          let tokenEntity = await this.tokenRepository.findOne({
+            where: { ca },
+          });
+
+          // 2) If missing, fetch from Zapper and persist minimal token row
+          if (!tokenEntity) {
+            const zapperToken = await this.zapperService.getTokenByAddress(ca);
+            if (!zapperToken) return null;
+
+            tokenEntity = await this.tokenRepository.save({
+              ca,
+              name: zapperToken.name || 'Unknown',
+              symbol: zapperToken.symbol || 'UNKNOWN',
+              decimals:
+                zapperToken.detail_platforms?.base?.decimal_place ??
+                zapperToken.decimals ??
+                18,
+              image:
+                zapperToken.image?.large ||
+                zapperToken.image?.small ||
+                zapperToken.image?.thumb,
+
+              created_at: new Date(),
+              updated_at: new Date(),
+              market_cap: BigInt(
+                Math.floor(Number(zapperToken.market_cap || 0)),
+              ),
+            });
+          }
+
+          // 3) Enrich with latest market cap snapshot if available
+          const latestSnapshot = await this.priceSnapshotRepository.findOne({
+            where: { token_address: ca },
+            order: { snapshot_at: 'DESC' as any },
+          });
+
+          const marketCap = latestSnapshot
+            ? this.parseMarketCapNumber(latestSnapshot.market_cap)
+            : this.parseMarketCapNumber(
+                tokenEntity.market_cap as unknown as string,
+              );
+
+          return {
+            ca,
+            chainId: 8453,
+            token: {
+              name: tokenEntity.name || 'Unknown',
+              symbol: tokenEntity.symbol || 'UNKNOWN',
+              image: tokenEntity.image || '',
+              decimals: tokenEntity.decimals || 18,
+              market_cap: marketCap,
+              ca: ca,
+            },
+          } as FeaturedTokenDto;
+        }),
+      );
+
+      return results.filter((x): x is FeaturedTokenDto => !!x);
+    } catch (error) {
+      this.logger.error('[/me] Failed to build featured tokens data:', error);
       return [];
     }
+  }
+
+  private parseMarketCapNumber(
+    value: string | number | bigint | null | undefined,
+  ): number {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'bigint') {
+      const asNumber = Number(value);
+      return Number.isFinite(asNumber) ? asNumber : 0;
+    }
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/[,$]/g, '');
+      const parsed = parseFloat(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
   }
 
   /**

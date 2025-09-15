@@ -20,45 +20,6 @@ export class PriceTrackingService {
   ) {}
 
   /**
-   * Signal resolution job - runs every 30 minutes
-   * Find expired signals and resolve them with MFS calculation
-   */
-  @Cron('0 */30 * * * *')
-  async resolveExpiredSignals(): Promise<void> {
-    this.logger.log('Starting expired signal resolution...');
-
-    try {
-      const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
-
-      // Find signals that are expired but not resolved
-      const expiredSignals = await this.signalRepository
-        .createQueryBuilder('signal')
-        .where('signal.resolved = :resolved', { resolved: false })
-        .andWhere('signal.expires_at < :currentTimestamp', {
-          currentTimestamp: currentTimestamp.toString(),
-        })
-        .getMany();
-
-      this.logger.log(
-        `Found ${expiredSignals.length} expired signals to resolve`,
-      );
-
-      if (expiredSignals.length === 0) {
-        return;
-      }
-
-      // Process each expired signal
-      for (const signal of expiredSignals) {
-        await this.resolveSignal(signal);
-      }
-
-      this.logger.log('Signal resolution completed successfully');
-    } catch (error) {
-      this.logger.error('Signal resolution failed:', error);
-    }
-  }
-
-  /**
    * Resolve a single signal by fetching price at expiry and calculating MFS
    */
   private async resolveSignal(signal: Signal): Promise<void> {
@@ -66,7 +27,8 @@ export class PriceTrackingService {
       // Double check expiry conditions
       const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
       const signalExpiryTime =
-        BigInt(Math.floor(signal.timestamp.getTime() / 1000)) + BigInt(signal.duration_days * 86400);
+        BigInt(Math.floor(signal.timestamp.getTime() / 1000)) +
+        BigInt(signal.duration_days * 86400);
 
       if (
         signal.expires_at >= currentTimestamp ||
@@ -166,14 +128,6 @@ export class PriceTrackingService {
     } catch (error) {
       this.logger.error(`Failed to resolve signal ${signal.signal_id}:`, error);
     }
-  }
-
-  /**
-   * Manual trigger for signal resolution (useful for testing)
-   */
-  async triggerSignalResolution(): Promise<void> {
-    this.logger.log('Manually triggered signal resolution...');
-    await this.resolveExpiredSignals();
   }
 
   /**

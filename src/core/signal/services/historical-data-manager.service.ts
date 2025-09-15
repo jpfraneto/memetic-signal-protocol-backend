@@ -27,6 +27,7 @@ export class HistoricalDataManagerService {
   ) {
     this.providers = [
       this.zapperProvider,
+      { name: 'CoinGecko', fetchHistoricalData: this.fetchFromCoinGecko.bind(this) },
       this.coinMarketCapService,
       this.cryptoCompareService,
       this.coinAPIService,
@@ -181,6 +182,8 @@ export class HistoricalDataManagerService {
     switch (providerName) {
       case 'Zapper':
         return !!process.env.ZAPPER_API_KEY;
+      case 'CoinGecko':
+        return !!process.env.COINGECKO_API_KEY;
       case 'CoinMarketCap':
         return !!process.env.COINMARKETCAP_API_KEY;
       case 'CryptoCompare':
@@ -189,6 +192,60 @@ export class HistoricalDataManagerService {
         return !!process.env.COINAPI_KEY;
       default:
         return false;
+    }
+  }
+
+  /**
+   * Simple CoinGecko historical data fetch
+   */
+  private async fetchFromCoinGecko(
+    contractAddress: string,
+    timestamp: Date,
+  ): Promise<HistoricalDataPoint | null> {
+    try {
+      // Get coin ID from contract address
+      const contractUrl = `https://pro-api.coingecko.com/api/v3/coins/base/contract/${contractAddress}`;
+      const contractResponse = await fetch(contractUrl, {
+        headers: {
+          'x-cg-pro-api-key': process.env.COINGECKO_API_KEY || '',
+          Accept: 'application/json',
+        },
+      });
+
+      if (!contractResponse.ok) {
+        throw new Error(`CoinGecko contract lookup failed: ${contractResponse.status}`);
+      }
+
+      const contractData = await contractResponse.json();
+      if (!contractData.id) {
+        throw new Error('No coin ID found');
+      }
+
+      // Get historical data using the date
+      const dateStr = timestamp.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const historyUrl = `https://pro-api.coingecko.com/api/v3/coins/${contractData.id}/history?date=${dateStr}`;
+      
+      const historyResponse = await fetch(historyUrl, {
+        headers: {
+          'x-cg-pro-api-key': process.env.COINGECKO_API_KEY || '',
+          Accept: 'application/json',
+        },
+      });
+
+      if (!historyResponse.ok) {
+        throw new Error(`CoinGecko history failed: ${historyResponse.status}`);
+      }
+
+      const historyData = await historyResponse.json();
+      
+      return {
+        price: historyData.market_data?.current_price?.usd || 0,
+        marketCap: historyData.market_data?.market_cap?.usd || 0,
+        timestamp: timestamp.getTime(),
+      };
+    } catch (error) {
+      this.logger.error(`CoinGecko fetch failed for ${contractAddress}:`, error);
+      return null;
     }
   }
 }

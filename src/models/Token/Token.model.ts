@@ -1,8 +1,4 @@
-import {
-  Entity,
-  Column,
-  PrimaryColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryColumn } from 'typeorm';
 
 @Entity({ name: 'tokens' })
 export class Token {
@@ -26,4 +22,7 @@ export class Token {
 
   @Column({ type: 'date' })
   updated_at: Date;
+
+  @Column({ type: 'bigint', nullable: true })
+  market_cap: bigint;
 }

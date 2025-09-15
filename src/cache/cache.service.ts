@@ -7,7 +7,7 @@ export const CACHE_TTL = {
   USER_PROFILE: 2 * 60 * 1000,    // 2 minutes
   LEADERBOARD: 5 * 60 * 1000,     // 5 minutes
   USER_SIGNALS: 3 * 60 * 1000,    // 3 minutes
-  TRENDING_TOKENS: 30 * 60 * 1000, // 30 minutes
+  TRENDING_TOKENS: 5 * 60 * 1000, // 5 minutes
   SIGNAL_FEED: 2 * 60 * 1000,     // 2 minutes
 } as const;
 

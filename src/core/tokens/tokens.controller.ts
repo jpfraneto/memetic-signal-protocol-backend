@@ -375,7 +375,7 @@ export class TokensController {
 
           // Transform to expected format
           const searchResults = filteredTokens.slice(0, 10).map((item) => ({
-            address: item.tokenAddress,
+            address: item.token.address,
             symbol: item.token.symbol,
             name: item.token.name,
             image: item.token.imageUrlV2,

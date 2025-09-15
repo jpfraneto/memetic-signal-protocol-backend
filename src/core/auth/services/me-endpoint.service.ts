@@ -360,6 +360,7 @@ export class MeEndpointService {
           image: row.token_image || '',
           created_at: row.token_created_at,
           updated_at: row.token_updated_at,
+          market_cap: row.market_cap || 0,
         };
 
         // Create Signal object with proper structure
@@ -454,14 +455,8 @@ export class MeEndpointService {
         image: zapperToken.token.imageUrlV2 || '',
         created_at: new Date(),
         updated_at: new Date(),
-        market_data: {
-          current_price: zapperToken.token.priceData.price || 0,
-          ath: 0, // Zapper doesn't provide ATH data, set default
-          ath_change_percentage: 0, // Zapper doesn't provide ATH change, set default
-          ath_date: new Date(), // Default date
-          market_cap: zapperToken.token.priceData.marketCap || 0,
-          price_change_24h: zapperToken.token.priceData.priceChange24h || 0,
-        },
+        market_cap: zapperToken.token.priceData.marketCap || 0,
+        decimals: zapperToken.token.decimals || 18,
       }));
 
       return formattedTokens;

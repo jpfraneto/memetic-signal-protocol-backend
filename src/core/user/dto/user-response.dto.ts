@@ -184,7 +184,10 @@ export class UserSignalsResponseDto {
   @ApiProperty({
     type: 'object',
     properties: {
-      signals: { type: 'array', items: { $ref: '#/components/schemas/SignalDto' } },
+      signals: {
+        type: 'array',
+        items: { $ref: '#/components/schemas/SignalDto' },
+      },
       total: { type: 'number' },
       hasMore: { type: 'boolean' },
     },

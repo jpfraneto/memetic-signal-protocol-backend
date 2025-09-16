@@ -12,10 +12,7 @@ import { CryptoCompareService } from '../signal/services/providers/cryptocompare
 import { CoinAPIService } from '../signal/services/providers/coinapi.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Token]),
-    ZapperModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Token]), ZapperModule],
   controllers: [TokensController],
   providers: [
     TokenPriceService,

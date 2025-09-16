@@ -3,7 +3,10 @@ import { ZapperProvider } from './providers/zapper.service';
 import { CoinMarketCapService } from './providers/coinmarketcap.service';
 import { CryptoCompareService } from './providers/cryptocompare.service';
 import { CoinAPIService } from './providers/coinapi.service';
-import { HistoricalDataProvider, HistoricalDataPoint } from './types/historical-data.types';
+import {
+  HistoricalDataProvider,
+  HistoricalDataPoint,
+} from './types/historical-data.types';
 
 export interface HistoricalDataResult {
   price: number;
@@ -18,7 +21,7 @@ export interface HistoricalDataResult {
 export class HistoricalDataManagerService {
   private readonly logger = new Logger(HistoricalDataManagerService.name);
   private readonly providers: HistoricalDataProvider[];
-  
+
   constructor(
     private zapperProvider: ZapperProvider,
     private coinMarketCapService: CoinMarketCapService,
@@ -27,7 +30,10 @@ export class HistoricalDataManagerService {
   ) {
     this.providers = [
       this.zapperProvider,
-      { name: 'CoinGecko', fetchHistoricalData: this.fetchFromCoinGecko.bind(this) },
+      {
+        name: 'CoinGecko',
+        fetchHistoricalData: this.fetchFromCoinGecko.bind(this),
+      },
       this.coinMarketCapService,
       this.cryptoCompareService,
       this.coinAPIService,
@@ -52,7 +58,7 @@ export class HistoricalDataManagerService {
       try {
         attempts.push(provider.name);
         this.logger.log(`Attempting ${provider.name} for ${contractAddress}`);
-        
+
         const startTime = Date.now();
         const result = await provider.fetchHistoricalData(
           contractAddress,
@@ -132,11 +138,11 @@ export class HistoricalDataManagerService {
   }> {
     const testAddress = '0x4200000000000000000000000000000000000006'; // WETH Base
     const testTimestamp = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24h ago
-    
+
     const providerStatuses = await Promise.all(
       this.providers.map(async (provider) => {
         const hasApiKey = this.checkApiKeyForProvider(provider.name);
-        
+
         if (!hasApiKey) {
           return {
             name: provider.name,
@@ -150,10 +156,10 @@ export class HistoricalDataManagerService {
           const result = await Promise.race([
             provider.fetchHistoricalData(testAddress, testTimestamp),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Timeout')), 10000)
+              setTimeout(() => reject(new Error('Timeout')), 10000),
             ),
           ]);
-          
+
           return {
             name: provider.name,
             available: !!result,
@@ -170,7 +176,7 @@ export class HistoricalDataManagerService {
       }),
     );
 
-    const totalAvailable = providerStatuses.filter(p => p.available).length;
+    const totalAvailable = providerStatuses.filter((p) => p.available).length;
 
     return {
       providers: providerStatuses,
@@ -213,7 +219,9 @@ export class HistoricalDataManagerService {
       });
 
       if (!contractResponse.ok) {
-        throw new Error(`CoinGecko contract lookup failed: ${contractResponse.status}`);
+        throw new Error(
+          `CoinGecko contract lookup failed: ${contractResponse.status}`,
+        );
       }
 
       const contractData = await contractResponse.json();
@@ -224,7 +232,7 @@ export class HistoricalDataManagerService {
       // Get historical data using the date
       const dateStr = timestamp.toISOString().split('T')[0]; // YYYY-MM-DD format
       const historyUrl = `https://pro-api.coingecko.com/api/v3/coins/${contractData.id}/history?date=${dateStr}`;
-      
+
       const historyResponse = await fetch(historyUrl, {
         headers: {
           'x-cg-pro-api-key': process.env.COINGECKO_API_KEY || '',
@@ -237,14 +245,17 @@ export class HistoricalDataManagerService {
       }
 
       const historyData = await historyResponse.json();
-      
+
       return {
         price: historyData.market_data?.current_price?.usd || 0,
         marketCap: historyData.market_data?.market_cap?.usd || 0,
         timestamp: timestamp.getTime(),
       };
     } catch (error) {
-      this.logger.error(`CoinGecko fetch failed for ${contractAddress}:`, error);
+      this.logger.error(
+        `CoinGecko fetch failed for ${contractAddress}:`,
+        error,
+      );
       return null;
     }
   }

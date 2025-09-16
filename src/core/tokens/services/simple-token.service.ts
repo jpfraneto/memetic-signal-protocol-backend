@@ -58,7 +58,7 @@ export class SimpleTokenService {
     const normalizedAddress = contractAddress.toLowerCase();
 
     // Check database first
-    let token = await this.fetchAndSaveTokenMetadata(normalizedAddress);
+    const token = await this.fetchAndSaveTokenMetadata(normalizedAddress);
 
     await this.updateTokenPrice(token);
 

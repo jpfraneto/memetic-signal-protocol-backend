@@ -4,11 +4,11 @@ import { Cache } from 'cache-manager';
 
 // Cache TTL constants (in milliseconds)
 export const CACHE_TTL = {
-  USER_PROFILE: 2 * 60 * 1000,    // 2 minutes
-  LEADERBOARD: 5 * 60 * 1000,     // 5 minutes
-  USER_SIGNALS: 3 * 60 * 1000,    // 3 minutes
+  USER_PROFILE: 2 * 60 * 1000, // 2 minutes
+  LEADERBOARD: 5 * 60 * 1000, // 5 minutes
+  USER_SIGNALS: 3 * 60 * 1000, // 3 minutes
   TRENDING_TOKENS: 60 * 60 * 1000, // 1 hour
-  SIGNAL_FEED: 2 * 60 * 1000,     // 2 minutes
+  SIGNAL_FEED: 2 * 60 * 1000, // 2 minutes
 } as const;
 
 // Cache key prefixes
@@ -28,7 +28,7 @@ export class CacheService {
   private cacheStats = {
     hits: 0,
     misses: 0,
-    lastReset: Date.now()
+    lastReset: Date.now(),
   };
 
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {
@@ -57,7 +57,9 @@ export class CacheService {
   async set(key: string, value: any, ttl?: number): Promise<void> {
     try {
       await this.cacheManager.set(key, value, ttl);
-      this.logger.debug(`Cache SET for key: ${key} (TTL: ${ttl || 'default'}ms)`);
+      this.logger.debug(
+        `Cache SET for key: ${key} (TTL: ${ttl || 'default'}ms)`,
+      );
     } catch (error) {
       this.logger.error(`Cache SET error for key ${key}:`, error);
     }
@@ -86,7 +88,7 @@ export class CacheService {
   }
 
   // Specific caching methods for user profile system
-  
+
   async getUserProfile(fid: number) {
     const key = this.generateKey(CACHE_KEYS.USER_PROFILE, fid);
     return await this.get(key);
@@ -102,13 +104,36 @@ export class CacheService {
     await this.del(key);
   }
 
-  async getUserSignals(fid: number, page: number = 1, limit: number = 20, status?: string) {
-    const key = this.generateKey(CACHE_KEYS.USER_SIGNALS, fid, page, limit, status || 'all');
+  async getUserSignals(
+    fid: number,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ) {
+    const key = this.generateKey(
+      CACHE_KEYS.USER_SIGNALS,
+      fid,
+      page,
+      limit,
+      status || 'all',
+    );
     return await this.get(key);
   }
 
-  async setUserSignals(fid: number, data: any, page: number = 1, limit: number = 20, status?: string) {
-    const key = this.generateKey(CACHE_KEYS.USER_SIGNALS, fid, page, limit, status || 'all');
+  async setUserSignals(
+    fid: number,
+    data: any,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ) {
+    const key = this.generateKey(
+      CACHE_KEYS.USER_SIGNALS,
+      fid,
+      page,
+      limit,
+      status || 'all',
+    );
     await this.set(key, data, CACHE_TTL.USER_SIGNALS);
   }
 
@@ -118,13 +143,32 @@ export class CacheService {
     await this.invalidatePattern(pattern);
   }
 
-  async getLeaderboard(page: number = 1, limit: number = 20, minSettledSignals: number = 5) {
-    const key = this.generateKey(CACHE_KEYS.LEADERBOARD, page, limit, minSettledSignals);
+  async getLeaderboard(
+    page: number = 1,
+    limit: number = 20,
+    minSettledSignals: number = 5,
+  ) {
+    const key = this.generateKey(
+      CACHE_KEYS.LEADERBOARD,
+      page,
+      limit,
+      minSettledSignals,
+    );
     return await this.get(key);
   }
 
-  async setLeaderboard(data: any, page: number = 1, limit: number = 20, minSettledSignals: number = 5) {
-    const key = this.generateKey(CACHE_KEYS.LEADERBOARD, page, limit, minSettledSignals);
+  async setLeaderboard(
+    data: any,
+    page: number = 1,
+    limit: number = 20,
+    minSettledSignals: number = 5,
+  ) {
+    const key = this.generateKey(
+      CACHE_KEYS.LEADERBOARD,
+      page,
+      limit,
+      minSettledSignals,
+    );
     await this.set(key, data, CACHE_TTL.LEADERBOARD);
   }
 
@@ -166,13 +210,36 @@ export class CacheService {
     await this.invalidatePattern(pattern);
   }
 
-  async getSignalsByCA(ca: string, page: number = 1, limit: number = 20, status?: string) {
-    const key = this.generateKey('signals:ca', ca, page, limit, status || 'all');
+  async getSignalsByCA(
+    ca: string,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ) {
+    const key = this.generateKey(
+      'signals:ca',
+      ca,
+      page,
+      limit,
+      status || 'all',
+    );
     return await this.get(key);
   }
 
-  async setSignalsByCA(ca: string, data: any, page: number = 1, limit: number = 20, status?: string) {
-    const key = this.generateKey('signals:ca', ca, page, limit, status || 'all');
+  async setSignalsByCA(
+    ca: string,
+    data: any,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ) {
+    const key = this.generateKey(
+      'signals:ca',
+      ca,
+      page,
+      limit,
+      status || 'all',
+    );
     await this.set(key, data, CACHE_TTL.USER_SIGNALS);
   }
 
@@ -184,12 +251,14 @@ export class CacheService {
 
   // Cache invalidation when signals are resolved
   async onSignalResolved(fid: number) {
-    this.logger.log(`Invalidating caches for signal resolution - user FID: ${fid}`);
-    
+    this.logger.log(
+      `Invalidating caches for signal resolution - user FID: ${fid}`,
+    );
+
     // Invalidate user-specific caches
     await this.invalidateUserProfile(fid);
     await this.invalidateUserSignals(fid);
-    
+
     // Invalidate global caches that depend on signal data
     await this.invalidateLeaderboard();
     await this.invalidateSignalFeed();
@@ -201,22 +270,25 @@ export class CacheService {
     // Note: This is a simplified implementation
     // In a real Redis setup, you'd use Redis SCAN with pattern matching
     this.logger.debug(`Invalidating cache pattern: ${pattern}`);
-    
+
     // For now, we'll just log the pattern
     // A full implementation would require Redis-specific commands
     // or storing keys in sets for efficient pattern-based invalidation
   }
 
   // Health check method
-  async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; message?: string }> {
+  async healthCheck(): Promise<{
+    status: 'healthy' | 'unhealthy';
+    message?: string;
+  }> {
     try {
       const testKey = 'health:check';
       const testValue = Date.now().toString();
-      
+
       await this.set(testKey, testValue, 1000);
       const retrieved = await this.get(testKey);
       await this.del(testKey);
-      
+
       if (retrieved === testValue) {
         return { status: 'healthy' };
       } else {
@@ -230,19 +302,25 @@ export class CacheService {
   // Start cache monitoring - logs every 1 minute
   private startCacheMonitoring(): void {
     setInterval(async () => {
-      const uptime = Math.floor((Date.now() - this.cacheStats.lastReset) / 1000);
+      const uptime = Math.floor(
+        (Date.now() - this.cacheStats.lastReset) / 1000,
+      );
       const totalRequests = this.cacheStats.hits + this.cacheStats.misses;
-      const hitRate = totalRequests > 0 ? ((this.cacheStats.hits / totalRequests) * 100).toFixed(2) : '0.00';
-      
+      const hitRate =
+        totalRequests > 0
+          ? ((this.cacheStats.hits / totalRequests) * 100).toFixed(2)
+          : '0.00';
+
       // Check health
       const health = await this.healthCheck();
-      
+
       // Special check for trending tokens cache
       const trendingTokensStatus = await this.getTrendingTokens();
-      const hasTrendingTokens = trendingTokensStatus && Array.isArray(trendingTokensStatus);
-      
+      const hasTrendingTokens =
+        trendingTokensStatus && Array.isArray(trendingTokensStatus);
+
       this.logger.log(
-        `[REDIS MONITOR] Uptime: ${uptime}s | Hits: ${this.cacheStats.hits} | Misses: ${this.cacheStats.misses} | Hit Rate: ${hitRate}% | Health: ${health.status} | Trending Tokens Cached: ${hasTrendingTokens ? 'YES' : 'NO'}${hasTrendingTokens ? ` (${trendingTokensStatus.length} tokens)` : ''}`
+        `[REDIS MONITOR] Uptime: ${uptime}s | Hits: ${this.cacheStats.hits} | Misses: ${this.cacheStats.misses} | Hit Rate: ${hitRate}% | Health: ${health.status} | Trending Tokens Cached: ${hasTrendingTokens ? 'YES' : 'NO'}${hasTrendingTokens ? ` (${trendingTokensStatus.length} tokens)` : ''}`,
       );
     }, 60000); // Every 1 minute
   }

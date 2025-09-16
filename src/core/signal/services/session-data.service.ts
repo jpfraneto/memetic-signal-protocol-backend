@@ -83,7 +83,7 @@ export class SessionDataService {
           });
 
           // Market data no longer available in simplified schema
-          let marketData: any = {};
+          const marketData: any = {};
 
           uniqueTokens.set(signal.ca, {
             ca: signal.ca,

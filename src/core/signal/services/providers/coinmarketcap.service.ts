@@ -86,9 +86,7 @@ export class CoinMarketCapService
       // First, lookup the token to get CMC ID
       const tokenMetadata = await this.lookupToken(contractAddress);
       if (!tokenMetadata?.coinMarketCapId) {
-        this.logger.warn(
-          `No CoinMarketCap ID found for ${contractAddress}`,
-        );
+        this.logger.warn(`No CoinMarketCap ID found for ${contractAddress}`);
         return null;
       }
 
@@ -96,9 +94,9 @@ export class CoinMarketCapService
 
       // Format timestamp for CMC API (they use YYYY-MM-DD format)
       const dateStr = timestamp.toISOString().split('T')[0];
-      
+
       const url = `${this.baseUrl}/cryptocurrency/quotes/historical?id=${tokenMetadata.coinMarketCapId}&time_start=${dateStr}&time_end=${dateStr}&interval=1d`;
-      
+
       this.logger.log(
         `Fetching historical data from CoinMarketCap for token ID ${tokenMetadata.coinMarketCapId} at ${dateStr}`,
       );

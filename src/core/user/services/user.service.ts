@@ -393,7 +393,7 @@ export class UserService {
 
     // Invalidate cache for this user
     await this.cacheService.invalidateUserProfile(fid);
-    
+
     this.logger.log(`Updated total signals for user ${fid}: ${totalSignals}`);
   }
 
@@ -432,7 +432,7 @@ export class UserService {
     latestSignalsCount: number;
   }> {
     const cacheKey = `user_stats:${fid}`;
-    
+
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -491,7 +491,7 @@ export class UserService {
 
     // Cache the result for 3 minutes
     await this.cacheService.set(cacheKey, stats, 3 * 60 * 1000);
-    
+
     this.logger.debug(`User statistics calculated and cached for FID: ${fid}`);
     return stats;
   }
@@ -666,7 +666,7 @@ export class UserService {
 
     // Invalidate cache for this user after updating
     await this.cacheService.invalidateUserProfile(fid);
-    
+
     this.logger.log(
       `Data consistency updated for user ${fid}: total=${totalSignals}, active=${activeSignals}, settled=${settledSignals}, winRate=${winRate.toFixed(2)}%, score=${totalScore.toFixed(4)}`,
     );

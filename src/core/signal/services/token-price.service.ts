@@ -33,9 +33,7 @@ export class TokenPriceService {
   private lastRequestTime = 0;
   private lastFallbackResult: any = null;
 
-  constructor(
-    private historicalDataManager: HistoricalDataManagerService,
-  ) {}
+  constructor(private historicalDataManager: HistoricalDataManagerService) {}
 
   private async rateLimit(): Promise<void> {
     const now = Date.now();
@@ -156,7 +154,6 @@ export class TokenPriceService {
       return { price: 0, marketCap: 0 };
     }
   }
-
 
   private async fetchFromDexScreener(ca: string): Promise<any> {
     try {
@@ -290,15 +287,16 @@ export class TokenPriceService {
         this.logger.log(
           `Fetching historical data for ${normalizedAddress} at ${timestamp} using Zapper-first fallback chain...`,
         );
-        const fallbackResult = await this.historicalDataManager.fetchHistoricalDataWithFallbacks(
-          normalizedAddress,
-          timestamp,
-        );
-        
+        const fallbackResult =
+          await this.historicalDataManager.fetchHistoricalDataWithFallbacks(
+            normalizedAddress,
+            timestamp,
+          );
+
         price = fallbackResult.price;
         marketCap = fallbackResult.marketCap;
         volume24h = 0;
-        
+
         // Store the fallback result for the resolution service to access
         this.lastFallbackResult = fallbackResult;
       } else if (coinData?.market_data) {

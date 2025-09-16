@@ -57,10 +57,10 @@ export class CoinAPIService
 
       // Look for the token by contract address (this might not work directly)
       // CoinAPI doesn't have great contract address support for Base tokens
-      const baseAssets = assets.filter((asset: any) => 
-        asset.asset_id?.includes('_BASE') || 
-        asset.data_quote_start && 
-        asset.asset_id?.length < 10 // Likely a symbol rather than address
+      const baseAssets = assets.filter(
+        (asset: any) =>
+          asset.asset_id?.includes('_BASE') ||
+          (asset.data_quote_start && asset.asset_id?.length < 10), // Likely a symbol rather than address
       );
 
       // This is a fallback - in reality, CoinAPI might not have many Base tokens
@@ -68,7 +68,7 @@ export class CoinAPIService
       this.logger.warn(
         `CoinAPI doesn't support direct contract address lookup for ${contractAddress}. Found ${baseAssets.length} Base assets.`,
       );
-      
+
       return null;
     } catch (error) {
       this.logger.error(
@@ -98,9 +98,9 @@ export class CoinAPIService
 
       // Format the timestamp to CoinAPI format (ISO 8601)
       const timeString = timestamp.toISOString();
-      
+
       const url = `${this.baseUrl}/quotes/${tokenMetadata.coinId}/USD/history?time_start=${timeString}&time_end=${timeString}&limit=1`;
-      
+
       this.logger.log(
         `Fetching historical data from CoinAPI for ${tokenMetadata.coinId} at ${timeString}`,
       );
@@ -128,7 +128,7 @@ export class CoinAPIService
       }
 
       const quote = quotes[0];
-      
+
       // CoinAPI doesn't always provide market cap directly
       const result = {
         price: quote.price || 0,
@@ -169,7 +169,7 @@ export class CoinAPIService
 
         const timeString = timestamp.toISOString();
         const url = `${this.baseUrl}/quotes/${assetId}/USD/history?time_start=${timeString}&time_end=${timeString}&limit=1`;
-        
+
         const response = await fetch(url, {
           headers: this.getHeaders(),
         });

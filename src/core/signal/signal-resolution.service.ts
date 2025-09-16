@@ -1,32 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, MoreThan } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
 
 import { Signal } from '../../models/Signal/Signal.model';
-import { SignalStatus } from '../../models/Signal/Signal.types';
 import { User } from '../../models/User/User.model';
 import { Token } from '../../models/Token/Token.model';
 import { TokenPriceService } from './services/token-price.service';
 import { NotificationService } from '../notification/services/notification.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { MFSService, MFSCalculationInput } from '../mfs/mfs.service';
-
-interface SignalResolutionBatch {
-  signals: Signal[];
-  signalIds: number[];
-  mfsDeltas: number[];
-  notifications: Array<{
-    fid: number;
-    signalResult: {
-      tokenSymbol: string;
-      direction: 'UP' | 'DOWN';
-      duration: number;
-      won: boolean;
-      mfsScore: number;
-    };
-  }>;
-}
 
 @Injectable()
 export class SignalResolutionService {
@@ -64,7 +47,7 @@ export class SignalResolutionService {
           resolution_error: false, // Skip signals that already failed resolution
           expires_at: LessThan(BigInt(nowTimestamp)), // Expired signals (bigint comparison)
         },
-        relations: ['user'],
+        relations: ['user', 'token'],
         order: { expires_at: 'ASC' }, // Process oldest expired signals first
       });
 
@@ -181,6 +164,44 @@ export class SignalResolutionService {
           } else {
             // Missing data: neutral update (no win/loss impact, keep win_rate)
             await this.updateUserStatisticsNeutral([signal]);
+          }
+
+          // Send notification and publish cast if signal has definitive outcome
+          if (tokenInfo && tokenInfo.marketCap > 0) {
+            // Send notification
+            try {
+              await this.notificationService.sendSignalSettledNotification(
+                signal.user.fid,
+                {
+                  tokenSymbol: signal.token?.symbol || 'Unknown',
+                  direction: signal.direction ? 'UP' : 'DOWN',
+                  duration: signal.duration_days,
+                  won: isCorrect,
+                  mfsScore: mfsDelta,
+                },
+              );
+            } catch (notificationError) {
+              this.logger.error(
+                `Failed to send notification for signal ${signal.signal_id}:`,
+                notificationError,
+              );
+            }
+
+            // Publish cast about the signal
+            try {
+              await this.notificationService.publishSignalCast({
+                username: signal.user.username || `fid:${signal.user.fid}`,
+                tokenSymbol: signal.token?.symbol || 'Unknown',
+                direction: signal.direction ? 'UP' : 'DOWN',
+                duration: signal.duration_days,
+                contractAddress: signal.ca,
+              });
+            } catch (castError) {
+              this.logger.error(
+                `Failed to publish cast for signal ${signal.signal_id}:`,
+                castError,
+              );
+            }
           }
 
           totalProcessed++;

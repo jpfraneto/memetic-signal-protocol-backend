@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HistoricalDataProvider, HistoricalDataPoint, TokenLookupProvider, TokenMetadata } from '../types/historical-data.types';
+import {
+  HistoricalDataProvider,
+  HistoricalDataPoint,
+  TokenLookupProvider,
+  TokenMetadata,
+} from '../types/historical-data.types';
 
-const ZAPPER_API_URL = "https://public.zapper.xyz/graphql";
+const ZAPPER_API_URL = 'https://public.zapper.xyz/graphql';
 const BASE_CHAIN_ID = 8453;
 
 export interface ZapperTokenData {
@@ -21,17 +26,22 @@ export interface ZapperTokenData {
 }
 
 @Injectable()
-export class ZapperProvider implements HistoricalDataProvider, TokenLookupProvider {
+export class ZapperProvider
+  implements HistoricalDataProvider, TokenLookupProvider
+{
   readonly name = 'Zapper';
   private readonly logger = new Logger(ZapperProvider.name);
 
   async fetchHistoricalData(
     contractAddress: string,
-    timestamp: Date
+    timestamp: Date,
   ): Promise<HistoricalDataPoint | null> {
     try {
-      const zapperData = await this.fetchZapperTokenData(contractAddress.toLowerCase(), timestamp);
-      
+      const zapperData = await this.fetchZapperTokenData(
+        contractAddress.toLowerCase(),
+        timestamp,
+      );
+
       if (!zapperData) {
         this.logger.warn(`No Zapper data found for ${contractAddress}`);
         return null;
@@ -39,7 +49,9 @@ export class ZapperProvider implements HistoricalDataProvider, TokenLookupProvid
 
       const historicalPriceData = zapperData.priceData.historicalPrice;
       if (!historicalPriceData) {
-        this.logger.warn(`No historical price data found for ${contractAddress} at ${timestamp}`);
+        this.logger.warn(
+          `No historical price data found for ${contractAddress} at ${timestamp}`,
+        );
         return null;
       }
 
@@ -49,10 +61,13 @@ export class ZapperProvider implements HistoricalDataProvider, TokenLookupProvid
 
       let historicalMarketCap = 0;
       if (currentPrice > 0 && currentMarketCap > 0) {
-        historicalMarketCap = (currentMarketCap / currentPrice) * historicalPrice;
+        historicalMarketCap =
+          (currentMarketCap / currentPrice) * historicalPrice;
       }
 
-      this.logger.log(`Zapper data for ${contractAddress}: price=${historicalPrice}, marketCap=${historicalMarketCap}`);
+      this.logger.log(
+        `Zapper data for ${contractAddress}: price=${historicalPrice}, marketCap=${historicalMarketCap}`,
+      );
 
       return {
         price: historicalPrice,
@@ -60,15 +75,21 @@ export class ZapperProvider implements HistoricalDataProvider, TokenLookupProvid
         timestamp: historicalPriceData.timestamp,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch Zapper historical data for ${contractAddress}:`, error);
+      this.logger.error(
+        `Failed to fetch Zapper historical data for ${contractAddress}:`,
+        error,
+      );
       return null;
     }
   }
 
   async lookupToken(contractAddress: string): Promise<TokenMetadata | null> {
     try {
-      const zapperData = await this.fetchZapperTokenData(contractAddress.toLowerCase(), new Date());
-      
+      const zapperData = await this.fetchZapperTokenData(
+        contractAddress.toLowerCase(),
+        new Date(),
+      );
+
       if (!zapperData) {
         return null;
       }
@@ -78,14 +99,17 @@ export class ZapperProvider implements HistoricalDataProvider, TokenLookupProvid
         name: zapperData.name || 'Unknown Token',
       };
     } catch (error) {
-      this.logger.error(`Failed to lookup token metadata for ${contractAddress}:`, error);
+      this.logger.error(
+        `Failed to lookup token metadata for ${contractAddress}:`,
+        error,
+      );
       return null;
     }
   }
 
   private async fetchZapperTokenData(
     ca: string,
-    timestamp: Date
+    timestamp: Date,
   ): Promise<ZapperTokenData | null> {
     try {
       const query = `
@@ -113,13 +137,15 @@ export class ZapperProvider implements HistoricalDataProvider, TokenLookupProvid
         chainId: BASE_CHAIN_ID,
       };
 
-      this.logger.debug(`Fetching Zapper data for ${ca} at ${timestamp.getTime()}`);
+      this.logger.debug(
+        `Fetching Zapper data for ${ca} at ${timestamp.getTime()}`,
+      );
 
       const response = await fetch(ZAPPER_API_URL, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "x-zapper-api-key": process.env.ZAPPER_API_KEY || "",
+          'Content-Type': 'application/json',
+          'x-zapper-api-key': process.env.ZAPPER_API_KEY || '',
         },
         body: JSON.stringify({
           query,
@@ -135,7 +161,7 @@ export class ZapperProvider implements HistoricalDataProvider, TokenLookupProvid
       const data = await response.json();
 
       if (data.errors) {
-        this.logger.warn("Zapper GraphQL errors:", data.errors);
+        this.logger.warn('Zapper GraphQL errors:', data.errors);
         return null;
       }
 

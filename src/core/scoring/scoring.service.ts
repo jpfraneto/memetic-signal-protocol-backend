@@ -260,7 +260,9 @@ export class ScoringService {
 
       // Recalculate win rate
       const totalSettled = user.settled_signals;
-      const currentWins = Math.round(((user.win_rate || 0) / 100) * (totalSettled - 1));
+      const currentWins = Math.round(
+        ((user.win_rate || 0) / 100) * (totalSettled - 1),
+      );
       const newWins = isWin ? currentWins + 1 : currentWins;
       user.win_rate = totalSettled > 0 ? (newWins / totalSettled) * 100 : 0;
 
@@ -271,7 +273,7 @@ export class ScoringService {
       await queryRunner.commitTransaction();
 
       this.logger.log(
-        `Updated user ${fid} stats: settled=${user.settled_signals}, winRate=${user.win_rate.toFixed(2)}%, mfsScore=${user.mfs_score}`
+        `Updated user ${fid} stats: settled=${user.settled_signals}, winRate=${user.win_rate.toFixed(2)}%, mfsScore=${user.mfs_score}`,
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -320,12 +322,16 @@ export class ScoringService {
   /**
    * Comprehensive stats update after signal resolution
    */
-  async processSignalResolution(signalHash: string, isWin: boolean, finalScore: number): Promise<void> {
+  async processSignalResolution(
+    signalHash: string,
+    isWin: boolean,
+    finalScore: number,
+  ): Promise<void> {
     try {
       // Get the signal with user information
       const signal = await this.signalRepository.findOne({
         where: { transaction_hash: signalHash },
-        relations: ['user']
+        relations: ['user'],
       });
 
       if (!signal || !signal.user) {
@@ -352,11 +358,13 @@ export class ScoringService {
       await this.cacheService.onSignalResolved(signal.fid);
 
       this.logger.log(
-        `Completed signal resolution for ${signalHash}: ${isWin ? 'WIN' : 'LOSS'}, score: ${finalScore}`
+        `Completed signal resolution for ${signalHash}: ${isWin ? 'WIN' : 'LOSS'}, score: ${finalScore}`,
       );
-
     } catch (error) {
-      this.logger.error(`Failed to process signal resolution for ${signalHash}:`, error);
+      this.logger.error(
+        `Failed to process signal resolution for ${signalHash}:`,
+        error,
+      );
       throw error;
     }
   }

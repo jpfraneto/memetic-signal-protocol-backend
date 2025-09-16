@@ -771,6 +771,54 @@ export class NotificationService {
   }
 
   /**
+   * Publishes a cast about a signal resolution via Neynar
+   */
+  async publishSignalCast(signalData: {
+    username: string;
+    tokenSymbol: string;
+    direction: 'UP' | 'DOWN';
+    duration: number;
+    contractAddress: string;
+  }): Promise<boolean> {
+    if (!this.neynarClient) {
+      this.logger.warn(
+        'Neynar client not initialized, skipping signal cast',
+      );
+      return false;
+    }
+
+    const signerUuid = this.configService.get<string>('NEYNAR_SIGNER_UUID');
+    if (!signerUuid) {
+      this.logger.warn(
+        'NEYNAR_SIGNER_UUID not found, cannot publish cast',
+      );
+      return false;
+    }
+
+    try {
+      const { username, tokenSymbol, direction, duration, contractAddress } = signalData;
+      
+      const castText = `@${username} signaled $${tokenSymbol} going ${direction} in ${duration} days\n\n${contractAddress}`;
+
+      await this.neynarClient.publishCast({
+        signerUuid,
+        text: castText,
+      });
+
+      this.logger.log(
+        `Signal cast published: @${username} signaled $${tokenSymbol} ${direction}`,
+      );
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish signal cast for @${signalData.username}:`,
+        error,
+      );
+      return false;
+    }
+  }
+
+  /**
    * Sleep utility for rate limiting
    */
   private sleep(ms: number): Promise<void> {

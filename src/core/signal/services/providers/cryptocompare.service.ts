@@ -29,7 +29,7 @@ export class CryptoCompareService
 
   private getHeaders() {
     const headers: Record<string, string> = {
-      'Accept': 'application/json',
+      Accept: 'application/json',
     };
     if (process.env.COINDESK_API_KEY) {
       headers['X-API-KEY'] = process.env.COINDESK_API_KEY;
@@ -43,7 +43,7 @@ export class CryptoCompareService
     this.logger.warn(
       `CoinDesk has limited support for contract-specific tokens like ${contractAddress}`,
     );
-    
+
     // Only return metadata for well-known tokens
     const knownTokens: Record<string, TokenMetadata> = {
       // Add major Base tokens here if CoinDesk covers them
@@ -56,7 +56,7 @@ export class CryptoCompareService
         `Token ${contractAddress} not supported by CoinDesk API`,
       );
     }
-    
+
     return result;
   }
 
@@ -69,12 +69,11 @@ export class CryptoCompareService
     this.logger.warn(
       `CoinDesk API doesn't support Base token ${contractAddress} - skipping`,
     );
-    
+
     // CoinDesk focuses on Bitcoin price data and crypto market news
     // For Base network tokens, this provider will typically return null
     // which is expected behavior for this fallback chain
-    
+
     return null;
   }
-
 }

@@ -781,23 +781,20 @@ export class NotificationService {
     contractAddress: string;
   }): Promise<boolean> {
     if (!this.neynarClient) {
-      this.logger.warn(
-        'Neynar client not initialized, skipping signal cast',
-      );
+      this.logger.warn('Neynar client not initialized, skipping signal cast');
       return false;
     }
 
     const signerUuid = this.configService.get<string>('NEYNAR_SIGNER_UUID');
     if (!signerUuid) {
-      this.logger.warn(
-        'NEYNAR_SIGNER_UUID not found, cannot publish cast',
-      );
+      this.logger.warn('NEYNAR_SIGNER_UUID not found, cannot publish cast');
       return false;
     }
 
     try {
-      const { username, tokenSymbol, direction, duration, contractAddress } = signalData;
-      
+      const { username, tokenSymbol, direction, duration, contractAddress } =
+        signalData;
+
       const castText = `@${username} signaled $${tokenSymbol} going ${direction} in ${duration} days\n\n${contractAddress}`;
 
       await this.neynarClient.publishCast({
@@ -812,6 +809,103 @@ export class NotificationService {
     } catch (error) {
       this.logger.error(
         `Failed to publish signal cast for @${signalData.username}:`,
+        error,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Publishes a cast when a signal has been resolved with outcomes and updated user stats
+   */
+  async publishResolvedSignalCast(payload: {
+    username: string;
+    tokenSymbol: string;
+    direction: 'UP' | 'DOWN';
+    duration: number;
+    contractAddress?: string;
+    entryMarketCap: number; // in USD
+    exitMarketCap: number; // in USD
+    mfsDelta: number; // score impact for this signal
+    userMfsScore: number; // user's updated cumulative MFS
+    userRank?: number | null; // leaderboard rank if available
+  }): Promise<boolean> {
+    if (!this.neynarClient) {
+      this.logger.warn(
+        'Neynar client not initialized, skipping resolved signal cast',
+      );
+      return false;
+    }
+
+    const signerUuid = this.configService.get<string>('NEYNAR_SIGNER_UUID');
+    if (!signerUuid) {
+      this.logger.warn(
+        'NEYNAR_SIGNER_UUID not found, cannot publish resolved signal cast',
+      );
+      return false;
+    }
+
+    try {
+      const {
+        username,
+        tokenSymbol,
+        direction,
+        duration,
+        contractAddress,
+        entryMarketCap,
+        exitMarketCap,
+        mfsDelta,
+        userMfsScore,
+        userRank,
+      } = payload;
+
+      const fmtCurrency = (value: number): string => {
+        const abs = Math.abs(value);
+        if (abs >= 1_000_000_000)
+          return `$${(value / 1_000_000_000).toFixed(2)}B`;
+        if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+        if (abs >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
+        return `$${value.toFixed(2)}`;
+      };
+
+      const fmtScore = (value: number): string => {
+        const sign = value >= 0 ? '+' : '';
+        return `${sign}${value.toFixed(2)}`;
+      };
+
+      const rankText =
+        typeof userRank === 'number' && userRank > 0
+          ? `#${userRank}`
+          : 'unranked';
+
+      const lines: string[] = [];
+      lines.push(
+        `@${username}'s $${tokenSymbol} ${direction} signal (${duration}d) resolved`,
+      );
+      lines.push(
+        `Entry MC: ${fmtCurrency(entryMarketCap)} → Exit MC: ${fmtCurrency(exitMarketCap)}`,
+      );
+      lines.push(
+        `MFS Δ: ${fmtScore(mfsDelta)} | User MFS: ${fmtScore(userMfsScore)} (${rankText})`,
+      );
+      if (contractAddress) {
+        lines.push(`${contractAddress}`);
+      }
+
+      const castText = lines.join('\n\n');
+
+      await this.neynarClient.publishCast({
+        signerUuid,
+        text: castText,
+      });
+
+      this.logger.log(
+        `Resolved signal cast published for @${username} on $${tokenSymbol}`,
+      );
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish resolved signal cast for @${payload.username}:`,
         error,
       );
       return false;

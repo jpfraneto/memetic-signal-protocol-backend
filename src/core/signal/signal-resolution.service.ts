@@ -187,18 +187,31 @@ export class SignalResolutionService {
               );
             }
 
-            // Publish cast about the signal
+            // Publish RESOLVED cast with details
             try {
-              await this.notificationService.publishSignalCast({
+              // Fetch updated user stats for MFS and rank after stats update
+              const refreshedUser = await this.userRepository.findOne({
+                where: { fid: signal.user.fid },
+              });
+
+              const updatedUserMfs = refreshedUser?.mfs_score ?? 0;
+              const updatedUserRank = refreshedUser?.rank ?? null;
+
+              await this.notificationService.publishResolvedSignalCast({
                 username: signal.user.username || `fid:${signal.user.fid}`,
                 tokenSymbol: signal.token?.symbol || 'Unknown',
                 direction: signal.direction ? 'UP' : 'DOWN',
                 duration: signal.duration_days,
                 contractAddress: signal.ca,
+                entryMarketCap: Math.floor(Number(signal.entry_market_cap)),
+                exitMarketCap: Math.floor(Number(tokenInfo.marketCap)),
+                mfsDelta: mfsDelta,
+                userMfsScore: updatedUserMfs,
+                userRank: updatedUserRank,
               });
             } catch (castError) {
               this.logger.error(
-                `Failed to publish cast for signal ${signal.signal_id}:`,
+                `Failed to publish resolved cast for signal ${signal.signal_id}:`,
                 castError,
               );
             }
